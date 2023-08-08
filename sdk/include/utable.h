@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <uuid/uuid.h>
 
 struct file_chunk
 {
