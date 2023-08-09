@@ -1,6 +1,6 @@
-#include "sdk/include/session.h"
-#include "sdk/include/session_mq.h"
-#include "sdk/include/subsystem.h"
+#include "session.h"
+#include "session_mq.h"
+#include "subsystem.h"
 
 #include <stdint.h>
 
@@ -11,6 +11,9 @@ void adapter_exit(struct adapter *adapter);
 
 struct streaminfo;
 
+//streaminfo open
 uint8_t adapter_session_open(struct streaminfo *stream, struct session **session, int thread_id);
 uint8_t adapter_session_active(struct streaminfo *stream, struct session **session, int thread_id);
+
+//streaminfo close, or firewall active close streaminfo  
 uint8_t adapter_session_close(struct streaminfo *stream, struct session **session, int thread_id);
