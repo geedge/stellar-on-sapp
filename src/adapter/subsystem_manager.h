@@ -3,29 +3,32 @@
 #include "utils.h"
 #include "subsystem.h"
 
-struct subsystem_descriptor
+struct subsystem_schema
 {
-	enum session_type type;
-	int interest_state;
 	subsystem_init_callback *init_cb;
 	subsystem_exit_callback *exit_cb;
-	subsystem_entry_callback *entry_cb;
+	subsystem_entry_callback *udp_session_entry_cb;
+	subsystem_entry_callback *tcp_session_entry_cb;
+	int udp_session_interest_state;
+	int tcp_session_interest_state;
 };
 
-struct subsystem_descriptor global_subsystem_schema[] = 
+struct subsystem_schema global_subsystem_schema[] = 
 {
 	{
-		.type=SESSION_TYPE_UDP,
 		.init_cb=NULL,
 		.exit_cb=NULL,
-		.entry_cb=NULL,
-		.interest_state=SESSION_STATE_ALL,
+		.udp_session_entry_cb=NULL,
+		.udp_session_interest_state=SESSION_STATE_ALL,
+		.tcp_session_entry_cb=NULL,
+		.tcp_session_interest_state=SESSION_STATE_ALL,
 	},
 	{
-		.type=SESSION_TYPE_UDP,
 		.init_cb=NULL,
 		.exit_cb=NULL,
-		.entry_cb=NULL,
-		.interest_state=SESSION_STATE_ALL,
+		.udp_session_entry_cb=NULL,
+		.udp_session_interest_state=SESSION_STATE_ALL,
+		.tcp_session_entry_cb=NULL,
+		.tcp_session_interest_state=SESSION_STATE_ALL,
 	},
 };

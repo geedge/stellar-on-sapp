@@ -21,7 +21,7 @@ enum session_state
 	SESSION_STATE_OPENING = 1 << 1,
 	SESSION_STATE_ACTIVE = 1 << 2,
 	SESSION_STATE_CLOSING = 1 << 3,
-		SESSION_STATE_ALL = (1 << 1 | 1 << 2 | 1 << 3),
+	SESSION_STATE_ALL = (1 << 1 | 1 << 2 | 1 << 3),
 };
 
 struct session;
