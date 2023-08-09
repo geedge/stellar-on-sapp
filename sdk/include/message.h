@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stddef.h>
 
 #define MESSAGE_MAGIC 0x12345678

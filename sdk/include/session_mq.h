@@ -4,8 +4,8 @@
 
 struct session;
 
-typedef void session_mq_free_callback(const struct session *session, const char* topic_name, void *data, const size_t data_len);
-typedef int  session_mq_read_callback(const struct session *session, const char* topic_name, void *data, const size_t data_len);
+typedef void session_mq_free_callback(const struct session *session, const char* topic_name, void *data, const size_t data_len, void *cb_arg);
+typedef int  session_mq_read_callback(const struct session *session, const char* topic_name, void *data, const size_t data_len, void *cb_arg);
 
 int session_mq_topic_create(const char *topic_name, session_mq_free_callback *free_cb, void *cb_arg);
 

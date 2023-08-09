@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdlib.h>	//calloc
+#include <stddef.h>	//NULL
 
 #define CALLOC(type, number) ((type *)calloc(sizeof(type), number))
 
