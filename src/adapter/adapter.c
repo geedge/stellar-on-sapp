@@ -1,4 +1,4 @@
-#include "sdk/include/session.h"
+#include "session.h"
 #include "adapter.h"
 
 struct session
