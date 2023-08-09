@@ -3,7 +3,7 @@
 #include "utils.h"
 #include "subsystem.h"
 
-struct subsystem_schema
+struct subsystem_descriptor
 {
 	subsystem_init_callback *init_cb;
 	subsystem_exit_callback *exit_cb;
@@ -13,7 +13,7 @@ struct subsystem_schema
 	int tcp_session_interest_state;
 };
 
-struct subsystem_schema global_subsystem_schema[] = 
+struct subsystem_descriptor global_subsystem_descriptor[] = 
 {
 	{
 		.init_cb=NULL,

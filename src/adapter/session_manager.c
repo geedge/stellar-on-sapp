@@ -34,7 +34,7 @@ void session_free(struct session *session,  enum session_type type, int subsyste
 	}
 }
 
-void session_dispatch(struct subsystem_schema *desc, int desc_num, struct session *session, enum session_type type, enum session_state state, int thread_id)
+void session_dispatch(struct subsystem_descriptor *desc, int desc_num, struct session *session, enum session_type type, enum session_state state, int thread_id)
 {
 	if(session==NULL)return;
 

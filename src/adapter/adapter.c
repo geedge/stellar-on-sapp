@@ -6,15 +6,15 @@
 struct adapter
 {
 	int subsystem_num;
-	struct subsystem_schema *desc;
+	struct subsystem_descriptor *desc;
 };
 
 struct adapter *adapter_init(void)
 {
 	struct adapter *adapter = CALLOC(struct adapter, 1);
-	adapter->subsystem_num = sizeof(global_subsystem_schema) / sizeof(global_subsystem_schema[0]);
-	adapter->desc = CALLOC(struct subsystem_schema, adapter->subsystem_num);
-	memcpy(adapter->desc, global_subsystem_schema, sizeof(global_subsystem_schema));
+	adapter->subsystem_num = sizeof(global_subsystem_descriptor) / sizeof(global_subsystem_descriptor[0]);
+	adapter->desc = CALLOC(struct subsystem_descriptor, adapter->subsystem_num);
+	memcpy(adapter->desc, global_subsystem_descriptor, sizeof(global_subsystem_descriptor));
 	for(int i = 0; i < adapter->subsystem_num; i++)
 	{
 		if (adapter->desc[i].init_cb != NULL)
