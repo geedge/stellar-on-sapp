@@ -20,6 +20,31 @@ endif()
 option(ENABLE_PIC "Generate position independent code (necessary for shared libraries)" TRUE)
 option(ENABLE_WARNING_ALL "Enable all optional warnings which are desirable for normal code" TRUE)
 
+find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
+if (CMAKE_CXX_CPPCHECK)
+    list(
+        APPEND CMAKE_CXX_CPPCHECK 
+            "--enable=all"
+            "--error-exitcode=1"
+            "--suppress=unusedFunction"
+            "--suppress=missingInclude"
+            "--suppress=uselessAssignmentPtrArg"
+            "--suppress=unmatchedSuppression"
+            "--suppress=variableScope"
+            "--suppress=unreadVariable"
+            "--suppress=cstyleCast"
+            "--suppress=memleakOnRealloc"
+            "--suppress=constParameter"
+            "--suppress=uselessAssignmentArg"
+            "--suppress=uninitvar"
+            "--suppress=unusedStructMember"
+            "--suppress=unreachableCode"
+    )
+    set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
+else()
+  message(FATAL_ERROR "Could not find the program cppcheck.")
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lelf")

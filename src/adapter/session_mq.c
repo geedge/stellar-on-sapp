@@ -15,7 +15,7 @@ struct session_mq_node
 
 struct session_mq
 {
-	STAILQ_HEAD(, session_mq_node) head;
+	STAILQ_HEAD(session_mq_head, session_mq_node) head;
 };
 
 
@@ -31,7 +31,7 @@ struct session_mq_topic_schema
 	const char *topic_name;
 	session_mq_free_callback *free_cb;
 	void *cb_arg;
-	STAILQ_HEAD(, subscriber) subscribers; 
+	STAILQ_HEAD(sub_q_head, subscriber) subscribers; 
 	UT_hash_handle hh;
 };
 
@@ -86,31 +86,35 @@ void session_mq_dequeue(struct session_mq *mq, struct session *session)
 	return;
 };
 
-int session_mq_topic_create(const char *topic_name, session_mq_free_callback *free_cb, void *cb_arg) {
-    struct session_mq_topic_schema *topic;
-    // 检查topic_name是否已存在
-    HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
-    if (topic != NULL && topic->free_cb != NULL)
+int session_mq_topic_create(const char *topic_name, session_mq_free_callback *free_cb, void *cb_arg)
+{
+	struct session_mq_topic_schema *topic;
+	// 检查topic_name是否已存在
+	HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
+	// 如果找到现有主题，并且free_cb也不为空，则认为生产者已创建此主题
+	if (topic != NULL && topic->free_cb != NULL)
 	{
-        return -1; // 已存在
-    }
-	if(topic == NULL)
-	{
-		topic = CALLOC(struct session_mq_topic_schema,1);
-    	HASH_ADD_KEYPTR(hh, global_session_mq_schema, topic->topic_name, strlen(topic->topic_name), topic);
+		return -1; // 已存在
 	}
-	if(topic->topic_name)
+	// 如果主题不存在，则创建新主题，由消费者或生产者调用
+	if (topic == NULL)
 	{
- 	   topic->topic_name = strdup(topic_name); // 复制字符串，确保独立存储
+		topic = CALLOC(struct session_mq_topic_schema, 1);
+		topic->topic_name = strdup(topic_name); // 复制字符串，确保独立存储
+		HASH_ADD_KEYPTR(hh, global_session_mq_schema, topic->topic_name, strlen(topic->topic_name), topic);
+		if (STAILQ_EMPTY(&topic->subscribers))
+		{
+			STAILQ_INIT(&topic->subscribers);
+		}
 	}
-    topic->free_cb = free_cb;
-	if(STAILQ_EMPTY(&topic->subscribers))
+	// 如果找到现有主题但free_cb为空，则为消费者占的坑，现在由生产者来填充
+	if (free_cb != NULL)
 	{
-		STAILQ_INIT(&topic->subscribers);
+		topic->free_cb = free_cb;
+		topic->cb_arg = cb_arg;
 	}
-    return 0; // 成功
+	return 0; // 成功
 }
-
 
 int session_mq_topic_destroy(const char *topic_name) {
     struct session_mq_topic_schema *topic;

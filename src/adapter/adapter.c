@@ -57,8 +57,8 @@ uint8_t adapter_session_open(struct adapter *adapter, struct streaminfo *stream,
 	{
 		return -1;
 	}
-	*session=session_new(stream, type, SESSION_STATE_OPENING, adapter->subsystem_num, stream->threadnum);
-	session_dispatch(adapter->desc, adapter->subsystem_num, *session, type, SESSION_STATE_OPENING, stream->threadnum);
+	*session=session_new(stream, type, SESSION_STATE_OPENING, adapter->subsystem_num, thread_id);
+	session_dispatch(adapter->desc, adapter->subsystem_num, *session, type, SESSION_STATE_OPENING, thread_id);
 	return 0;
 }
 
@@ -79,10 +79,10 @@ uint8_t adapter_session_active(struct adapter *adapter, struct streaminfo *strea
 	}
 	if(*session==NULL)
 	{
-		*session=session_new(stream, type, SESSION_STATE_ACTIVE, adapter->subsystem_num,stream->threadnum);
+		*session=session_new(stream, type, SESSION_STATE_ACTIVE, adapter->subsystem_num,thread_id);
 	}
 	(*session)->state=SESSION_STATE_ACTIVE;
-	session_dispatch(adapter->desc, adapter->subsystem_num, *session, type, SESSION_STATE_ACTIVE, stream->threadnum);
+	session_dispatch(adapter->desc, adapter->subsystem_num, *session, type, SESSION_STATE_ACTIVE, thread_id);
 	return 0;
 }
 
@@ -102,7 +102,7 @@ uint8_t adapter_session_close(struct adapter *adapter, struct streaminfo *stream
 	{
 		return -1;
 	}
-	session_dispatch(adapter->desc, adapter->subsystem_num, *session, type,  SESSION_STATE_CLOSING, stream->threadnum);
+	session_dispatch(adapter->desc, adapter->subsystem_num, *session, type,  SESSION_STATE_CLOSING, thread_id);
 	if(*session)
 	{
 		session_free(*session, type, adapter->subsystem_num, stream->threadnum);
