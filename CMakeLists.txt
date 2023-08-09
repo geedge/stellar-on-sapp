@@ -32,6 +32,7 @@ include_directories(${CMAKE_SOURCE_DIR}/sdk/include)
 
 add_subdirectory(vendor)
 add_subdirectory(deps/toml)
+add_subdirectory(deps/utable)
 
 enable_testing()
 add_subdirectory(test)
