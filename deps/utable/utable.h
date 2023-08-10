@@ -1,20 +1,11 @@
 #pragma once
 
 #include <stddef.h>
-#include <uuid/uuid.h>
 
 #ifdef __cplusplus
 extern "C"
 {
 #endif
-
-struct file_chunk
-{
-    uuid_t uuid;
-    size_t offset;
-    const char *chunk;
-    size_t chunk_len;
-};
 
 struct utable;
 struct utable *utable_new(void);

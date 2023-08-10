@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mpack.h"
-#include "uthash.h"
-#include "b64.h"
-#include "cJSON.h"
+#include "mpack/mpack.h"
+#include "uthash/uthash.h"
+#include "base64/b64.h"
+#include "cjson/cJSON.h"
 
 struct utable_item {
     char *key;

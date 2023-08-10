@@ -57,3 +57,13 @@ struct capture_info_message
 	int vlan_num;
 	int vlan_id[];
 };
+
+#define	FILE_CHUNK_MESSAGE_TOPIC "TOPIC_FILE_CHUNK"
+#include <uuid/uuid.h>
+struct file_chunk
+{
+    uuid_t uuid;
+    size_t offset;
+    const char *chunk;
+    size_t chunk_len;
+};

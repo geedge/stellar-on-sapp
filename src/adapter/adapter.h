@@ -1,12 +1,14 @@
 #include "session.h"
-#include "session_mq.h"
-#include "subsystem_manager.h"
+#include "plugin_spec.h"
 
 #include <stdint.h>
 
 struct adapter;
-struct adapter *adapter_init(void);
+
+struct adapter *adapter_init(struct plugin_spec schemas[] , int schema_num);
 void adapter_exit(struct adapter *adapter);
+
+
 
 
 struct streaminfo;

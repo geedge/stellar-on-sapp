@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stddef.h>
 
 /* session direction definition */
 #define SESSION_DIR_C2S 			0x01
@@ -25,8 +26,24 @@ enum session_state
 };
 
 struct session;
-uint8_t session_direction_get(struct session *session);        	//  tcp or udp 
-uint8_t session_current_direction_get(struct session *session);   //  tcp or udp 
+uint8_t session_direction_get(struct session *sess);        	//  tcp or udp 
+uint8_t session_current_direction_get(struct session *sess);   //  tcp or udp 
+const char* session_printaddr(struct session *sess);
+const char *session_payload_get(struct session *sess, int *payload_len);
 
 
+//session mq
+typedef void session_mq_free_callback(const struct session *sess, const char* topic_name, void *data, const size_t data_len, void *cb_arg);
+typedef int  session_mq_read_callback(const struct session *sess, const char* topic_name, void *data, const size_t data_len, void *cb_arg);
 
+int session_mq_topic_create(const char *topic_name, session_mq_free_callback *free_cb, void *cb_arg);
+int session_mq_topic_destroy(const char *topic_name);
+int session_mq_send_msg(struct session *sess, const char *topic, const void *data, const size_t data_len);
+int session_mq_topic_subscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg);
+int session_mq_topic_unsubscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg);
+
+//session plugin
+void *session_get_plugin_ctx(struct session *session, int plugin_id);	
+void session_set_plugin_ctx(struct session *session, int plugin_id, void *ctx);
+void plugin_dettach_session(struct session *session,  int plugin_id);
+void plugin_attach_session(struct session *session,  int plugin_id);
