@@ -31,16 +31,20 @@ uint8_t session_current_direction_get(struct session *sess);   //  tcp or udp
 const char* session_printaddr(struct session *sess);
 const char *session_payload_get(struct session *sess, int *payload_len);
 
+struct packet;
+const struct packet *session_packet_get(struct session *sess);
+
 
 //session mq
-typedef void session_mq_free_callback(const struct session *sess, const char* topic_name, void *data, const size_t data_len, void *cb_arg);
-typedef int  session_mq_read_callback(const struct session *sess, const char* topic_name, void *data, const size_t data_len, void *cb_arg);
+typedef void session_mq_free_callback(struct session *sess, const char* topic_name, void *data, void *cb_arg);
+typedef int  session_mq_read_callback(struct session *sess, const char* topic_name, void *data, void *cb_arg);
 
 int session_mq_topic_create(const char *topic_name, session_mq_free_callback *free_cb, void *cb_arg);
 int session_mq_topic_destroy(const char *topic_name);
-int session_mq_send_msg(struct session *sess, const char *topic, const void *data, const size_t data_len);
+int session_mq_send_msg(struct session *sess, const char *topic, void *data);
 int session_mq_topic_subscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg);
 int session_mq_topic_unsubscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg);
+void session_mq_cleanup();
 
 //session plugin
 void *session_get_plugin_ctx(struct session *session, int plugin_id);	

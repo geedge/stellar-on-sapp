@@ -27,7 +27,7 @@ struct subscriber
 
 struct session_mq_topic_schema
 {
-	const char *topic_name;
+	char *topic_name;
 	session_mq_free_callback *free_cb;
 	void *cb_arg;
 	STAILQ_HEAD(sub_q_head, subscriber) subscribers; 
@@ -35,6 +35,7 @@ struct session_mq_topic_schema
 };
 
 static struct session_mq_topic_schema *global_session_mq_schema = NULL;
+
 
 struct session_mq *session_mq_new(void) 
 {
@@ -51,6 +52,7 @@ void session_mq_free(struct session_mq *mq)
 		STAILQ_REMOVE_HEAD(&mq->head, entries);
 		free(node);
 	}
+	FREE(mq);
 }
 
 static struct session_mq_topic_schema *session_mq_topic_schema(const char *topic_name)
@@ -59,6 +61,30 @@ static struct session_mq_topic_schema *session_mq_topic_schema(const char *topic
 	HASH_FIND_STR(global_session_mq_schema, topic_name, schema);
 	return schema;
 };
+
+void session_mq_cleanup()
+{
+	struct session_mq_topic_schema *current, *tmp;
+	HASH_ITER(hh, global_session_mq_schema, current, tmp)
+	{
+		HASH_DEL(global_session_mq_schema, current); // 从哈希表中删除
+		// 释放其他你需要清理的内存，比如：
+		if (current->topic_name)
+		{
+			FREE(current->topic_name);
+		}	
+
+        // 清空STAILQ
+        struct subscriber *sub;
+        while (!STAILQ_EMPTY(&current->subscribers)) {
+            sub = STAILQ_FIRST(&current->subscribers);
+            STAILQ_REMOVE_HEAD(&current->subscribers, entries);
+            FREE(sub); // 假设你需要释放订阅者
+        }
+		FREE(current); // 释放当前结构体
+	}
+	return;
+}
 
 void session_mq_loop(struct session_mq *mq, struct session *session)
 {
@@ -73,11 +99,11 @@ void session_mq_loop(struct session_mq *mq, struct session *session)
 		{
 			STAILQ_FOREACH(sub, &topic->subscribers, entries)
 			{
-				sub->read_cb(session, node->topic_name, node->message, node->message_len, sub->cb_arg);
+				sub->read_cb(session, node->topic_name, node->message, sub->cb_arg);
 			}
 			if(topic->free_cb != NULL)
 			{
-				topic->free_cb(session, node->topic_name, node->message, node->message_len, topic->cb_arg);
+				topic->free_cb(session, node->topic_name, node->message, topic->cb_arg);
 			}
 		}
 		FREE(node);
@@ -127,33 +153,32 @@ int session_mq_topic_destroy(const char *topic_name) {
     // 从哈希表中删除
     HASH_DEL(global_session_mq_schema, topic);
     // 释放存储的主题名
-    free((void*)topic->topic_name);
+    FREE(topic->topic_name);
 
 	struct subscriber *sub;
 	while ((sub = STAILQ_FIRST(&topic->subscribers)) != NULL)
 	{
 		STAILQ_REMOVE_HEAD(&topic->subscribers, entries);
-		free(sub);
+		FREE(sub);
 	}
     // 释放结构体
-    free(topic);
+    FREE(topic);
     return 0; // 成功
 }
 
 
-int session_mq_enqueue(struct session_mq *mq, const char *topic_name, const void *data, const size_t data_len)
+int session_mq_send_msg(struct session *session, const char *topic_name, void *data)
 {
 	struct session_mq_topic_schema *topic;
 	HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
 	if (topic == NULL)
 	{
-		return -1; // 没有找到
+		return -1;  
 	}
+	struct session_mq *mq=session->mq;
 	struct session_mq_node *node= CALLOC(struct session_mq_node,1);
 	node->topic_name = topic->topic_name;
-	node->message = CALLOC(char, data_len);
-	memcpy(node->message, data, data_len);
-	node->message_len=data_len;
+	node->message = data;
 	STAILQ_INSERT_TAIL(&mq->head, node, entries);
 	return 0;
 }
@@ -246,6 +271,7 @@ void session_free(struct session *session,  int thread_id)
 	{
 		session_mq_free(session->mq);
 	}
+	FREE(session);
 }
 
 void session_dispatch(struct session *session, enum session_state state, int thread_id)
@@ -277,11 +303,6 @@ void session_dispatch(struct session *session, enum session_state state, int thr
 	}
 	session_mq_loop(session->mq, session);
 	return;
-}
-
-int session_mq_send_msg(struct session *session, const char *topic, const void *data, const size_t data_len)
-{
-	return session_mq_enqueue(session->mq, topic, data, data_len);
 }
 
 void *session_get_plugin_ctx(struct session *session, int plugin_id)

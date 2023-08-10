@@ -45,6 +45,26 @@ else()
   message(FATAL_ERROR "Could not find the program cppcheck.")
 endif()
 
+#ASAN option
+set(ASAN_OPTION "OFF" CACHE STRING
+    " set asan type chosen by the user, using OFF as default")
+set_property(CACHE ASAN_OPTION  PROPERTY STRINGS OFF ADDRESS THREAD)
+message(STATUS "ASAN_OPTION='${ASAN_OPTION}'")
+
+if(ASAN_OPTION STREQUAL "ADDRESS")
+    set(CMAKE_C_FLAGS "${CMAKADDRESS} -g -DCMAKE_BUILD_TYPE=Debug -fsanitize=address -fno-omit-frame-pointer")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCMAKE_BUILD_TYPE=Debug -fsanitize=address -fno-omit-frame-pointer")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lasan")
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lasan")
+	add_definitions(-DASAN_ENABLED=1)
+elseif(ASAN_OPTION STREQUAL "THREAD")
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -DCMAKE_BUILD_TYPE=Debug -fsanitize=thread -fno-omit-frame-pointer")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -DCMAKE_BUILD_TYPE=Debug -fsanitize=thread -fno-omit-frame-pointer")
+	set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lasan")
+	set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lasan")
+	add_definitions(-DASAN_ENABLED=1)
+endif()
+
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -lelf")

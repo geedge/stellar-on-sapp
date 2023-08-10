@@ -142,3 +142,8 @@ const char *session_payload_get(struct session *session, int *len)
 	*len = session->stream->ptcpdetail->datalen;
 	return session->stream->ptcpdetail->pdata;
 }
+
+const struct packet *session_packet_get(struct session *sess)
+{
+	return get_rawpkt_from_streaminfo(sess->stream);
+}
