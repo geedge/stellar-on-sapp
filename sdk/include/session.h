@@ -44,7 +44,6 @@ int session_mq_topic_destroy(const char *topic_name);
 int session_mq_send_msg(struct session *sess, const char *topic, void *data);
 int session_mq_topic_subscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg);
 int session_mq_topic_unsubscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg);
-void session_mq_cleanup();
 
 //session plugin
 void *session_get_plugin_ctx(struct session *session, int plugin_id);	

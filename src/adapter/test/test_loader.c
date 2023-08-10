@@ -69,8 +69,8 @@ void TEST_EXIT(void)
 {
 	if(g_adapter)
 	{
+		session_mq_topic_unsubscribe("test_mq_topic", test_mq_loader_read, NULL);
 		session_mq_topic_destroy("test_mq_topic");
-		session_mq_cleanup();
 		adapter_exit(g_adapter);
 		g_adapter = NULL;
 	}

@@ -46,6 +46,7 @@ int test_mq_plugin_init(int plugin_id)
 }
 void test_mq_plugin_exit(void)
 {
+	session_mq_topic_unsubscribe("test_mq_topic", test_session_mq_plugin_read, NULL);
 	return;
 }
 
