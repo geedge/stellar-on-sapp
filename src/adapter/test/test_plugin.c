@@ -26,7 +26,7 @@ void test_entry_plugin_exit(void)
 	return;
 }
 
-int  test_session_mq_plugin_read(struct session *sess, const char* topic_name, void *data, void *cb_arg)
+int  test_session_mq_plugin_read(struct session *session, const char* topic_name, void *data, void *cb_arg)
 {
 	struct test_session_message *ctx =(struct test_session_message *)data;	
 	printf("plugin_read_message(%s)-----------%20s", topic_name, session_get_readable_addr(sess));
@@ -35,6 +35,8 @@ int  test_session_mq_plugin_read(struct session *sess, const char* topic_name, v
 	ctx->s2c_pkts, ctx->s2c_bytes);
 	printf("total-pkt=%u, ", ctx->c2s_pkts+ctx->s2c_pkts);
 	printf("total-count=%u\n", ctx->c2s_bytes+ctx->s2c_bytes);
+	printf("session(%d)-----------%20s: attach\n", g_test_mq_plugin_id, session_printaddr(session));
+	plugin_attach_session(session, g_test_mq_plugin_id);
 	return 0;
 }
 
@@ -105,6 +107,8 @@ void test_entry_plugin_entry(struct session *session, enum session_state state, 
 
 void test_mq_plugin_entry(struct session *session, enum session_state state, int thread_id)
 {
+	printf("session(%d)-----------%20s: dettach\n", g_test_mq_plugin_id, session_printaddr(session));
+	plugin_dettach_session(session, g_test_mq_plugin_id);
 	return;
 }
 

@@ -36,13 +36,13 @@ struct test_stream_ctx
 	struct session *session;
 };
 
-static void test_mq_topic_free(struct session *sess, const char* topic_name, void *data, void *cb_arg)
+static void test_mq_topic_free(struct session *session, const char* topic_name, void *data, void *cb_arg)
 {
 	FREE(data);
 	return;
 }
 
-int  test_mq_loader_read(struct session *sess, const char* topic_name, void *data, void *cb_arg)
+int  test_mq_loader_read(struct session *session, const char* topic_name, void *data, void *cb_arg)
 {
 	struct test_stream_ctx *ctx =(struct test_stream_ctx *)data;	
 	printf("loader_read_message(%s)-----------%20s", topic_name, session_get_readable_addr(sess));
