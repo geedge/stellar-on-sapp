@@ -132,18 +132,18 @@ uint8_t session_current_direction_get(struct session *session)
 	return 0;
 }   
 
-const char* session_printaddr(struct session *session)
+const char* session_get_readable_addr(struct session *session)
 {
 	return printaddr(&session->stream->addr, session->stream->threadnum);
 }
 
-const char *session_payload_get(struct session *session, int *len)
+const char *session_get_payload(struct session *session, int *len)
 {
 	*len = session->stream->ptcpdetail->datalen;
 	return session->stream->ptcpdetail->pdata;
 }
 
-const struct packet *session_packet_get(struct session *sess)
+const struct packet *session_get_current_packet(struct session *sess)
 {
 	return get_rawpkt_from_streaminfo(sess->stream);
 }

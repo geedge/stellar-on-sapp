@@ -29,7 +29,7 @@ void test_entry_plugin_exit(void)
 int  test_session_mq_plugin_read(struct session *sess, const char* topic_name, void *data, void *cb_arg)
 {
 	struct test_session_message *ctx =(struct test_session_message *)data;	
-	printf("plugin_read_message(%s)-----------%20s", topic_name, session_printaddr(sess));
+	printf("plugin_read_message(%s)-----------%20s", topic_name, session_get_readable_addr(sess));
 	printf("server-pkt=%u, server-count=%u, client-pkt=%u, client-count=%u, ",
 	ctx->c2s_pkts, ctx->c2s_bytes,
 	ctx->s2c_pkts, ctx->s2c_bytes);
@@ -41,12 +41,12 @@ int  test_session_mq_plugin_read(struct session *sess, const char* topic_name, v
 int test_mq_plugin_init(int plugin_id)
 {
 	g_test_mq_plugin_id = plugin_id;
-	session_mq_topic_subscribe("test_mq_topic", test_session_mq_plugin_read, NULL);
+	session_mq_subscribe_topic("test_mq_topic", test_session_mq_plugin_read, NULL);
 	return 0;
 }
 void test_mq_plugin_exit(void)
 {
-	session_mq_topic_unsubscribe("test_mq_topic", test_session_mq_plugin_read, NULL);
+	session_mq_unsubscribe_topic("test_mq_topic", test_session_mq_plugin_read, NULL);
 	return;
 }
 
@@ -54,7 +54,7 @@ void test_mq_plugin_exit(void)
 
 void print_session_ctx(struct session *session, struct test_session_message *ctx, int plugin_id)
 {
-	printf("session(%d)-----------%20s: ", plugin_id, session_printaddr(session));
+	printf("session(%d)-----------%20s: ", plugin_id, session_get_readable_addr(session));
 	printf("server-pkt=%u, server-count=%u, client-pkt=%u, client-count=%u, ",
 	ctx->c2s_pkts, ctx->c2s_bytes,
 	ctx->s2c_pkts, ctx->s2c_bytes);
@@ -73,8 +73,8 @@ void test_entry_plugin_entry(struct session *session, enum session_state state, 
 	}
 	int payload_len = 0;
 	int curdir = session_current_direction_get(session);
-	session_payload_get(session, &payload_len);
-	const struct packet *pkt = session_packet_get(session);
+	session_get_payload(session, &payload_len);
+	const struct packet *pkt = session_get_current_packet(session);
 	if (pkt)
 	{
 		if (curdir == SESSION_DIR_C2S)

@@ -20,7 +20,7 @@ struct session_mq
 
 struct subscriber 
 {
-    session_mq_read_callback *read_cb;
+    msg_consume_cb_func *read_cb;
     void *cb_arg;
     STAILQ_ENTRY(subscriber) entries;
 };
@@ -28,7 +28,7 @@ struct subscriber
 struct session_mq_topic_schema
 {
 	char *topic_name;
-	session_mq_free_callback *free_cb;
+	msg_free_cb_func *free_cb;
 	void *cb_arg;
 	STAILQ_HEAD(sub_q_head, subscriber) subscribers; 
 	UT_hash_handle hh;
@@ -111,7 +111,7 @@ void session_mq_loop(struct session_mq *mq, struct session *session)
 	return;
 };
 
-int session_mq_topic_create(const char *topic_name, session_mq_free_callback *free_cb, void *cb_arg)
+int session_mq_create_topic(const char *topic_name, msg_free_cb_func *free_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
 	// 检查topic_name是否已存在
@@ -141,7 +141,7 @@ int session_mq_topic_create(const char *topic_name, session_mq_free_callback *fr
 	return 0; // 成功
 }
 
-int session_mq_topic_destroy(const char *topic_name) {
+int session_mq_destroy_topic(const char *topic_name) {
     struct session_mq_topic_schema *topic;
 
     // 在哈希表中查找指定的主题名
@@ -167,7 +167,7 @@ int session_mq_topic_destroy(const char *topic_name) {
 }
 
 
-int session_mq_send_msg(struct session *session, const char *topic_name, void *data)
+int session_send_message(struct session *session, const char *topic_name, void *data)
 {
 	struct session_mq_topic_schema *topic;
 	HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
@@ -183,10 +183,10 @@ int session_mq_send_msg(struct session *session, const char *topic_name, void *d
 	return 0;
 }
 
-int session_mq_topic_subscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg)
+int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
-	session_mq_topic_create(topic_name, NULL, NULL);
+	session_mq_create_topic(topic_name, NULL, NULL);
     HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
     if (topic == NULL) 
 	{
@@ -199,7 +199,7 @@ int session_mq_topic_subscribe(const char *topic_name, session_mq_read_callback 
 	return 0;
 }
 
-int session_mq_topic_unsubscribe(const char *topic_name, session_mq_read_callback *read_cb, void *cb_arg)
+int session_mq_unsubscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
 	int unsubscribe_count = 0;

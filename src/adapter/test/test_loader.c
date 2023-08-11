@@ -45,7 +45,7 @@ static void test_mq_topic_free(struct session *sess, const char* topic_name, voi
 int  test_mq_loader_read(struct session *sess, const char* topic_name, void *data, void *cb_arg)
 {
 	struct test_stream_ctx *ctx =(struct test_stream_ctx *)data;	
-	printf("loader_read_message(%s)-----------%20s", topic_name, session_printaddr(sess));
+	printf("loader_read_message(%s)-----------%20s", topic_name, session_get_readable_addr(sess));
 	printf("server-pkt=%u, server-count=%u, client-pkt=%u, client-count=%u, ",
 	ctx->c2s_pkts, ctx->c2s_bytes,
 	ctx->s2c_pkts, ctx->s2c_bytes);
@@ -60,8 +60,8 @@ int TEST_INIT()
 	g_adapter = adapter_init(g_plugin_schema, 2);
 	if(g_adapter == NULL)return -1;
 
-	session_mq_topic_create("test_mq_topic", test_mq_topic_free, NULL);
-	session_mq_topic_subscribe("test_mq_topic", test_mq_loader_read, NULL);
+	session_mq_create_topic("test_mq_topic", test_mq_topic_free, NULL);
+	session_mq_subscribe_topic("test_mq_topic", test_mq_loader_read, NULL);
 	return 0;
 }
 
@@ -69,8 +69,8 @@ void TEST_EXIT(void)
 {
 	if(g_adapter)
 	{
-		session_mq_topic_unsubscribe("test_mq_topic", test_mq_loader_read, NULL);
-		session_mq_topic_destroy("test_mq_topic");
+		session_mq_unsubscribe_topic("test_mq_topic", test_mq_loader_read, NULL);
+		session_mq_destroy_topic("test_mq_topic");
 		adapter_exit(g_adapter);
 		g_adapter = NULL;
 	}
@@ -124,7 +124,7 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		break;
 	case OP_STATE_DATA:
 		msg = stream_ctx_dup(*pme);
-		if(session_mq_send_msg(ctx->session, "test_mq_topic", msg) < 0)
+		if(session_produce_message(ctx->session, "test_mq_topic", msg) < 0)
 		{
 			FREE(msg);
 		}
