@@ -7,7 +7,7 @@
 #include <MESA/stream.h>
 #include <stdio.h>
 
-struct plugin_spec g_plugin_schema[] =
+struct plugin_specific g_plugin_schema[] =
 {
 	{
 	.init_cb = test_entry_plugin_init,
@@ -33,16 +33,16 @@ struct test_stream_ctx
 	uint32_t c2s_bytes;
 	uint32_t  s2c_pkts;
 	uint32_t  s2c_bytes;
-	struct session *session;
+	struct session *sess;
 };
 
-static void test_mq_topic_free(struct session *session, const char* topic_name, void *data, void *cb_arg)
+static void test_mq_topic_free(void *data, void *cb_arg)
 {
 	FREE(data);
 	return;
 }
 
-int  test_mq_loader_read(struct session *session, const char* topic_name, void *data, void *cb_arg)
+int  test_mq_loader_read(struct session *sess, const char* topic_name, const void *data, void *cb_arg)
 {
 	struct test_stream_ctx *ctx =(struct test_stream_ctx *)data;	
 	printf("loader_read_message(%s)-----------%20s", topic_name, session_get_readable_addr(sess));
@@ -54,26 +54,21 @@ int  test_mq_loader_read(struct session *session, const char* topic_name, void *
 	return 0;
 }
 
-struct adapter *g_adapter;
 int TEST_INIT()
 {
-	g_adapter = adapter_init(g_plugin_schema, 2);
-	if(g_adapter == NULL)return -1;
+	int ret = adapter_init(g_plugin_schema, 2);
+	if(ret != 0)return -1;
 
 	session_mq_create_topic("test_mq_topic", test_mq_topic_free, NULL);
-	session_mq_subscribe_topic("test_mq_topic", test_mq_loader_read, NULL);
+	session_mq_subscribe_topic("test_mq_topic", test_mq_loader_read, NULL, 1);
 	return 0;
 }
 
 void TEST_EXIT(void)
 {
-	if(g_adapter)
-	{
-		session_mq_unsubscribe_topic("test_mq_topic", test_mq_loader_read, NULL);
+
 		session_mq_destroy_topic("test_mq_topic");
-		adapter_exit(g_adapter);
-		g_adapter = NULL;
-	}
+		adapter_exit();
 	return;
 }
 
@@ -120,18 +115,18 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	switch (state)
 	{
 	case OP_STATE_PENDING:
-		adapter_session_open(g_adapter, pstream, &ctx->session, thread_seq);
+		adapter_session_open(pstream, &ctx->sess, thread_seq);
 		break;
 	case OP_STATE_DATA:
 		msg = stream_ctx_dup(*pme);
-		if(session_produce_message(ctx->session, "test_mq_topic", msg) < 0)
+		if(session_produce_message(ctx->sess, "test_mq_topic", msg) < 0)
 		{
 			FREE(msg);
 		}
-		adapter_session_active(g_adapter, pstream, &ctx->session, thread_seq);
+		adapter_session_active(pstream, &ctx->sess, thread_seq);
 		break;
 	case OP_STATE_CLOSE:
-		adapter_session_close(g_adapter, pstream, &ctx->session, thread_seq);
+		adapter_session_close(pstream, &ctx->sess, thread_seq);
 		print_steam_ctx(pstream, ctx);
 		FREE(*pme);
 		break;

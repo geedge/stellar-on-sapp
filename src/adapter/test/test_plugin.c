@@ -8,6 +8,10 @@
 int g_test_entry_plugin_id = 0;
 int g_test_mq_plugin_id = 0;
 
+
+int g_test_entry_exdata_idx = 0;
+int g_test_mq_plugin_exdata_idx = 0;
+
 struct test_session_message
 {
 	uint32_t c2s_pkts;
@@ -16,9 +20,19 @@ struct test_session_message
 	uint32_t s2c_bytes;
 };
 
+static void test_exdata_free(struct session *sess, int idx, void *ex_ptr, void *arg)
+{
+	if(ex_ptr)
+	{
+		FREE(ex_ptr);
+	}
+	return;
+}
+
 int test_entry_plugin_init(int plugin_id)
 {
 	g_test_entry_plugin_id = plugin_id;
+	g_test_entry_exdata_idx=session_get_ex_new_index("TEST_ENTRY", test_exdata_free, NULL);
 	return 0;
 }
 void test_entry_plugin_exit(void)
@@ -26,7 +40,7 @@ void test_entry_plugin_exit(void)
 	return;
 }
 
-int  test_session_mq_plugin_read(struct session *session, const char* topic_name, void *data, void *cb_arg)
+static int  test_session_mq_plugin_read(struct session *sess, const char* topic_name, const void *data, void *cb_arg)
 {
 	struct test_session_message *ctx =(struct test_session_message *)data;	
 	printf("plugin_read_message(%s)-----------%20s", topic_name, session_get_readable_addr(sess));
@@ -35,28 +49,28 @@ int  test_session_mq_plugin_read(struct session *session, const char* topic_name
 	ctx->s2c_pkts, ctx->s2c_bytes);
 	printf("total-pkt=%u, ", ctx->c2s_pkts+ctx->s2c_pkts);
 	printf("total-count=%u\n", ctx->c2s_bytes+ctx->s2c_bytes);
-	printf("session(%d)-----------%20s: attach\n", g_test_mq_plugin_id, session_printaddr(session));
-	plugin_attach_session(session, g_test_mq_plugin_id);
+	printf("session(%d)-----------%20s: attach\n", g_test_mq_plugin_id, session_get_readable_addr(sess));
+	session_attach_plugin(sess, g_test_mq_plugin_id);
 	return 0;
 }
 
 int test_mq_plugin_init(int plugin_id)
 {
 	g_test_mq_plugin_id = plugin_id;
-	session_mq_subscribe_topic("test_mq_topic", test_session_mq_plugin_read, NULL);
+	g_test_mq_plugin_exdata_idx=session_get_ex_new_index("TEST_MQ", test_exdata_free, NULL);
+	session_mq_subscribe_topic("test_mq_topic", test_session_mq_plugin_read, NULL, g_test_mq_plugin_id);
 	return 0;
 }
 void test_mq_plugin_exit(void)
 {
-	session_mq_unsubscribe_topic("test_mq_topic", test_session_mq_plugin_read, NULL);
 	return;
 }
 
 
 
-void print_session_ctx(struct session *session, struct test_session_message *ctx, int plugin_id)
+static void print_session_ctx(struct session *sess, struct test_session_message *ctx, int plugin_id)
 {
-	printf("session(%d)-----------%20s: ", plugin_id, session_get_readable_addr(session));
+	printf("session(%d)-----------%20s: ", plugin_id, session_get_readable_addr(sess));
 	printf("server-pkt=%u, server-count=%u, client-pkt=%u, client-count=%u, ",
 	ctx->c2s_pkts, ctx->c2s_bytes,
 	ctx->s2c_pkts, ctx->s2c_bytes);
@@ -65,26 +79,26 @@ void print_session_ctx(struct session *session, struct test_session_message *ctx
 	return;
 }
 
-void test_entry_plugin_entry(struct session *session, enum session_state state, int thread_id)
+void test_entry_plugin_entry(struct session *sess, enum session_state state, int thread_id)
 {
-	struct test_session_message *test_ctx = session_get_plugin_ctx(session, g_test_entry_plugin_id);
+	struct test_session_message *test_ctx = session_get_ex_data(sess, g_test_entry_exdata_idx);
 	if (test_ctx == NULL)
 	{
 		test_ctx = CALLOC(struct test_session_message, 1);
-		session_set_plugin_ctx(session, g_test_entry_plugin_id, test_ctx);
+		session_set_ex_data(sess, g_test_entry_exdata_idx, test_ctx);
 	}
-	int payload_len = 0;
-	int curdir = session_current_direction_get(session);
-	session_get_payload(session, &payload_len);
-	const struct packet *pkt = session_get_current_packet(session);
+	size_t payload_len = 0;
+	session_get_current_payload(sess, &payload_len);
+	const struct packet *pkt = session_get_current_packet(sess);
 	if (pkt)
 	{
-		if (curdir == SESSION_DIR_C2S)
+		struct flow_flag flag = session_get_current_flow_flag(sess);
+		if (flag.flow_flag_see_client_to_server)
 		{
 			test_ctx->c2s_bytes += payload_len;
 			test_ctx->c2s_pkts += 1;
 		}
-		if (curdir == SESSION_DIR_S2C)
+		if (flag.flow_flag_see_server_to_client)
 		{
 			test_ctx->s2c_bytes += payload_len;
 			test_ctx->s2c_pkts += 1;
@@ -95,7 +109,7 @@ void test_entry_plugin_entry(struct session *session, enum session_state state, 
 	case SESSION_STATE_CLOSING:
 		if (test_ctx != NULL)
 		{
-			print_session_ctx(session, test_ctx, g_test_entry_plugin_id);
+			print_session_ctx(sess, test_ctx, g_test_entry_plugin_id);
 			FREE(test_ctx);
 		}
 		break;
@@ -105,10 +119,10 @@ void test_entry_plugin_entry(struct session *session, enum session_state state, 
 	return;
 }
 
-void test_mq_plugin_entry(struct session *session, enum session_state state, int thread_id)
+void test_mq_plugin_entry(struct session *sess, enum session_state state, int thread_id)
 {
-	printf("session(%d)-----------%20s: dettach\n", g_test_mq_plugin_id, session_printaddr(session));
-	plugin_dettach_session(session, g_test_mq_plugin_id);
+	printf("session(%d)-----------%20s: dettach\n", g_test_mq_plugin_id, session_get_readable_addr(sess));
+	session_dettach_plugin(sess, g_test_mq_plugin_id);
 	return;
 }
 

@@ -3,11 +3,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-/* session direction definition */
-#define SESSION_DIR_C2S 			0x01
-#define SESSION_DIR_S2C 			0x02
-#define SESSION_DIR_DOUBLE 			0x03
-
 enum session_type
 {
 	SESSION_TYPE_CUSTOM,
@@ -25,19 +20,29 @@ enum session_state
 	SESSION_STATE_ALL = (1 << 1 | 1 << 2 | 1 << 3),
 };
 
+struct flow_flag 
+{
+    unsigned char flow_flag_see_client_to_server:1;
+    unsigned char flow_flag_see_server_to_client:1;
+    unsigned char flow_flag_client_is_local:1;
+    unsigned char flow_flag_server_is_local:1;
+	unsigned char pad:4;
+};
+	
 struct session;
-uint8_t session_get_flow_flag(const struct session *sess);        	//  tcp or udp 
-uint8_t session_current_direction_get(const struct session *sess);   //  tcp or udp 
+struct flow_flag  session_get_flow_flag(const struct session *sess);       	
+struct flow_flag  session_get_current_flow_flag(struct session *sess);   	
 const char *session_get_readable_addr(struct session *sess);
-const char *session_get_payload(struct session *sess, int *payload_len);
+const char *session_get_current_payload(struct session *sess, size_t *payload_len);
 
 struct packet;
 const struct packet *session_get_current_packet(struct session *sess);
+const char *packet_get_data(const struct packet *pkt, size_t *data_len);
 
-typedef plugin_id_t int;
+typedef  int plugin_id_t;
 //session mq
 typedef void msg_free_cb_func(void *msg, void *cb_arg);
-typedef int  msg_consume_cb_func(struct session *sess, const char *topic_name, void *msg, void *cb_arg);
+typedef int  msg_consume_cb_func(struct session *sess, const char *topic_name, const void *msg, void *cb_arg);
 
 int session_mq_create_topic(const char *topic_name, msg_free_cb_func *free_cb, void *cb_arg);
 int session_mq_destroy_topic(const char *topic_name);
@@ -46,20 +51,13 @@ int session_ignore_message(struct session *sess, const char *topic_name, int con
 
 //return consumer_id >=0 if success, otherwise return -1.
 int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg, plugin_id_t self);
-int session_mq_unsubscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg,  plugin_id_t self);
 
 
-typedef void sess_ex_free(struct session *sess, int idx, void *ex_ptr, void *arg);
-int session_get_ex_new_index(void *arg, const char *name, sess_ex_free *free_func);
+typedef void session_ex_free(struct session *sess, int idx, void *ex_ptr, void *arg);
+int session_get_ex_new_index(const char *name, session_ex_free *free_func,void *arg); // Only support in INIT stage
 int session_set_ex_data(struct session *sess, int idx, void *ex_ptr);
 void *session_get_ex_data(struct session *sess, int idx);
 
 void session_dettach_plugin(struct session *sess, plugin_id_t self);
 void session_attach_plugin(struct session *sess, plugin_id_t self);
 
-
-//session plugin
-void *session_get_plugin_ctx(struct session *sess, int plugin_id);	
-void session_set_plugin_ctx(struct session *sess, int plugin_id, void *ctx);
-void plugin_dettach_session(struct session *sess,  int plugin_id);
-void plugin_attach_session(struct session *sess,  int plugin_id);

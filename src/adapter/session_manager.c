@@ -2,7 +2,98 @@
 #include "session_manager.h"
 
 #include "uthash/uthash.h"
+#include "uthash/utarray.h"
 #include <sys/queue.h>
+
+/*
+struct session_mq_subscriber 
+{
+    msg_consume_cb_func *read_cb;
+    void *cb_arg;
+};
+UT_icd session_mq_subscribers_icd = {sizeof(struct session_mq_subscriber), NULL, NULL, NULL};
+
+
+struct session_mq_topic_schema
+{
+	char *topic_name;
+	msg_free_cb_func *free_cb;
+	void *cb_arg;
+	UT_array *subscribers;	
+	UT_hash_handle hh;
+};
+*/
+
+
+
+struct session_exdata_meta
+{
+	const char *name;
+	session_ex_free *free_func;
+	void *arg;
+	int idx;
+};
+UT_icd session_exdata_meta_icd = {sizeof(struct session_exdata_meta), NULL, NULL, NULL};
+UT_array *global_session_exdata_metas = NULL;
+
+struct session_exdata_runtime
+{
+	struct session *sess;
+	void *exdata;
+};
+UT_icd session_exdata_runtime_icd = {sizeof(struct session_exdata_runtime), NULL, NULL, NULL};
+
+
+int session_get_ex_new_index(const char *name, session_ex_free *free_func,void *arg)
+{
+	if(global_session_exdata_metas == NULL)
+	{
+		utarray_new(global_session_exdata_metas, &session_exdata_meta_icd);
+	}
+	unsigned int len = utarray_len(global_session_exdata_metas);
+	struct session_exdata_meta *t_meta;
+	for(unsigned int i = 0; i < len; i++)
+	{
+		t_meta = (struct session_exdata_meta *)utarray_eltptr(global_session_exdata_metas, i);
+		if(strcmp(t_meta->name, name) == 0)
+		{
+			return t_meta->idx;
+		}
+	}
+	struct session_exdata_meta meta;
+	meta.free_func=free_func;
+	meta.name=name;
+	meta.idx=len;
+	meta.arg=arg;
+	utarray_push_back(global_session_exdata_metas, &meta);
+	return meta.idx;
+}
+
+int session_set_ex_data(struct session *sess, int idx, void *ex_ptr)
+{
+	if(sess->ex_data_rt == NULL)return -1;
+	if(utarray_len(sess->ex_data_rt) > (unsigned int)idx)return -1;
+	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)utarray_eltptr(sess->ex_data_rt, (unsigned int)idx);
+	struct session_exdata_meta* meta = (struct session_exdata_meta*)utarray_eltptr(global_session_exdata_metas, (unsigned int)idx);
+	if(exdata)
+	{
+		exdata->sess=sess;
+		if(meta->free_func && exdata->exdata)
+		{
+			meta->free_func(sess, idx, exdata->exdata, meta->arg);
+		}
+		exdata->exdata = ex_ptr;
+	}
+	return -1;
+}
+
+void *session_get_ex_data(struct session *sess, int idx)
+{
+	if(sess->ex_data_rt == NULL)return NULL;
+	if(utarray_len(sess->ex_data_rt) > (unsigned int)idx)return NULL;
+	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)utarray_eltptr(sess->ex_data_rt, (unsigned int)idx);
+	return exdata->exdata;
+}
 
 struct session_mq_node
 {
@@ -35,8 +126,6 @@ struct session_mq_topic_schema
 };
 
 static struct session_mq_topic_schema *global_session_mq_schema = NULL;
-
-
 struct session_mq *session_mq_new(void) 
 {
     struct session_mq *mq = CALLOC(struct session_mq, 1);
@@ -55,7 +144,7 @@ void session_mq_free(struct session_mq *mq)
 	FREE(mq);
 }
 
-static struct session_mq_topic_schema *session_mq_topic_schema(const char *topic_name)
+static struct session_mq_topic_schema *session_mq_topic2schema(const char *topic_name)
 {
 	struct session_mq_topic_schema *schema;
 	HASH_FIND_STR(global_session_mq_schema, topic_name, schema);
@@ -67,43 +156,45 @@ void session_mq_cleanup()
 	struct session_mq_topic_schema *current, *tmp;
 	HASH_ITER(hh, global_session_mq_schema, current, tmp)
 	{
-		HASH_DEL(global_session_mq_schema, current); // 从哈希表中删除
-		// 释放其他你需要清理的内存，比如：
+		HASH_DEL(global_session_mq_schema, current); // delete frome global_session_mq_schema
+		// free topic_name
 		if (current->topic_name)
 		{
 			FREE(current->topic_name);
-		}	
+		}
 
-        // 清空STAILQ
-        struct subscriber *sub;
-        while (!STAILQ_EMPTY(&current->subscribers)) {
-            sub = STAILQ_FIRST(&current->subscribers);
-            STAILQ_REMOVE_HEAD(&current->subscribers, entries);
-            FREE(sub); // 假设你需要释放订阅者
-        }
-		FREE(current); // 释放当前结构体
+		// cleanup STAILQ
+		struct subscriber *sub;
+		while (!STAILQ_EMPTY(&current->subscribers))
+		{
+			sub = STAILQ_FIRST(&current->subscribers);
+			STAILQ_REMOVE_HEAD(&current->subscribers, entries);
+			FREE(sub); // free subscriber
+		}
+		FREE(current); // free the item
 	}
 	return;
 }
 
-void session_mq_loop(struct session_mq *mq, struct session *session)
+void session_mq_loop(struct session *sess)
 {
 	struct session_mq_node *node;
 	struct subscriber *sub;
+	struct session_mq *mq = sess->mq;
 	while (!STAILQ_EMPTY(&mq->head))
 	{
 		node = STAILQ_FIRST(&mq->head);
 		STAILQ_REMOVE_HEAD(&mq->head, entries);
-		struct session_mq_topic_schema *topic= session_mq_topic_schema(node->topic_name);
+		struct session_mq_topic_schema *topic= session_mq_topic2schema(node->topic_name);
 		if(topic != NULL)
 		{
 			STAILQ_FOREACH(sub, &topic->subscribers, entries)
 			{
-				sub->read_cb(session, node->topic_name, node->message, sub->cb_arg);
+				sub->read_cb(sess, node->topic_name, node->message, sub->cb_arg);
 			}
 			if(topic->free_cb != NULL)
 			{
-				topic->free_cb(session, node->topic_name, node->message, topic->cb_arg);
+				topic->free_cb(node->message, topic->cb_arg);
 			}
 		}
 		FREE(node);
@@ -114,14 +205,14 @@ void session_mq_loop(struct session_mq *mq, struct session *session)
 int session_mq_create_topic(const char *topic_name, msg_free_cb_func *free_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
-	// 检查topic_name是否已存在
+	// check if topic_name exist
 	HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
-	// 如果找到现有主题，并且free_cb也不为空，则认为生产者已创建此主题
+	//if found and free_cb is not NULL, it's a exist producer
 	if (topic != NULL && topic->free_cb != NULL)
 	{
-		return -1; // 已存在
+		return -1; // exist
 	}
-	// 如果主题不存在，则创建新主题，由消费者或生产者调用
+	// if topic not found, create new topic, called by consumer or producer
 	if (topic == NULL)
 	{
 		topic = CALLOC(struct session_mq_topic_schema, 1);
@@ -132,27 +223,27 @@ int session_mq_create_topic(const char *topic_name, msg_free_cb_func *free_cb, v
 			STAILQ_INIT(&topic->subscribers);
 		}
 	}
-	// 如果找到现有主题但free_cb为空，则为消费者占的坑，现在由生产者来填充
+	//if found but free_cb is NULL, it's a consumer's placeholder, now filled by producer
 	if (free_cb != NULL)
 	{
 		topic->free_cb = free_cb;
 		topic->cb_arg = cb_arg;
 	}
-	return 0; // 成功
+	return 0; // success
 }
 
 int session_mq_destroy_topic(const char *topic_name) {
     struct session_mq_topic_schema *topic;
 
-    // 在哈希表中查找指定的主题名
+    // find topic in global schma
     HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
     if (topic == NULL) 
 	{
-        return -1; // 没有找到
+        return -1; // not found	
     }
-    // 从哈希表中删除
+    // delete topic from global schema
     HASH_DEL(global_session_mq_schema, topic);
-    // 释放存储的主题名
+    // free topic name
     FREE(topic->topic_name);
 
 	struct subscriber *sub;
@@ -161,13 +252,13 @@ int session_mq_destroy_topic(const char *topic_name) {
 		STAILQ_REMOVE_HEAD(&topic->subscribers, entries);
 		FREE(sub);
 	}
-    // 释放结构体
+    // free topic itself
     FREE(topic);
-    return 0; // 成功
+    return 0; // success
 }
 
 
-int session_send_message(struct session *session, const char *topic_name, void *data)
+int session_produce_message(struct session *sess, const char *topic_name, void *data)
 {
 	struct session_mq_topic_schema *topic;
 	HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
@@ -175,7 +266,7 @@ int session_send_message(struct session *session, const char *topic_name, void *
 	{
 		return -1;  
 	}
-	struct session_mq *mq=session->mq;
+	struct session_mq *mq=sess->mq;
 	struct session_mq_node *node= CALLOC(struct session_mq_node,1);
 	node->topic_name = topic->topic_name;
 	node->message = data;
@@ -183,14 +274,14 @@ int session_send_message(struct session *session, const char *topic_name, void *
 	return 0;
 }
 
-int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg)
+int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg, plugin_id_t self)
 {
 	struct session_mq_topic_schema *topic;
 	session_mq_create_topic(topic_name, NULL, NULL);
     HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
     if (topic == NULL) 
 	{
-        return -1; // topic 创建失败
+        return -1; // topic create failed
     }
 	struct subscriber *new_subscriber = CALLOC(struct subscriber,1);
     new_subscriber->read_cb = read_cb;
@@ -206,7 +297,7 @@ int session_mq_unsubscribe_topic(const char *topic_name, msg_consume_cb_func *re
 	HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
 	if (topic == NULL)
 	{
-		return -1; // topic 创建失败
+		return -1; // opic create failed
 	}
 	struct subscriber *sub, *tmp_sub;
 
@@ -223,120 +314,42 @@ int session_mq_unsubscribe_topic(const char *topic_name, msg_consume_cb_func *re
 		}
 		else
 		{
-			sub = STAILQ_NEXT(sub, entries); // 转到下一个元素
+			sub = STAILQ_NEXT(sub, entries); // next sub
 		}
 	}
 	return unsubscribe_count;
 }
 
 struct streaminfo;
-struct session *session_new(struct streaminfo* stream, struct plugin_spec *specs, int desc_num, enum session_type type, int thread_id)
+struct session *session_new(struct streaminfo* stream, enum session_type type, int thread_id)
 {
 	if(stream == NULL)return NULL;
 	if(type!=SESSION_TYPE_TCP && type!=SESSION_TYPE_UDP)return NULL;
-	struct session *session = CALLOC(struct session, 1);
-	session->stream = stream;
-	session->desc = specs;
-	session->type = type;
-	session->state = SESSION_STATE_OPENING;
-	session->plugin_rt_num = desc_num;
-	session->plugin_rt = CALLOC(struct session_runtime, desc_num);
-	session->mq = session_mq_new();
-	for (int i = 0; i < session->plugin_rt_num; i++)
-	{
-		if (type == SESSION_TYPE_TCP)
-		{
-			session->plugin_rt[i].interest_state = specs[i].tcp_session_interest_state;
-			session->plugin_rt[i].entry_cb = specs[i].tcp_session_entry_cb;
-		}
-		if (type == SESSION_TYPE_UDP)
-		{
-			session->plugin_rt[i].interest_state = specs[i].udp_session_interest_state;
-			session->plugin_rt[i].entry_cb = specs[i].udp_session_entry_cb;
-		}
-	}
-	return session;
+	struct session *sess = CALLOC(struct session, 1);
+	sess->stream = stream;
+	sess->type = type;
+	sess->state = SESSION_STATE_OPENING;
+	sess->mq = session_mq_new();
+
+	utarray_new(sess->ex_data_rt, &session_exdata_runtime_icd);
+	utarray_resize(sess->ex_data_rt, utarray_len(global_session_exdata_metas));
+	return sess;
 
 }
 
-void session_free(struct session *session,  int thread_id)
+void session_free(struct session *sess,  int thread_id)
 {
-	if(session==NULL)return;
-	
-	if(session->plugin_rt != NULL)
+	if(sess==NULL)return;
+	if(sess->mq != NULL)
 	{
-		FREE(session->plugin_rt);
+		session_mq_free(sess->mq);
 	}
-	if(session->mq != NULL)
-	{
-		session_mq_free(session->mq);
-	}
-	FREE(session);
+	utarray_free(sess->ex_data_rt);
+	FREE(sess);
 }
 
-void session_dispatch(struct session *session, enum session_state state, int thread_id)
+void session_set_state(struct session *session, enum session_state state, int thread_id)
 {
-	if(session==NULL)return;
-
-	int interest_state=0;
-	plugin_entry_callback *entry_cb=NULL;
-	session->state=state;	
-	for (int i = 0; i < session->plugin_rt_num; i++)
-	{
-		switch (state)
-		{
-		//sync from session runtime
-		case SESSION_STATE_OPENING:
-		case SESSION_STATE_ACTIVE:
-		case SESSION_STATE_CLOSING:
-			interest_state = session->plugin_rt[i].interest_state;
-			entry_cb = session->plugin_rt[i].entry_cb;
-			break;
-
-		default:
-			break;
-		}
-		if ((interest_state & session->state) && (entry_cb != NULL))
-		{
-			entry_cb(session, session->state, thread_id);
-		}
-	}
-	session_mq_loop(session->mq, session);
-	return;
+	if(session == NULL)return;
+	session->state = state;
 }
-
-void *session_get_plugin_ctx(struct session *session, int plugin_id)
-{
-	if(plugin_id >= 0 && plugin_id < session->plugin_rt_num)
-	{
-		return session->plugin_rt[plugin_id].ctx;
-	}
-	return NULL;
-};
-
-void session_set_plugin_ctx(struct session *session, int plugin_id, void *ctx)
-{
-	if(plugin_id >= 0 && plugin_id < session->plugin_rt_num)
-	{
-		session->plugin_rt[plugin_id].ctx=ctx;
-	}
-	return;
-};
-
-void plugin_dettach_session(struct session *session,int plugin_id)
-{
-	if(plugin_id >= 0 && plugin_id < session->plugin_rt_num)
-	{
-		session->plugin_rt[plugin_id].interest_state = SESSION_STATE_INVALID;
-	}
-	return;
-};
-
-void plugin_attach_session(struct session *session,  int plugin_id)
-{
-	if(plugin_id >= 0 && plugin_id < session->plugin_rt_num)
-	{
-		session->plugin_rt[plugin_id].interest_state = SESSION_STATE_ALL;
-	}
-	return;
-};
