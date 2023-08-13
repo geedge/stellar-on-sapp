@@ -5,44 +5,31 @@
 #include "uthash/utarray.h"
 #include <sys/queue.h>
 
-/*
-struct session_mq_subscriber 
-{
-    msg_consume_cb_func *read_cb;
-    void *cb_arg;
-};
-UT_icd session_mq_subscribers_icd = {sizeof(struct session_mq_subscriber), NULL, NULL, NULL};
-
-
-struct session_mq_topic_schema
-{
-	char *topic_name;
-	msg_free_cb_func *free_cb;
-	void *cb_arg;
-	UT_array *subscribers;	
-	UT_hash_handle hh;
-};
-*/
-
-
-
 struct session_exdata_meta
 {
-	const char *name;
+	char *name;
 	session_ex_free *free_func;
 	void *arg;
 	int idx;
 };
-UT_icd session_exdata_meta_icd = {sizeof(struct session_exdata_meta), NULL, NULL, NULL};
-UT_array *global_session_exdata_metas = NULL;
 
-struct session_exdata_runtime
+static void session_exdata_met_copy(void *_dst, const void *_src) 
 {
-	struct session *sess;
-	void *exdata;
-};
-UT_icd session_exdata_runtime_icd = {sizeof(struct session_exdata_runtime), NULL, NULL, NULL};
+  struct session_exdata_meta *dst = (struct session_exdata_meta*)_dst, *src = (struct session_exdata_meta*)_src;
+  dst->free_func = src->free_func;
+  dst->arg = src->arg;
+  dst->idx = src->idx;
+  dst->name = src->name ? strdup(src->name) : NULL;
+}
 
+static void session_exdata_met_dtor(void *_elt) 
+{
+  struct session_exdata_meta *elt = (struct session_exdata_meta*)_elt;
+  if (elt->name) FREE(elt->name);
+}
+
+UT_icd session_exdata_meta_icd = {sizeof(struct session_exdata_meta), NULL, session_exdata_met_copy, session_exdata_met_dtor};
+UT_array *global_session_exdata_metas = NULL;
 
 int session_get_ex_new_index(const char *name, session_ex_free *free_func,void *arg)
 {
@@ -62,27 +49,34 @@ int session_get_ex_new_index(const char *name, session_ex_free *free_func,void *
 	}
 	struct session_exdata_meta meta;
 	meta.free_func=free_func;
-	meta.name=name;
+	meta.name=(char *)name;
 	meta.idx=len;
 	meta.arg=arg;
 	utarray_push_back(global_session_exdata_metas, &meta);
 	return meta.idx;
 }
 
+struct session_exdata_runtime
+{
+	struct session *sess;
+	void *data;
+};
+
 int session_set_ex_data(struct session *sess, int idx, void *ex_ptr)
 {
 	if(sess->ex_data_rt == NULL)return -1;
-	if(utarray_len(sess->ex_data_rt) > (unsigned int)idx)return -1;
-	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)utarray_eltptr(sess->ex_data_rt, (unsigned int)idx);
+	unsigned int len=utarray_len(global_session_exdata_metas);
+	if(len < (unsigned int)idx)return -1;
+	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)(sess->ex_data_rt+idx);
 	struct session_exdata_meta* meta = (struct session_exdata_meta*)utarray_eltptr(global_session_exdata_metas, (unsigned int)idx);
 	if(exdata)
 	{
 		exdata->sess=sess;
-		if(meta->free_func && exdata->exdata)
+		if(meta->free_func && exdata->data)
 		{
-			meta->free_func(sess, idx, exdata->exdata, meta->arg);
+			meta->free_func(sess, idx, exdata->data, meta->arg);
 		}
-		exdata->exdata = ex_ptr;
+		exdata->data = ex_ptr;
 	}
 	return -1;
 }
@@ -90,9 +84,10 @@ int session_set_ex_data(struct session *sess, int idx, void *ex_ptr)
 void *session_get_ex_data(struct session *sess, int idx)
 {
 	if(sess->ex_data_rt == NULL)return NULL;
-	if(utarray_len(sess->ex_data_rt) > (unsigned int)idx)return NULL;
-	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)utarray_eltptr(sess->ex_data_rt, (unsigned int)idx);
-	return exdata->exdata;
+	unsigned int len = utarray_len(global_session_exdata_metas);
+	if(len < (unsigned int)idx)return NULL;
+	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)(sess->ex_data_rt+idx);
+	return exdata->data;
 }
 
 struct session_mq_node
@@ -139,24 +134,24 @@ void session_mq_free(struct session_mq *mq)
 	while ((node = STAILQ_FIRST(&mq->head)) != NULL)
 	{
 		STAILQ_REMOVE_HEAD(&mq->head, entries);
-		free(node);
+		FREE(node);
 	}
 	FREE(mq);
 }
 
-static struct session_mq_topic_schema *session_mq_topic2schema(const char *topic_name)
+static struct session_mq_topic_schema *session_mq_topic2schema(struct session_mq_topic_schema *topic_schema, const char *topic_name)
 {
 	struct session_mq_topic_schema *schema;
-	HASH_FIND_STR(global_session_mq_schema, topic_name, schema);
+	HASH_FIND_STR(topic_schema, topic_name, schema);
 	return schema;
 };
 
-void session_mq_cleanup()
+static void session_mq_cleanup(struct session_mq_topic_schema *schema)
 {
 	struct session_mq_topic_schema *current, *tmp;
-	HASH_ITER(hh, global_session_mq_schema, current, tmp)
+	HASH_ITER(hh, schema, current, tmp)
 	{
-		HASH_DEL(global_session_mq_schema, current); // delete frome global_session_mq_schema
+		HASH_DEL(schema, current); // delete frome global_session_mq_schema
 		// free topic_name
 		if (current->topic_name)
 		{
@@ -176,6 +171,12 @@ void session_mq_cleanup()
 	return;
 }
 
+void session_manager_cleanup()
+{
+	session_mq_cleanup(global_session_mq_schema);
+	utarray_free(global_session_exdata_metas);
+}
+
 void session_mq_loop(struct session *sess)
 {
 	struct session_mq_node *node;
@@ -185,7 +186,7 @@ void session_mq_loop(struct session *sess)
 	{
 		node = STAILQ_FIRST(&mq->head);
 		STAILQ_REMOVE_HEAD(&mq->head, entries);
-		struct session_mq_topic_schema *topic= session_mq_topic2schema(node->topic_name);
+		struct session_mq_topic_schema *topic= session_mq_topic2schema(global_session_mq_schema, node->topic_name);
 		if(topic != NULL)
 		{
 			STAILQ_FOREACH(sub, &topic->subscribers, entries)
@@ -274,7 +275,7 @@ int session_produce_message(struct session *sess, const char *topic_name, void *
 	return 0;
 }
 
-int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg, plugin_id_t self)
+int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
 	session_mq_create_topic(topic_name, NULL, NULL);
@@ -289,7 +290,7 @@ int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read
 	STAILQ_INSERT_TAIL(&topic->subscribers, new_subscriber, entries);
 	return 0;
 }
-
+/*
 int session_mq_unsubscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
@@ -319,6 +320,36 @@ int session_mq_unsubscribe_topic(const char *topic_name, msg_consume_cb_func *re
 	}
 	return unsubscribe_count;
 }
+*/
+
+static struct session_exdata_runtime  *session_new_exdata_rt()
+{
+	struct session_exdata_runtime *exdata_rt = NULL;
+	unsigned int len = utarray_len(global_session_exdata_metas);
+	if(len > 0)
+	{
+		exdata_rt=CALLOC(struct session_exdata_runtime, len);
+	}
+	return exdata_rt;
+}
+
+static void session_free_exdata_rt(struct session* sess, struct session_exdata_runtime *exdata_rt)
+{
+	if(exdata_rt==NULL)return;
+	unsigned int len=utarray_len(global_session_exdata_metas);
+	for (unsigned int i = 0; i < len; i++)
+	{
+		struct session_exdata_runtime *exdata = (struct session_exdata_runtime *)(exdata_rt + i);
+		struct session_exdata_meta *meta = (struct session_exdata_meta *)utarray_eltptr(global_session_exdata_metas, i);
+		if (exdata)
+		{
+			if (meta->free_func && exdata->data)
+			{
+				meta->free_func(sess, i, exdata->data, meta->arg);
+			}
+		}
+	}
+}
 
 struct streaminfo;
 struct session *session_new(struct streaminfo* stream, enum session_type type, int thread_id)
@@ -330,9 +361,7 @@ struct session *session_new(struct streaminfo* stream, enum session_type type, i
 	sess->type = type;
 	sess->state = SESSION_STATE_OPENING;
 	sess->mq = session_mq_new();
-
-	utarray_new(sess->ex_data_rt, &session_exdata_runtime_icd);
-	utarray_resize(sess->ex_data_rt, utarray_len(global_session_exdata_metas));
+	sess->ex_data_rt = session_new_exdata_rt();
 	return sess;
 
 }
@@ -344,7 +373,8 @@ void session_free(struct session *sess,  int thread_id)
 	{
 		session_mq_free(sess->mq);
 	}
-	utarray_free(sess->ex_data_rt);
+	session_free_exdata_rt(sess, sess->ex_data_rt);
+	FREE(sess->ex_data_rt);
 	FREE(sess);
 }
 

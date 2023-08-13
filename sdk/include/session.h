@@ -50,7 +50,7 @@ int session_produce_message(struct session *sess, const char *topic_name, void *
 int session_ignore_message(struct session *sess, const char *topic_name, int consumer_id);
 
 //return consumer_id >=0 if success, otherwise return -1.
-int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg, plugin_id_t self);
+int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg);
 
 
 typedef void session_ex_free(struct session *sess, int idx, void *ex_ptr, void *arg);

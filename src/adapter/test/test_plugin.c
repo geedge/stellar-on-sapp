@@ -58,7 +58,7 @@ int test_mq_plugin_init(int plugin_id)
 {
 	g_test_mq_plugin_id = plugin_id;
 	g_test_mq_plugin_exdata_idx=session_get_ex_new_index("TEST_MQ", test_exdata_free, NULL);
-	session_mq_subscribe_topic("test_mq_topic", test_session_mq_plugin_read, NULL, g_test_mq_plugin_id);
+	session_mq_subscribe_topic("test_mq_topic", test_session_mq_plugin_read, NULL);
 	return 0;
 }
 void test_mq_plugin_exit(void)
@@ -81,7 +81,7 @@ static void print_session_ctx(struct session *sess, struct test_session_message 
 
 void test_entry_plugin_entry(struct session *sess, enum session_state state, int thread_id)
 {
-	struct test_session_message *test_ctx = session_get_ex_data(sess, g_test_entry_exdata_idx);
+	struct test_session_message *test_ctx = (struct test_session_message *)session_get_ex_data(sess, g_test_entry_exdata_idx);
 	if (test_ctx == NULL)
 	{
 		test_ctx = CALLOC(struct test_session_message, 1);
@@ -110,7 +110,6 @@ void test_entry_plugin_entry(struct session *sess, enum session_state state, int
 		if (test_ctx != NULL)
 		{
 			print_session_ctx(sess, test_ctx, g_test_entry_plugin_id);
-			FREE(test_ctx);
 		}
 		break;
 	default:

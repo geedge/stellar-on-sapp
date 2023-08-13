@@ -16,7 +16,7 @@ static void exdata_plugin_rt_free(struct session *sess, int idx, void *ex_ptr, v
 {
 	if(ex_ptr)
 	{
-		utarray_free((UT_array *)ex_ptr);
+		FREE(ex_ptr);
 	}
 	return;
 }
@@ -24,7 +24,9 @@ static void exdata_plugin_rt_free(struct session *sess, int idx, void *ex_ptr, v
 int adapter_init(struct plugin_specific specs[] , int spec_num)
 {
 	utarray_new(global_plugin_specs,&plugin_specs_icd);
+	utarray_reserve(global_plugin_specs, spec_num);
 	int init_cb_ret = 0;
+	global_plugin_runtime_exdata_idx=session_get_ex_new_index("__SYSTEM__", exdata_plugin_rt_free, NULL);
 	for(int i = 0; i < spec_num; i++)
 	{
 		if (specs[i].init_cb != NULL)
@@ -37,7 +39,6 @@ int adapter_init(struct plugin_specific specs[] , int spec_num)
 			utarray_push_back(global_plugin_specs, &specs[i]);
 		}
 	}
-	global_plugin_runtime_exdata_idx=session_get_ex_new_index("__SYSTEM__", exdata_plugin_rt_free, NULL);
 	return 0;
 ADAPTER_INIT_ERROR:
 	adapter_exit();
@@ -54,7 +55,7 @@ void adapter_exit()
 			p->exit_cb();
 		}
 	}
-	session_mq_cleanup();
+	session_manager_cleanup();
 	utarray_free(global_plugin_specs);
 	return;	
 };
@@ -66,18 +67,17 @@ struct plugin_runtime_exdata
 	int session_interest_state;
 };
 
-UT_icd plugin_runtime_exdata_icd = {sizeof(struct plugin_runtime_exdata), NULL, NULL, NULL};
-static UT_array * adapter_init_plugin_runtime(struct session *sess, enum session_type type)
+static struct plugin_runtime_exdata* adapter_new_plugin_runtime(enum session_type type, UT_array *plugin_specs)
 {
-	UT_array *plugin_rt = NULL;
-	unsigned int len = utarray_len(global_plugin_specs);
+	struct plugin_runtime_exdata *plugin_rt = NULL;
+	unsigned int len = utarray_len(plugin_specs);
 	if (len > 0)
 	{
-		utarray_new(plugin_rt, &plugin_runtime_exdata_icd);
+		plugin_rt=CALLOC(struct plugin_runtime_exdata, len);
 		for (unsigned int i = 0; i < len; i++)
 		{
-			struct plugin_specific *spec = (struct plugin_specific *)utarray_eltptr(global_plugin_specs, i);
-			struct plugin_runtime_exdata *exdata = CALLOC(struct plugin_runtime_exdata, 1);
+			struct plugin_specific *spec = (struct plugin_specific *)utarray_eltptr(plugin_specs, i);
+			struct plugin_runtime_exdata *exdata = plugin_rt+i;
 			if (type == SESSION_TYPE_TCP)
 			{
 				exdata->session_entry_cb = spec->tcp_session_entry_cb;
@@ -88,7 +88,6 @@ static UT_array * adapter_init_plugin_runtime(struct session *sess, enum session
 				exdata->session_entry_cb = spec->tcp_session_entry_cb;
 				exdata->session_interest_state = spec->tcp_session_interest_state;
 			}
-			utarray_push_back(plugin_rt, exdata);
 		}
 	}
 	return plugin_rt;
@@ -96,10 +95,12 @@ static UT_array * adapter_init_plugin_runtime(struct session *sess, enum session
 
 static void adapter_dispatch_session(int plugin_rt_exdata_idx, struct session *sess, enum session_state state, int thread_id)
 {
-	UT_array *plugin_rt = session_get_ex_data(sess, plugin_rt_exdata_idx);
+	struct plugin_runtime_exdata  *plugin_rt = (struct plugin_runtime_exdata *)session_get_ex_data(sess, plugin_rt_exdata_idx);
 	struct plugin_runtime_exdata *p = NULL;
-	while( (p=(struct plugin_runtime_exdata*)utarray_next(plugin_rt,p))) 
+	unsigned int len = utarray_len(global_plugin_specs);
+	for(unsigned  i = 0; i < len; i++)
 	{
+		p = (plugin_rt+i);
 		if(p->session_entry_cb != NULL && (p->session_interest_state & state))
 		{
 			p->session_entry_cb(sess, state, thread_id);
@@ -127,7 +128,7 @@ void adapter_session_open(struct streaminfo *stream, struct session **sess, int 
 		return;
 	}
 	*sess=session_new(stream, type, thread_id);
-	UT_array *plugin_rt=adapter_init_plugin_runtime(*sess,type);
+	struct plugin_runtime_exdata*plugin_rt=adapter_new_plugin_runtime(type, global_plugin_specs);
 	session_set_ex_data(*sess, global_plugin_runtime_exdata_idx, plugin_rt);
 	adapter_dispatch_session(global_plugin_runtime_exdata_idx, *sess, SESSION_STATE_OPENING, thread_id);
 	return;
@@ -135,7 +136,7 @@ void adapter_session_open(struct streaminfo *stream, struct session **sess, int 
 
 void adapter_session_active(struct streaminfo *stream, struct session **sess, int thread_id)
 {
-	if (*sess == NULL)
+	if (*sess)
 	{
 		session_set_state(*sess, SESSION_STATE_ACTIVE, thread_id);
 		adapter_dispatch_session(global_plugin_runtime_exdata_idx, *sess, SESSION_STATE_ACTIVE, thread_id);
@@ -158,8 +159,8 @@ void adapter_session_close(struct streaminfo *stream, struct session **sess, int
 void session_dettach_plugin(struct session *sess, plugin_id_t self)
 {
 	if(sess==NULL)return;
-	UT_array *plugin_rt=session_get_ex_data(sess, global_plugin_runtime_exdata_idx);
-	struct plugin_runtime_exdata *p=(struct plugin_runtime_exdata *)utarray_eltptr(plugin_rt, (unsigned int)self);
+	struct plugin_runtime_exdata *plugin_rt=(struct plugin_runtime_exdata *)session_get_ex_data(sess, global_plugin_runtime_exdata_idx);
+	struct plugin_runtime_exdata *p=(plugin_rt+(unsigned int)self);
 	if(p)
 	{
 		p->session_interest_state=SESSION_STATE_INVALID;
@@ -170,8 +171,8 @@ void session_dettach_plugin(struct session *sess, plugin_id_t self)
 void session_attach_plugin(struct session *sess, plugin_id_t self)
 {	
 	if(sess==NULL)return;
-	UT_array *plugin_rt=session_get_ex_data(sess, global_plugin_runtime_exdata_idx);
-	struct plugin_runtime_exdata *p=(struct plugin_runtime_exdata *)utarray_eltptr(plugin_rt, (unsigned int)self);
+	struct plugin_runtime_exdata *plugin_rt=(struct plugin_runtime_exdata *)session_get_ex_data(sess, global_plugin_runtime_exdata_idx);
+	struct plugin_runtime_exdata *p=(plugin_rt+(unsigned int)self);
 	if(p)
 	{
 		p->session_interest_state=SESSION_STATE_ALL;
@@ -187,12 +188,12 @@ const char* session_get_readable_addr(struct session *sess)
 const char *session_get_current_payload(struct session *sess, size_t *payload_len)
 {
 	*payload_len = (size_t)sess->stream->ptcpdetail->datalen;
-	return sess->stream->ptcpdetail->pdata;
+	return (const char*)sess->stream->ptcpdetail->pdata;
 }
 
 const struct packet *session_get_current_packet(struct session *sess)
 {
-	return get_rawpkt_from_streaminfo(sess->stream);
+	return (const struct packet *)get_rawpkt_from_streaminfo(sess->stream);
 }
 
 const char *packet_get_data(const struct packet *pkt, size_t *data_len)

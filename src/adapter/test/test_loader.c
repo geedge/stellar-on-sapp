@@ -12,18 +12,18 @@ struct plugin_specific g_plugin_schema[] =
 	{
 	.init_cb = test_entry_plugin_init,
 	.exit_cb = test_entry_plugin_exit,
-	.tcp_session_entry_cb=test_entry_plugin_entry,
 	.udp_session_entry_cb=test_entry_plugin_entry,
-	.tcp_session_interest_state=SESSION_STATE_ALL,
+	.tcp_session_entry_cb=test_entry_plugin_entry,
 	.udp_session_interest_state=SESSION_STATE_ALL,
+	.tcp_session_interest_state=SESSION_STATE_ALL,
 	},
 	{
 	.init_cb = test_mq_plugin_init,
 	.exit_cb = test_mq_plugin_exit,
-	.tcp_session_entry_cb=test_mq_plugin_entry,
 	.udp_session_entry_cb=test_mq_plugin_entry,
-	.tcp_session_interest_state=SESSION_STATE_ALL,
+	.tcp_session_entry_cb=test_mq_plugin_entry,
 	.udp_session_interest_state=SESSION_STATE_ALL,
+	.tcp_session_interest_state=SESSION_STATE_ALL,
 	},
 };
 
@@ -60,7 +60,7 @@ int TEST_INIT()
 	if(ret != 0)return -1;
 
 	session_mq_create_topic("test_mq_topic", test_mq_topic_free, NULL);
-	session_mq_subscribe_topic("test_mq_topic", test_mq_loader_read, NULL, 1);
+	session_mq_subscribe_topic("test_mq_topic", test_mq_loader_read, NULL);
 	return 0;
 }
 
@@ -73,7 +73,7 @@ void TEST_EXIT(void)
 }
 
 
-static void print_steam_ctx(struct streaminfo *pstream, struct test_stream_ctx *ctx)
+static void print_stream_ctx(struct streaminfo *pstream, struct test_stream_ctx *ctx)
 {
 	printf("stream-----------%20s: ", printaddr(&(pstream->addr),	pstream->threadnum));
 	printf("server-pkt=%u, server-count=%u, client-pkt=%u, client-count=%u, ",
@@ -84,7 +84,7 @@ static void print_steam_ctx(struct streaminfo *pstream, struct test_stream_ctx *
 	return;
 }
 
-static struct test_stream_ctx *stream_ctx_dup(struct test_stream_ctx *origin)
+static struct test_stream_ctx *stream_ctx_dup(const struct test_stream_ctx *origin)
 {
 	struct test_stream_ctx *ctx=CALLOC(struct test_stream_ctx,1);
 	memcpy(ctx, origin, sizeof(struct test_stream_ctx));
@@ -93,12 +93,12 @@ static struct test_stream_ctx *stream_ctx_dup(struct test_stream_ctx *origin)
 
 static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet)
 {
-	struct test_stream_ctx *ctx=*pme;
+	struct test_stream_ctx *ctx=(struct test_stream_ctx *)*pme;
 	struct tcpdetail *pdetail=(struct tcpdetail *)pstream->pdetail;
 	if(*pme==NULL)
 	{
 		*pme=CALLOC(struct test_stream_ctx,1);
-		ctx=*pme;
+		ctx=(struct test_stream_ctx *)*pme;
 	}
 
 	if(a_packet!=NULL)
@@ -118,7 +118,7 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		adapter_session_open(pstream, &ctx->sess, thread_seq);
 		break;
 	case OP_STATE_DATA:
-		msg = stream_ctx_dup(*pme);
+		msg = stream_ctx_dup((const struct test_stream_ctx *)*pme);
 		if(session_produce_message(ctx->sess, "test_mq_topic", msg) < 0)
 		{
 			FREE(msg);
@@ -127,7 +127,7 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		break;
 	case OP_STATE_CLOSE:
 		adapter_session_close(pstream, &ctx->sess, thread_seq);
-		print_steam_ctx(pstream, ctx);
+		print_stream_ctx(pstream, ctx);
 		FREE(*pme);
 		break;
 	default:
