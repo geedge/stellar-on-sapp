@@ -3,10 +3,19 @@
 
 #include <stdint.h>
 
-struct adapter;
+struct plugin_specific
+{
+	plugin_init_callback *init_cb;
+	plugin_exit_callback *exit_cb;
+	plugin_session_callback *udp_session_entry_cb;
+	plugin_session_callback *tcp_session_entry_cb;
+	int udp_session_interest_state;
+	int tcp_session_interest_state;
+	
+};
 
-struct adapter *adapter_init(struct plugin_spec schemas[] , int schema_num);
-void adapter_exit(struct adapter *adapter);
+int adapter_init(struct plugin_specific specs[] , int specs_num);
+void adapter_exit();
 
 
 
@@ -14,8 +23,8 @@ void adapter_exit(struct adapter *adapter);
 struct streaminfo;
 
 //streaminfo open
-uint8_t adapter_session_open(struct adapter *adapter, struct streaminfo *stream, struct session **session, int thread_id);
-uint8_t adapter_session_active(struct adapter *adapter, struct streaminfo *stream, struct session **session, int thread_id);
+void adapter_session_open(struct streaminfo *stream, struct session **session, int thread_id);
+void adapter_session_active(struct streaminfo *stream, struct session **session, int thread_id);
 
 //streaminfo close, or firewall active close streaminfo  
-uint8_t adapter_session_close(struct adapter *adapter, struct streaminfo *stream, struct session **session, int thread_id);
+void adapter_session_close(struct streaminfo *stream, struct session **session, int thread_id);

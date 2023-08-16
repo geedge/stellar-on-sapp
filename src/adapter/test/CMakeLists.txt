@@ -1,4 +1,3 @@
-set(CMAKE_C_FLAGS "-std=c99")
 add_definitions(-fPIC)
 
 add_library(test_loader SHARED test_loader.c test_plugin.c) 
