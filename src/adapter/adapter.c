@@ -63,7 +63,7 @@ void adapter_exit()
 
 struct plugin_runtime_exdata
 {
-	plugin_entry_callback *session_entry_cb;
+	plugin_session_callback *session_entry_cb;
 	int session_interest_state;
 };
 

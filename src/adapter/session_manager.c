@@ -58,7 +58,6 @@ int session_get_ex_new_index(const char *name, session_ex_free *free_func,void *
 
 struct session_exdata_runtime
 {
-	struct session *sess;
 	void *data;
 };
 
@@ -71,7 +70,6 @@ int session_set_ex_data(struct session *sess, int idx, void *ex_ptr)
 	struct session_exdata_meta* meta = (struct session_exdata_meta*)utarray_eltptr(global_session_exdata_metas, (unsigned int)idx);
 	if(exdata)
 	{
-		exdata->sess=sess;
 		if(meta->free_func && exdata->data)
 		{
 			meta->free_func(sess, idx, exdata->data, meta->arg);
@@ -106,7 +104,7 @@ struct session_mq
 
 struct subscriber 
 {
-    msg_consume_cb_func *read_cb;
+    msg_subscriber_cb_func *sub_cb;
     void *cb_arg;
     STAILQ_ENTRY(subscriber) entries;
 };
@@ -191,7 +189,7 @@ void session_mq_loop(struct session *sess)
 		{
 			STAILQ_FOREACH(sub, &topic->subscribers, entries)
 			{
-				sub->read_cb(sess, node->topic_name, node->message, sub->cb_arg);
+				sub->sub_cb(sess, node->topic_name, node->message, sub->cb_arg);
 			}
 			if(topic->free_cb != NULL)
 			{
@@ -259,7 +257,7 @@ int session_mq_destroy_topic(const char *topic_name) {
 }
 
 
-int session_produce_message(struct session *sess, const char *topic_name, void *data)
+int session_publish_message(struct session *sess, const char *topic_name, void *data)
 {
 	struct session_mq_topic_schema *topic;
 	HASH_FIND_STR(global_session_mq_schema, topic_name, topic);
@@ -275,7 +273,7 @@ int session_produce_message(struct session *sess, const char *topic_name, void *
 	return 0;
 }
 
-int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg)
+int session_mq_subscribe_topic(const char *topic_name, msg_subscriber_cb_func *sub_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
 	session_mq_create_topic(topic_name, NULL, NULL);
@@ -285,7 +283,7 @@ int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read
         return -1; // topic create failed
     }
 	struct subscriber *new_subscriber = CALLOC(struct subscriber,1);
-    new_subscriber->read_cb = read_cb;
+    new_subscriber->sub_cb = sub_cb;
     new_subscriber->cb_arg = cb_arg;
 	STAILQ_INSERT_TAIL(&topic->subscribers, new_subscriber, entries);
 	return 0;

@@ -119,7 +119,7 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		break;
 	case OP_STATE_DATA:
 		msg = stream_ctx_dup((const struct test_stream_ctx *)*pme);
-		if(session_produce_message(ctx->sess, "test_mq_topic", msg) < 0)
+		if(session_publish_message(ctx->sess, "test_mq_topic", msg) < 0)
 		{
 			FREE(msg);
 		}

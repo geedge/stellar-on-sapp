@@ -7,10 +7,11 @@ struct plugin_specific
 {
 	plugin_init_callback *init_cb;
 	plugin_exit_callback *exit_cb;
-	plugin_entry_callback *udp_session_entry_cb;
-	plugin_entry_callback *tcp_session_entry_cb;
+	plugin_session_callback *udp_session_entry_cb;
+	plugin_session_callback *tcp_session_entry_cb;
 	int udp_session_interest_state;
 	int tcp_session_interest_state;
+	
 };
 
 int adapter_init(struct plugin_specific specs[] , int specs_num);

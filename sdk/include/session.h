@@ -18,6 +18,7 @@ enum session_state
 	SESSION_STATE_ACTIVE = 1 << 2,
 	SESSION_STATE_CLOSING = 1 << 3,
 	SESSION_STATE_ALL = (1 << 1 | 1 << 2 | 1 << 3),
+	__SESSION_STATE_MAX,
 };
 
 struct flow_flag 
@@ -42,15 +43,15 @@ const char *packet_get_data(const struct packet *pkt, size_t *data_len);
 typedef  int plugin_id_t;
 //session mq
 typedef void msg_free_cb_func(void *msg, void *cb_arg);
-typedef int  msg_consume_cb_func(struct session *sess, const char *topic_name, const void *msg, void *cb_arg);
+typedef int  msg_subscriber_cb_func(struct session *sess, const char *topic_name, const void *msg, void *cb_arg);
 
 int session_mq_create_topic(const char *topic_name, msg_free_cb_func *free_cb, void *cb_arg);
 int session_mq_destroy_topic(const char *topic_name);
-int session_produce_message(struct session *sess, const char *topic_name, void *msg);
-int session_ignore_message(struct session *sess, const char *topic_name, int consumer_id);
+int session_publish_message(struct session *sess, const char *topic_name, void *msg);
+int session_ignore_message(struct session *sess, const char *topic_name, int sub_id);
 
-//return consumer_id >=0 if success, otherwise return -1.
-int session_mq_subscribe_topic(const char *topic_name, msg_consume_cb_func *read_cb, void *cb_arg);
+//return sub_id >=0 if success, otherwise return -1.
+int session_mq_subscribe_topic(const char *topic_name, msg_subscriber_cb_func *sub_cb, void *cb_arg);
 
 
 typedef void session_ex_free(struct session *sess, int idx, void *ex_ptr, void *arg);
