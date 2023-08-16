@@ -92,13 +92,13 @@ void test_entry_plugin_entry(struct session *sess, enum session_state state, int
 	const struct packet *pkt = session_get_current_packet(sess);
 	if (pkt)
 	{
-		struct flow_flag flag = session_get_current_flow_flag(sess);
-		if (flag.flow_flag_see_client_to_server)
+		int dir = session_get_direction(sess);
+		if (dir==SESSION_DIRECTION_IN)
 		{
 			test_ctx->c2s_bytes += payload_len;
 			test_ctx->c2s_pkts += 1;
 		}
-		if (flag.flow_flag_see_server_to_client)
+		if (dir==SESSION_DIRECTION_OUT)
 		{
 			test_ctx->s2c_bytes += payload_len;
 			test_ctx->s2c_pkts += 1;

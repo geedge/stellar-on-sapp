@@ -175,7 +175,7 @@ void session_attach_plugin(struct session *sess, plugin_id_t self)
 	struct plugin_runtime_exdata *p=(plugin_rt+(unsigned int)self);
 	if(p)
 	{
-		p->session_interest_state=SESSION_STATE_ALL;
+		p->session_interest_state=__SESSION_STATE_MAX;
 	}
 	return;
 }
@@ -201,46 +201,40 @@ const char *packet_get_data(const struct packet *pkt, size_t *data_len)
 	return NULL;
 }
 
-struct flow_flag session_get_flow_flag(const struct session *sess)
+int  session_get_direction(const struct session *sess)
 {
-	struct flow_flag flag={0};
 	if(sess->stream)
 	{
-		if(sess->stream->dir==DIR_DOUBLE)
+		if(sess->stream->curdir==DIR_C2S)
 		{
-			flag.flow_flag_see_client_to_server=1;
-			flag.flow_flag_see_server_to_client=1;
+			return SESSION_DIRECTION_IN;
 		}
-		else if(sess->stream->dir==DIR_C2S)
+		else if(sess->stream->curdir==DIR_S2C)
 		{
-			flag.flow_flag_see_client_to_server=1;
-		}
-		else if(sess->stream->dir==DIR_S2C)
-		{
-			flag.flow_flag_see_server_to_client=1;
+			return SESSION_DIRECTION_OUT;
 		}
 	}
-	return flag;
-}
+	return -1;
+} 
 
-struct flow_flag session_get_current_flow_flag(struct session *sess)
+int session_is_symmetric(const struct session *sess, unsigned char *flag)
 {
-	struct flow_flag flag={0};
+	int is_symmetric=0;
 	if(sess->stream)
 	{
 		if(sess->stream->curdir==DIR_DOUBLE)
 		{
-			flag.flow_flag_see_client_to_server=1;
-			flag.flow_flag_see_server_to_client=1;
+			*flag=(SESSION_SEEN_C2S_FLOW|SESSION_SEEN_S2C_FLOW);
+			is_symmetric=1;
 		}
 		else if(sess->stream->curdir==DIR_C2S)
 		{
-			flag.flow_flag_see_client_to_server=1;
+			*flag=SESSION_SEEN_C2S_FLOW;
 		}
 		else if(sess->stream->curdir==DIR_S2C)
 		{
-			flag.flow_flag_see_server_to_client=1;
+			*flag=SESSION_SEEN_S2C_FLOW;
 		}
 	}
-	return flag;
+	return is_symmetric;
 }	

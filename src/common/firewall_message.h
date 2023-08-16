@@ -49,17 +49,19 @@ struct tsg_rule_message
 
 #define	MONITOR_CAPTURE_INFO_MESSAGE_TOPIC "TOPIC_MONITOR_CAPTURE_INFO"
 #define	MAX_VLAN_ID_NUM	8
+#include <uuid/uuid.h>
 struct capture_info_message
 {
 	int magic;
 	long long rule_id;
+	uuid_t uuid;
 	int capture_depth;
 	int vlan_num;
 	int vlan_id[];
 };
 
 #define	FILE_CHUNK_MESSAGE_TOPIC "TOPIC_FILE_CHUNK"
-#include <uuid/uuid.h>
+
 struct file_chunk
 {
     uuid_t uuid;
@@ -67,3 +69,4 @@ struct file_chunk
     const char *chunk;
     size_t chunk_len;
 };
+

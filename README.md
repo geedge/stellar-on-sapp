@@ -4,7 +4,7 @@ The Stellar-C is a transition solution from Sapp to Stellar for fast DPI plugin 
 * Each session has a message queue, which facilitates the exchange of messages among plugins. The message delivery is in the session scope. In Stellar-C, plugins are decoupled through the publish-subscribe mechanism.
 * EXdata (Extra Data) is attached to a session for plugin context management.
 
-![stellar-c-high-level-design](./docs/images/firewall-stellar-session.png)
+![stellar-c-high-level-design](./docs/images/stellar-arch.jpg)
 
 ## Components
 The Stellar-C consists of the following components:
@@ -14,9 +14,7 @@ The Stellar-C consists of the following components:
 * Common libraries are shared libraries that are used by Stellar plugins, such as utable, logger.
 * Test framework generates sessions and messages from different data source for testing Stellar plugins. Possible data sources include pcap file, Kafka message queue, and fuzzing data.
 
-![stellar-c-high-level-design](./docs/images/firewall-stellar-c.png)
-
-
 ## The Lifecycle of a Session
+All session has three states for plugin view, which are Opening, Active, Closing.
 
 ![stellar-session-life-cycle](./docs/images/firewall-session-lifecycle.png)

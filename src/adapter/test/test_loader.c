@@ -14,16 +14,16 @@ struct plugin_specific g_plugin_schema[] =
 	.exit_cb = test_entry_plugin_exit,
 	.udp_session_entry_cb=test_entry_plugin_entry,
 	.tcp_session_entry_cb=test_entry_plugin_entry,
-	.udp_session_interest_state=SESSION_STATE_ALL,
-	.tcp_session_interest_state=SESSION_STATE_ALL,
+	.udp_session_interest_state=__SESSION_STATE_MAX,
+	.tcp_session_interest_state=__SESSION_STATE_MAX,
 	},
 	{
 	.init_cb = test_mq_plugin_init,
 	.exit_cb = test_mq_plugin_exit,
 	.udp_session_entry_cb=test_mq_plugin_entry,
 	.tcp_session_entry_cb=test_mq_plugin_entry,
-	.udp_session_interest_state=SESSION_STATE_ALL,
-	.tcp_session_interest_state=SESSION_STATE_ALL,
+	.udp_session_interest_state=__SESSION_STATE_MAX,
+	.tcp_session_interest_state=__SESSION_STATE_MAX,
 	},
 };
 

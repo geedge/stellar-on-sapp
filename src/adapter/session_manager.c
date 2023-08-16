@@ -104,7 +104,7 @@ struct session_mq
 
 struct subscriber 
 {
-    msg_subscriber_cb_func *sub_cb;
+    on_msg_cb_func *sub_cb;
     void *cb_arg;
     STAILQ_ENTRY(subscriber) entries;
 };
@@ -273,7 +273,7 @@ int session_publish_message(struct session *sess, const char *topic_name, void *
 	return 0;
 }
 
-int session_mq_subscribe_topic(const char *topic_name, msg_subscriber_cb_func *sub_cb, void *cb_arg)
+int session_mq_subscribe_topic(const char *topic_name, on_msg_cb_func *sub_cb, void *cb_arg)
 {
 	struct session_mq_topic_schema *topic;
 	session_mq_create_topic(topic_name, NULL, NULL);
