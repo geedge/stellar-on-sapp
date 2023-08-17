@@ -68,13 +68,13 @@ add_custom_target("install-profile" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Pr
 
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/deps)
-include_directories(${CMAKE_SOURCE_DIR}/sdk/include)
+include_directories(${CMAKE_SOURCE_DIR}/include)
 
 #add_subdirectory(vendor)
-add_subdirectory(deps/toml)
+#add_subdirectory(deps/toml)
 #add_subdirectory(deps/utable)
 add_subdirectory(src/adapter)
-add_subdirectory(src/adapter/test)
+add_subdirectory(examples/sapp_plugin)
 
 #enable_testing()
 #add_subdirectory(test)
