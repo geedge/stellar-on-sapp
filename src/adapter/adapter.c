@@ -211,13 +211,13 @@ const struct packet *session_get0_current_packet(struct session *sess)
 
 int packet_get_direction(const struct packet *pkt)
 {
-	// TODO: 
+	// TODO: adaptor to sapp api
 	return -1;
 }   	
 
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 {
-	// TODO:
+	// TODO: adaptor to sapp api
 	return NULL;
 }
 
@@ -267,6 +267,6 @@ int stellar_get_worker_thread_num(struct stellar *st)
 
 int stellar_get_current_thread_id(struct stellar *st)
 {
-	// TODO:
+	// TODO: adaptor to sapp api
 	return 0;
 }

@@ -305,7 +305,8 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 	struct session_event *p = NULL;
 	unsigned int len = utarray_len(sess->st->plugin_specs_array);
 	sess->state = state;
-	int events=(1<<state|(sess->type==SESSION_TYPE_TCP?SESS_EV_TCP:SESS_EV_UDP));// TODO: upgrade
+	// TODO: improve state to events logic 
+	int events=(1<<state|(sess->type==SESSION_TYPE_TCP?SESS_EV_TCP:SESS_EV_UDP));
 	for(unsigned i = 0; i < len; i++)
 	{
 		p = (intrinsic_events+i);
@@ -389,12 +390,11 @@ void session_event_free(struct session_event *ev)
 
 int session_event_add(struct session_event *ev, const struct timeval *timeout)
 {
-	// TODO
+	// TODO: add to sapp stream timer
 	if(timeout)
 	{
 		ev->timeout = *timeout;
 	}
-	// TODO: if is_intrinsic, dup or move to ev_list
 	DL_APPEND(ev->sess->ev_list, ev);
 	return 0;
 }
@@ -413,7 +413,6 @@ int session_event_assign(struct session_event *ev, struct stellar *st, struct se
 
 int session_event_del(struct session_event *ev)
 {
-	// TODO:
 	ev->is_delete=1;
 	if(ev->is_intrinsic==0 && (ev->prev != NULL || ev->next != NULL))
 	{
@@ -483,6 +482,6 @@ void session_defer_loop(struct session *sess)
 
 int stellar_worker_thread_periodic_add(struct stellar *st, stellar_periodic_cb_func *periodic_cb, void *cb_arg, const struct timeval *interval)
 {
-	// TODO:
+	// TODO: add to sapp thread timer
 	return -1;
 }
