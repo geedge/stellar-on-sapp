@@ -14,11 +14,3 @@ typedef int stellar_periodic_cb_func(struct stellar *st, void *cb_arg);
 
 int stellar_worker_thread_periodic_add(struct stellar *st, stellar_periodic_cb_func *periodic_cb, void *cb_arg, const struct timeval *interval);
 
-struct plugin_specific
-{
-	plugin_init_callback *init_cb;
-	plugin_exit_callback *exit_cb;
-};
-
-struct stellar *stellar_init(struct plugin_specific specs[] , int specs_num);
-void stellar_exit(struct stellar *);

@@ -2,25 +2,12 @@
 #include "stellar/session_mq.h"
 #include "stellar/utils.h"
 
-#include "simple_stellar_plugin.h"
-
 #include "adapter/adapter.h"
 #include "adapter/session_manager.h"
 
 #include <MESA/stream.h>
 #include <stdio.h>
 
-struct plugin_specific g_plugin_schema[] =
-{
-	{
-	.init_cb = simple_stellar_event_plugin_init,
-	.exit_cb = simple_stellar_event_plugin_exit,
-	},
-	{
-	.init_cb = simple_stellar_mq_plugin_init,
-	.exit_cb = simple_stellar_mq_plugin_exit,
-	},
-};
 
 struct simple_stream_ctx
 {
@@ -53,7 +40,7 @@ void *g_stellar=NULL;
 int g_topic_id=-1;
 int LOADER_INIT()
 {
-	g_stellar = stellar_init(g_plugin_schema, 2);
+	g_stellar = stellar_init("./stellar_plugin/simple_plugin.toml");
 	if(g_stellar==NULL)return -1;
 	int t_topic_id=session_mq_get_topic_id(g_stellar, "SIMPLE_MQ_TOPIC");
 	if(t_topic_id >= 0)

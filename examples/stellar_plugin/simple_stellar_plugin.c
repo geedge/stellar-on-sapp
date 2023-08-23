@@ -1,5 +1,3 @@
-#include "simple_stellar_plugin.h"
-
 #include "stellar/stellar.h"
 #include "stellar/utils.h"
 #include "stellar/session_exdata.h"

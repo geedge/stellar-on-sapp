@@ -75,6 +75,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 #add_subdirectory(deps/utable)
 add_subdirectory(src/adapter)
 add_subdirectory(examples/sapp_plugin)
+add_subdirectory(examples/stellar_plugin)
 
 #enable_testing()
 #add_subdirectory(test)
