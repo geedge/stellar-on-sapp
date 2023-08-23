@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 #define MESSAGE_MAGIC 0x12345678
 
@@ -58,6 +59,13 @@ struct capture_info_message
 	int capture_depth;
 	int vlan_num;
 	int vlan_id[];
+};
+
+#define SESSION_FLAGS_MESSAGE_TOPIC "TOPIC_SESSION_FLAGS"
+struct session_flags_message
+{
+	uint64_t flags;
+	char *identify_info;
 };
 
 #define	FILE_CHUNK_MESSAGE_TOPIC "TOPIC_FILE_CHUNK"
