@@ -78,3 +78,10 @@ struct file_chunk
     size_t chunk_len;
 };
 
+#define CTRL_PACKET_IN_MESSAGE_TOPIC "TOPIC_CTRL_PACKET_IN"
+#define CTRL_PACKET_OUT_MESSAGE_TOPIC "TOPIC_CTRL_PACKET_OUT"
+struct buffer_message
+{
+    size_t buff_sz;
+    char *buff;
+};
