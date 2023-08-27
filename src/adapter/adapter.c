@@ -211,26 +211,47 @@ const struct packet *session_get0_current_packet(struct session *sess)
 
 int packet_get_direction(const struct packet *pkt)
 {
-	// TODO: adaptor to sapp api
+	const struct streaminfo *pstream=get_streaminfo_from_rawpkt(pkt);
+	if(pstream->curdir==DIR_C2S)
+	{
+		return PACKET_DIRECTION_C2S;
+	}
+	else if(pstream->curdir==DIR_S2C)
+	{
+		return PACKET_DIRECTION_S2C;
+	}
 	return -1;
 }   	
 
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 {
-	// TODO: adaptor to sapp api
-	return NULL;
+	const void *raw_data=NULL;
+	int raw_datalen=0;
+	int ret1 = get_opt_from_rawpkt(pkt, RAW_PKT_GET_DATA, &raw_data);
+	int ret2 = get_opt_from_rawpkt(pkt, RAW_PKT_GET_TOT_LEN, &raw_datalen);
+	if(ret1 >= 0 || ret2 >= 0)
+	{
+		*data_len = raw_datalen;
+		return (const char *)raw_data;
+	}
+	else
+	{
+		*data_len = 0;
+		return NULL;
+	}
 }
 
 int  session_get_direction(const struct session *sess)
 {
-	// TODO: check route dir
 	if(sess->stream)
 	{
-		if(sess->stream->curdir==DIR_C2S)
+		int c2s_router_dir=(sess->stream->curdir==DIR_C2S)?(sess->stream->routedir):((sess->stream->routedir)^1);
+		int dir=MESA_dir_link_to_human(c2s_router_dir);
+		if(dir == (int)'I')
 		{
 			return SESSION_DIRECTION_IN;
 		}
-		else if(sess->stream->curdir==DIR_S2C)
+		if(dir == (int)'E')
 		{
 			return SESSION_DIRECTION_OUT;
 		}
@@ -267,6 +288,5 @@ int stellar_get_worker_thread_num(struct stellar *st)
 
 int stellar_get_current_thread_id(struct stellar *st)
 {
-	// TODO: adaptor to sapp api
-	return 0;
+	return get_current_worker_thread_id();
 }
