@@ -72,15 +72,7 @@ int session_set_ex_data(struct session *sess, int idx, void *ex_ptr)
 	unsigned int len=utarray_len(sess->st->session_exdata_schema_array);
 	if(len < (unsigned int)idx)return -1;
 	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)(sess->ex_data_rt+idx);
-	struct session_exdata_schema* schema = (struct session_exdata_schema*)utarray_eltptr(sess->st->session_exdata_schema_array, (unsigned int)idx);
-	if(exdata)
-	{
-		if(schema->free_func && exdata->data)
-		{
-			schema->free_func(sess, idx, exdata->data, schema->arg);
-		}
-		exdata->data = ex_ptr;
-	}
+	exdata->data = ex_ptr;
 	return -1;
 }
 
@@ -299,6 +291,7 @@ typedef struct session_event
 	struct session_event *next, *prev;
 }session_event;
 
+
 void session_dispatch(struct session *sess, enum session_state state,  struct packet *pkt)
 {
 	struct session_event  *intrinsic_events = (struct session_event *)session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
@@ -330,14 +323,11 @@ static struct session_event* session_intrinsic_events_init(struct stellar *st, s
 	return intrinsic_events;
 }
 
-struct streaminfo;
-struct session *session_new(struct stellar *st, struct streaminfo* stream, enum session_type type, int thread_id)
+struct session *session_new(struct stellar *st, enum session_type type, int thread_id)
 {
-	if(stream == NULL)return NULL;
 	if(type!=SESSION_TYPE_TCP && type!=SESSION_TYPE_UDP)return NULL;
 	struct session *sess = CALLOC(struct session, 1);
 	sess->st = st;
-	sess->stream = stream;
 	sess->type = type;
 	sess->state = SESSION_STATE_OPENING;
 	sess->mq = NULL;
@@ -349,6 +339,16 @@ struct session *session_new(struct stellar *st, struct streaminfo* stream, enum 
 
 }
 
+inline struct packet *session_get_current_packet(struct session *sess)
+{
+	return sess->cur_pkt;
+}
+
+inline void session_set_current_packet(struct session *sess, struct packet *pkt)
+{
+	sess->cur_pkt = pkt;
+}
+
 void session_free(struct session *sess)
 {
 	if(sess==NULL)return;
@@ -357,6 +357,10 @@ void session_free(struct session *sess)
 		session_mq_free(sess->mq);
 	}
 	session_free_exdata_runtime(sess, sess->ex_data_rt);
+	if(sess->cur_pkt)
+	{
+		FREE(sess->cur_pkt);
+	}
 	FREE(sess->ex_data_rt);
 	FREE(sess);
 }

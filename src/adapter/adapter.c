@@ -153,6 +153,14 @@ void stellar_exit(struct stellar *st)
 
 struct streaminfo;
 //streaminfo open
+
+
+struct packet
+{
+	void *a_packet;
+	struct streaminfo *a_stream;
+};
+
 struct session *adapter_session_open(struct stellar *st, struct streaminfo *stream, void *a_packet)
 {
 	enum session_type type;
@@ -168,8 +176,12 @@ struct session *adapter_session_open(struct stellar *st, struct streaminfo *stre
 	{
 		return NULL;
 	}
-	struct session *sess=session_new(st, stream, type, stream->threadnum);
-	session_dispatch(sess, SESSION_STATE_OPENING, a_packet);
+	struct packet *pkt=CALLOC(struct packet, 1);
+	pkt->a_packet=a_packet;
+	pkt->a_stream=stream;
+	struct session *sess=session_new(st, type, stream->threadnum);
+	session_set_current_packet(sess, pkt);
+	session_dispatch(sess, SESSION_STATE_OPENING, pkt);
 	return sess;
 }
 
@@ -177,7 +189,9 @@ void adapter_session_active(struct streaminfo *stream, struct session *sess, voi
 {
 	if (sess)
 	{
-		session_dispatch( sess, SESSION_STATE_ACTIVE, a_packet);
+		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
+		pkt->a_packet=a_packet;
+		session_dispatch( sess, SESSION_STATE_ACTIVE, pkt);
 	}
 	return;
 }
@@ -187,6 +201,8 @@ void adapter_session_close(struct streaminfo *stream, struct session *sess, void
 {
 	if(sess)
 	{
+		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
+		pkt->a_packet=a_packet;
 		session_dispatch(sess, SESSION_STATE_CLOSING, a_packet);
 		session_free(sess);
 	}
@@ -195,23 +211,23 @@ void adapter_session_close(struct streaminfo *stream, struct session *sess, void
 
 const char* session_get0_readable_addr(struct session *sess)
 {
-	return printaddr(&sess->stream->addr, sess->stream->threadnum);
+	return printaddr(&sess->cur_pkt->a_stream->addr, sess->cur_pkt->a_stream->threadnum);
 }
 
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len)
 {
-	*payload_len = (size_t)sess->stream->ptcpdetail->datalen;
-	return (const char*)sess->stream->ptcpdetail->pdata;
+	*payload_len = (size_t)sess->cur_pkt->a_stream->ptcpdetail->datalen;
+	return (const char*)sess->cur_pkt->a_stream->ptcpdetail->pdata;
 }
 
 const struct packet *session_get0_current_packet(struct session *sess)
 {
-	return (const struct packet *)get_rawpkt_from_streaminfo(sess->stream);
+	return sess->cur_pkt;
 }
 
 int packet_get_direction(const struct packet *pkt)
 {
-	const struct streaminfo *pstream=get_streaminfo_from_rawpkt(pkt);
+	const struct streaminfo *pstream=pkt->a_stream;
 	if(pstream->curdir==DIR_C2S)
 	{
 		return PACKET_DIRECTION_C2S;
@@ -243,9 +259,9 @@ const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 
 int  session_get_direction(const struct session *sess)
 {
-	if(sess->stream)
+	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
-		int c2s_router_dir=(sess->stream->curdir==DIR_C2S)?(sess->stream->routedir):((sess->stream->routedir)^1);
+		int c2s_router_dir=(sess->cur_pkt->a_stream->curdir==DIR_C2S)?(sess->cur_pkt->a_stream->routedir):((sess->cur_pkt->a_stream->routedir)^1);
 		int dir=MESA_dir_link_to_human(c2s_router_dir);
 		if(dir == (int)'I')
 		{
@@ -262,18 +278,18 @@ int  session_get_direction(const struct session *sess)
 int session_is_symmetric(const struct session *sess, unsigned char *flag)
 {
 	int is_symmetric=0;
-	if(sess->stream)
+	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
-		if(sess->stream->curdir==DIR_DOUBLE)
+		if(sess->cur_pkt->a_stream->curdir==DIR_DOUBLE)
 		{
 			*flag=(SESSION_SEEN_C2S_FLOW|SESSION_SEEN_S2C_FLOW);
 			is_symmetric=1;
 		}
-		else if(sess->stream->curdir==DIR_C2S)
+		else if(sess->cur_pkt->a_stream->curdir==DIR_C2S)
 		{
 			*flag=SESSION_SEEN_C2S_FLOW;
 		}
-		else if(sess->stream->curdir==DIR_S2C)
+		else if(sess->cur_pkt->a_stream->curdir==DIR_S2C)
 		{
 			*flag=SESSION_SEEN_S2C_FLOW;
 		}

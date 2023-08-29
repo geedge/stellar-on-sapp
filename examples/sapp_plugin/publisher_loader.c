@@ -38,7 +38,7 @@ static int session_mq_loader_read(struct session *sess, int topic_id, const void
 
 void *g_stellar=NULL;
 int g_topic_id=-1;
-int LOADER_INIT()
+int PUBLISHER_LOADER_INIT()
 {
 	g_stellar = stellar_init("./stellar_plugin/simple_plugin.toml");
 	if(g_stellar==NULL)return -1;
@@ -56,7 +56,7 @@ int LOADER_INIT()
 	return 0;
 }
 
-void LOADER_EXIT(void)
+void PUBLISHER_LOADER_EXIT(void)
 {
 
 	session_mq_destroy_topic(g_stellar, g_topic_id);
@@ -128,13 +128,13 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	return;
 }
 
-char loader_udp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char publisher_loader_udp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 	return APP_STATE_GIVEME;
 }
 
-char loader_tcpall_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char publisher_loader_tcpall_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
 	return APP_STATE_GIVEME;

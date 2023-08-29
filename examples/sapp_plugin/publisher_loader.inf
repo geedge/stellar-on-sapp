@@ -1,0 +1,13 @@
+[PLUGINFO]
+PLUGNAME=publisher_loader
+SO_PATH=./plug/business/publisher_loader/publisher_loader.so
+INIT_FUNC=PUBLISHER_LOADER_INIT
+DESTROY_FUNC=PUBLISHER_LOADER_EXIT
+
+[TCP_ALL]
+FUNC_FLAG=ALL
+FUNC_NAME=publisher_loader_tcpall_stream_entry
+
+[UDP]
+FUNC_FLAG=ALL
+FUNC_NAME=publisher_loader_udp_stream_entry
