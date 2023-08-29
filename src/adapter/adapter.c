@@ -117,20 +117,12 @@ struct stellar *stellar_init(const char *toml_conf_path)
 		if (specs[i].init_cb != NULL)
 		{
 			spec_internal.plugin_ctx=specs[i].init_cb(st);
-			if(spec_internal.plugin_ctx == NULL)
-			{
-				goto ADAPTER_INIT_ERROR;
-			}
 			spec_internal.specs=specs[i];
 			utarray_push_back(st->plugin_specs_array, &spec_internal);
 		}
 	}
 	FREE(specs);
 	return st;
-ADAPTER_INIT_ERROR:
-	stellar_exit(st);
-	FREE(specs);
-	return NULL;
 }
 
 void stellar_exit(struct stellar *st)
@@ -214,6 +206,41 @@ const char* session_get0_readable_addr(struct session *sess)
 	return printaddr(&sess->cur_pkt->a_stream->addr, sess->cur_pkt->a_stream->threadnum);
 }
 
+struct session_addr *session_get0_addr(struct session *sess, enum session_addr_type *addr_type)
+{
+	struct session_addr *addr=NULL;
+	*addr_type=SESSION_ADDR_TYPE_UNKNOWN;
+	if(sess && sess->cur_pkt && sess->cur_pkt->a_stream)
+	{
+		struct streaminfo *pstream=sess->cur_pkt->a_stream;
+		if(pstream->addr.addrtype==ADDR_TYPE_IPV4)
+		{
+			if(pstream->type == STREAM_TYPE_TCP)
+			{
+				*addr_type=SESSION_ADDR_TYPE_IPV4_TCP;
+			}
+			else if(pstream->type == STREAM_TYPE_UDP)
+			{
+				*addr_type=SESSION_ADDR_TYPE_IPV4_UDP;
+			}
+			addr=(struct session_addr *)pstream->addr.tuple4_v4;
+		}
+		if(pstream->addr.addrtype==ADDR_TYPE_IPV6)
+		{
+			if(pstream->type == STREAM_TYPE_TCP)
+			{
+				*addr_type=SESSION_ADDR_TYPE_IPV6_TCP;
+			}
+			else if(pstream->type == STREAM_TYPE_UDP)
+			{
+				*addr_type=SESSION_ADDR_TYPE_IPV6_UDP;
+			}
+			addr=(struct session_addr *)pstream->addr.tuple4_v6;
+		}		
+	}
+	return addr;
+}
+
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len)
 {
 	*payload_len = (size_t)sess->cur_pkt->a_stream->ptcpdetail->datalen;
@@ -280,16 +307,16 @@ int session_is_symmetric(const struct session *sess, unsigned char *flag)
 	int is_symmetric=0;
 	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
-		if(sess->cur_pkt->a_stream->curdir==DIR_DOUBLE)
+		if(sess->cur_pkt->a_stream->dir==DIR_DOUBLE)
 		{
 			*flag=(SESSION_SEEN_C2S_FLOW|SESSION_SEEN_S2C_FLOW);
 			is_symmetric=1;
 		}
-		else if(sess->cur_pkt->a_stream->curdir==DIR_C2S)
+		else if(sess->cur_pkt->a_stream->dir==DIR_C2S)
 		{
 			*flag=SESSION_SEEN_C2S_FLOW;
 		}
-		else if(sess->cur_pkt->a_stream->curdir==DIR_S2C)
+		else if(sess->cur_pkt->a_stream->dir==DIR_S2C)
 		{
 			*flag=SESSION_SEEN_S2C_FLOW;
 		}

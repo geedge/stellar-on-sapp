@@ -86,3 +86,9 @@ char simple_loader_tcpall_stream_entry(struct streaminfo *pstream,void **pme, in
 	loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
 	return APP_STATE_GIVEME;
 }
+
+char simple_loader_tcp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+{
+	loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
+	return APP_STATE_GIVEME;
+}

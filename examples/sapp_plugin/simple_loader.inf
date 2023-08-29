@@ -8,6 +8,10 @@ DESTROY_FUNC=SIMPLE_LOADER_EXIT
 FUNC_FLAG=ALL
 FUNC_NAME=simple_loader_tcpall_stream_entry
 
+#[TCP]
+#FUNC_FLAG=ALL
+#FUNC_NAME=simple_loader_tcp_stream_entry
+
 [UDP]
 FUNC_FLAG=ALL
 FUNC_NAME=simple_loader_udp_stream_entry

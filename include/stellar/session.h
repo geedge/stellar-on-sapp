@@ -32,6 +32,42 @@ int session_is_symmetric(const struct session *sess, unsigned char *flag);
 #define SESSION_DIRECTION_OUT 1
 int  session_get_direction(const struct session *sess);       	
 
+enum session_addr_type
+{
+	SESSION_ADDR_TYPE_IPV4_TCP,
+	SESSION_ADDR_TYPE_IPV4_UDP,
+	SESSION_ADDR_TYPE_IPV6_TCP,
+	SESSION_ADDR_TYPE_IPV6_UDP,
+	SESSION_ADDR_TYPE_UNKNOWN,
+	__SESSION_ADDR_TYPE_MAX,
+};
+struct session_addr_ipv4{
+	uint32_t saddr;	/* network order */
+	uint32_t daddr;	/* network order */
+	uint16_t sport;	/* network order */
+	uint16_t dport;	/* network order */
+};
+
+#include <netinet/in.h>
+struct session_addr_ipv6
+{
+	uint8_t saddr[INET6_ADDRSTRLEN] ;
+	uint8_t daddr[INET6_ADDRSTRLEN] ;
+	uint16_t sport;	/* network order */
+	uint16_t dport;	/* network order */
+};
+
+struct session_addr
+{
+	union
+	{
+		struct session_addr_ipv4 ipv4;
+		struct session_addr_ipv6 ipv6;
+	};
+};
+
+struct session_addr *session_get0_addr(struct session *sess, enum session_addr_type *addr_type);
+
 const char *session_get0_readable_addr(struct session *sess);
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len);
 
