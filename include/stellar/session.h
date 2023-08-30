@@ -24,8 +24,8 @@ enum session_state
 
 struct session;
 
-#define SESSION_SEEN_C2S_FLOW (1 >> 1)
-#define SESSION_SEEN_S2C_FLOW (1 >> 2)
+#define SESSION_SEEN_C2S_FLOW (1 << 0)
+#define SESSION_SEEN_S2C_FLOW (1 << 1)
 int session_is_symmetric(const struct session *sess, unsigned char *flag);
 
 #define SESSION_DIRECTION_IN 0
