@@ -65,10 +65,13 @@ struct session_addr_ipv4{
 };
 
 #include <netinet/in.h>
+#ifndef IPV6_ADDR_LEN
+#define IPV6_ADDR_LEN	(sizeof(struct in6_addr))
+#endif
 struct session_addr_ipv6
 {
-	uint8_t saddr[INET6_ADDRSTRLEN] ;
-	uint8_t daddr[INET6_ADDRSTRLEN] ;
+	uint8_t saddr[IPV6_ADDR_LEN] ;
+	uint8_t daddr[IPV6_ADDR_LEN] ;
 	uint16_t sport;	/* network order */
 	uint16_t dport;	/* network order */
 };
