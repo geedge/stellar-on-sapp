@@ -28,6 +28,22 @@ struct session;
 #define SESSION_SEEN_S2C_FLOW (1 << 1)
 int session_is_symmetric(const struct session *sess, unsigned char *flag);
 
+
+
+#define SESSION_IS_TUNNLE_NON 	 (0) 	/* default is 0, not tunnel; */
+#define	SESSION_IS_TUNNLE_6OVER4 	 (1 << 0)
+#define	SESSION_IS_TUNNLE_4OVER6	 (1 << 1)
+#define	SESSION_IS_TUNNLE_GRE		 (1 << 2)
+#define	SESSION_IS_TUNNLE_IP_IN_IP	 (1 << 3)
+#define	SESSION_IS_TUNNLE_PPTP		 (1 << 4)
+#define	SESSION_IS_TUNNLE_L2TP		 (1 << 5)
+#define	SESSION_IS_TUNNLE_TEREDO	 (1 << 6)
+#define	SESSION_IS_TUNNLE_GTP (1 << 7)
+#define	SESSION_IS_TUNNLE_SOCKS (1 << 8)
+#define	SESSION_IS_TUNNLE_HTTP_PROXY (1 << 9)
+
+int session_is_outer_tunnel(struct session *sess, uint64_t *flag);
+
 #define SESSION_DIRECTION_IN 0
 #define SESSION_DIRECTION_OUT 1
 int  session_get_direction(const struct session *sess);       	

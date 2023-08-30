@@ -307,22 +307,62 @@ int session_is_symmetric(const struct session *sess, unsigned char *flag)
 	int is_symmetric=0;
 	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
-		if(sess->cur_pkt->a_stream->dir==DIR_DOUBLE)
+		if(sess->cur_pkt->a_stream->dir==DIR_DOUBLE && flag)
 		{
 			*flag=(SESSION_SEEN_C2S_FLOW|SESSION_SEEN_S2C_FLOW);
 			is_symmetric=1;
 		}
-		else if(sess->cur_pkt->a_stream->dir==DIR_C2S)
+		else if(sess->cur_pkt->a_stream->dir==DIR_C2S && flag)
 		{
 			*flag=SESSION_SEEN_C2S_FLOW;
 		}
-		else if(sess->cur_pkt->a_stream->dir==DIR_S2C)
+		else if(sess->cur_pkt->a_stream->dir==DIR_S2C && flag)
 		{
 			*flag=SESSION_SEEN_S2C_FLOW;
 		}
 	}
 	return is_symmetric;
 }	
+
+int session_is_outer_tunnel(struct session *sess, uint64_t *flag)
+{
+	if(sess==NULL||sess->cur_pkt==NULL||sess->cur_pkt->a_stream==NULL)
+	{
+		return 0;
+	}
+	struct streaminfo *t_stream = sess->cur_pkt->a_stream->pfather;
+	struct streaminfo *a_stream = sess->cur_pkt->a_stream;
+	if(flag)*flag=SESSION_IS_TUNNLE_NON;
+
+	int ret=0;
+	unsigned short tunnel_type=0;
+	int tunnel_type_len=sizeof(unsigned short);
+	ret=MESA_get_stream_opt(a_stream, MSO_STREAM_UP_LAYER_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
+	if(ret==0)
+	{
+		if(tunnel_type!=STREAM_TUNNLE_NON)
+		{
+			if(flag)*flag=(uint64_t)tunnel_type;
+			return 1;
+		}
+	}
+
+	while (t_stream != NULL)
+	{
+		if (t_stream->type == STREAM_TYPE_HTTP_PROXY)
+		{
+			if(flag) (*flag)|= (uint64_t)SESSION_IS_TUNNLE_HTTP_PROXY;
+			return 1;
+		}
+		if(t_stream->type == STREAM_TYPE_SOCKS4 || t_stream->type == STREAM_TYPE_SOCKS5)
+		{
+			if(flag) (*flag)|= (uint64_t)SESSION_IS_TUNNLE_SOCKS;
+			return 1;
+		}
+		t_stream = t_stream->pfather;
+	}
+	return 0;
+}
 
 int stellar_get_worker_thread_num(struct stellar *st)
 {
