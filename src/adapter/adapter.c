@@ -270,8 +270,8 @@ const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 {
 	const void *raw_data=NULL;
 	int raw_datalen=0;
-	int ret1 = get_opt_from_rawpkt(pkt, RAW_PKT_GET_DATA, &raw_data);
-	int ret2 = get_opt_from_rawpkt(pkt, RAW_PKT_GET_TOT_LEN, &raw_datalen);
+	int ret1 = get_opt_from_rawpkt(pkt->a_packet, RAW_PKT_GET_DATA, &raw_data);
+	int ret2 = get_opt_from_rawpkt(pkt->a_packet, RAW_PKT_GET_TOT_LEN, &raw_datalen);
 	if(ret1 >= 0 || ret2 >= 0)
 	{
 		*data_len = raw_datalen;
@@ -372,4 +372,14 @@ int stellar_get_worker_thread_num(struct stellar *st)
 int stellar_get_current_thread_id(struct stellar *st)
 {
 	return get_current_worker_thread_id();
+}
+
+int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
+{
+	if(pkt == NULL || ts == NULL)return -1;
+	if(pkt->a_packet == NULL || pkt->a_stream == NULL)return -1;
+
+	get_opt_from_rawpkt(pkt->a_packet , RAW_PKT_GET_TIMESTAMP, &ts);
+	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
+	return 0;
 }
