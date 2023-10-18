@@ -290,7 +290,7 @@ typedef struct session_event
 {
 	struct stellar *st;
 	struct session *sess;
-	session_event_cb_func *sesion_event_cb;
+	session_event_cb_func *session_event_cb;
 	void *cb_arg;
 	struct timeval timeout;
 	int events;
@@ -312,9 +312,9 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 	for(unsigned i = 0; i < len; i++)
 	{
 		p = (intrinsic_events+i);
-		if(p->sesion_event_cb != NULL && (p->events & events) && (p->is_delete == 0))
+		if(p->session_event_cb != NULL && (p->events & events) && (p->is_delete == 0))
 		{
-			p->sesion_event_cb(sess, events, pkt, p->cb_arg);
+			p->session_event_cb(sess, events, pkt, p->cb_arg);
 		}
 	}
 
@@ -375,13 +375,13 @@ void session_free(struct session *sess)
 	FREE(sess);
 }
 
-UT_icd sesion_event_icd = {sizeof(struct session_event), NULL, NULL, NULL};
+UT_icd session_event_icd = {sizeof(struct session_event), NULL, NULL, NULL};
 
 struct session_event *session_event_new(struct stellar *st, struct session *sess, int events, session_event_cb_func *cb, void *cb_arg)
 {
 	struct session_event *event = CALLOC(struct session_event, 1);
 	event->events = events;
-	event->sesion_event_cb = cb;
+	event->session_event_cb = cb;
 	event->cb_arg = cb_arg;
 	event->sess = sess;
 	event->st = st;
@@ -418,7 +418,7 @@ int session_event_assign(struct session_event *ev, struct stellar *st, struct se
 {
 	if(ev==NULL)return -1;
 	ev->events = events;
-	ev->sesion_event_cb = cb;
+	ev->session_event_cb = cb;
 	ev->cb_arg = cb_arg;
 	ev->sess = sess;
 	ev->st = st;
@@ -439,10 +439,10 @@ int session_event_del(struct session_event *ev)
 
 int stellar_plugin_register(struct stellar *st, int events, session_event_cb_func *cb, void *cb_arg)
 {
-	struct session_event event={.st=st, .sess=NULL, .sesion_event_cb=cb, .cb_arg=cb_arg, .timeout={0,0}, .events=events, .is_delete=0, .is_intrinsic=1,  .next=NULL, .prev=NULL};
+	struct session_event event={.st=st, .sess=NULL, .session_event_cb=cb, .cb_arg=cb_arg, .timeout={0,0}, .events=events, .is_delete=0, .is_intrinsic=1,  .next=NULL, .prev=NULL};
 	if(st->intrinsic_session_event_schema_array == NULL)
 	{
-		utarray_new(st->intrinsic_session_event_schema_array, &sesion_event_icd);
+		utarray_new(st->intrinsic_session_event_schema_array, &session_event_icd);
 	}
 	unsigned int len = utarray_len(st->intrinsic_session_event_schema_array);
 	utarray_push_back(st->intrinsic_session_event_schema_array, &event);
@@ -466,9 +466,9 @@ void session_defer_loop(struct session *sess)
 	const struct packet *pkt= session_get0_current_packet(sess);
 	DL_FOREACH_SAFE(sess->ev_list, ev, ev_tmp)
 	{
-		if(ev->sesion_event_cb != NULL && (ev->events & events) && (ev->is_delete == 0))
+		if(ev->session_event_cb != NULL && (ev->events & events) && (ev->is_delete == 0))
 		{
-			ev->sesion_event_cb(sess, events, pkt, ev->cb_arg);
+			ev->session_event_cb(sess, events, pkt, ev->cb_arg);
 		}
 	}
 

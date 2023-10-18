@@ -149,7 +149,7 @@ struct streaminfo;
 
 struct packet
 {
-	void *a_packet;
+	void *raw_pkt;
 	struct streaminfo *a_stream;
 };
 
@@ -169,7 +169,7 @@ struct session *adapter_session_open(struct stellar *st, struct streaminfo *stre
 		return NULL;
 	}
 	struct packet *pkt=CALLOC(struct packet, 1);
-	pkt->a_packet=a_packet;
+	pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
 	pkt->a_stream=stream;
 	struct session *sess=session_new(st, type, stream->threadnum);
 	session_set_current_packet(sess, pkt);
@@ -182,7 +182,7 @@ void adapter_session_active(struct streaminfo *stream, struct session *sess, voi
 	if (sess)
 	{
 		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->a_packet=a_packet;
+		pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
 		session_dispatch( sess, SESSION_STATE_ACTIVE, pkt);
 	}
 	return;
@@ -194,7 +194,7 @@ void adapter_session_close(struct streaminfo *stream, struct session *sess, void
 	if(sess)
 	{
 		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->a_packet=a_packet;
+		pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
 		session_dispatch(sess, SESSION_STATE_CLOSING, a_packet);
 		session_free(sess);
 	}
@@ -243,6 +243,7 @@ struct session_addr *session_get0_addr(struct session *sess, enum session_addr_t
 
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len)
 {
+	if(sess->cur_pkt->raw_pkt == NULL || sess->cur_pkt->a_stream == NULL || sess->cur_pkt->a_stream->ptcpdetail == NULL)return NULL;
 	*payload_len = (size_t)sess->cur_pkt->a_stream->ptcpdetail->datalen;
 	return (const char*)sess->cur_pkt->a_stream->ptcpdetail->pdata;
 }
@@ -270,8 +271,8 @@ const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 {
 	const void *raw_data=NULL;
 	int raw_datalen=0;
-	int ret1 = get_opt_from_rawpkt(pkt->a_packet, RAW_PKT_GET_DATA, &raw_data);
-	int ret2 = get_opt_from_rawpkt(pkt->a_packet, RAW_PKT_GET_TOT_LEN, &raw_datalen);
+	int ret1 = get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_DATA, &raw_data);
+	int ret2 = get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_TOT_LEN, &raw_datalen);
 	if(ret1 >= 0 || ret2 >= 0)
 	{
 		*data_len = raw_datalen;
@@ -377,9 +378,9 @@ int stellar_get_current_thread_id(struct stellar *st)
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 {
 	if(pkt == NULL || ts == NULL)return -1;
-	if(pkt->a_packet == NULL || pkt->a_stream == NULL)return -1;
+	if(pkt->raw_pkt == NULL || pkt->a_stream == NULL)return -1;
 
-	get_opt_from_rawpkt(pkt->a_packet , RAW_PKT_GET_TIMESTAMP, &ts);
+	get_opt_from_rawpkt(pkt->raw_pkt , RAW_PKT_GET_TIMESTAMP, &ts);
 	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
 	return 0;
 }

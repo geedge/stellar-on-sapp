@@ -23,13 +23,6 @@ struct simple_stream_ctx
 #define STELLAR_BRIDEGE_NAME "STELLAR_SESSION"
 
 
-static void __loader_bridge_free_cb(const struct streaminfo *stream, int bridge_id, void *data)
-{
-	adapter_session_close((struct streaminfo *)stream, (struct session *)data, NULL);
-	return;
-}
-
-
 struct stellar *g_stellar=NULL;
 int g_session_bridge_id=-1;
 int SIMPLE_LOADER_INIT()
@@ -37,10 +30,6 @@ int SIMPLE_LOADER_INIT()
 	g_stellar = stellar_init(STELLAR_PLUGIN_PATH);
 	if(g_stellar==NULL)return -1;
 	g_session_bridge_id=stream_bridge_build(STELLAR_BRIDEGE_NAME, "w");
-	if(g_session_bridge_id >= 0)// defer close session when streaminfo close
-	{
-		stream_bridge_register_data_free_cb(g_session_bridge_id, __loader_bridge_free_cb);
-	}
 	return 0;
 }
 
@@ -60,6 +49,10 @@ char defer_loader_stream_entry(struct streaminfo *pstream,void **pme, int thread
 	if(g_session_bridge_id >= 0)
 	{
 		struct session *sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
+		if(pstream->pktstate == OP_STATE_CLOSE) // close session by defer loader, to ensure session is closed after other plugin e.g firewall
+		{
+			adapter_session_close(pstream, sess, a_packet);
+		}
 		adapter_session_poll(sess);
 		return APP_STATE_GIVEME;
 	}
@@ -107,10 +100,6 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		adapter_session_active(pstream, ctx->sess, a_packet);
 		break;
 	case OP_STATE_CLOSE:
-        if (g_session_bridge_id < 0) // if no bridge, close session immediately
-        {
-            adapter_session_close(pstream, ctx->sess, a_packet);
-        }
         FREE(*pme);
         break;
     default:
