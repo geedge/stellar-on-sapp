@@ -6,7 +6,7 @@ struct streaminfo;
 
 
 struct stellar *stellar_init(const char *toml_conf_path);
-void stellar_exit(struct stellar *);
+void stellar_exit(struct stellar *st);
 
 //streaminfo open
 struct session *adapter_session_open(struct stellar *st, struct streaminfo *stream, void *a_packet);

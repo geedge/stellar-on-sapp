@@ -36,7 +36,7 @@ static int session_mq_loader_read(struct session *sess, int topic_id, const void
 	return 0;
 }
 
-void *g_stellar=NULL;
+struct stellar *g_stellar=NULL;
 int g_topic_id=-1;
 int PUBLISHER_LOADER_INIT()
 {

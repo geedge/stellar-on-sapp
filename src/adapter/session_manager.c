@@ -291,8 +291,8 @@ typedef struct session_event
 	struct stellar *st;
 	struct session *sess;
 	session_event_cb_func *sesion_event_cb;
-	struct timeval timeout;
 	void *cb_arg;
+	struct timeval timeout;
 	int events;
 	unsigned short is_delete;
 	unsigned short is_intrinsic;
@@ -439,7 +439,7 @@ int session_event_del(struct session_event *ev)
 
 int stellar_plugin_register(struct stellar *st, int events, session_event_cb_func *cb, void *cb_arg)
 {
-	struct session_event event={.is_intrinsic=1, .events=events, .sesion_event_cb=cb, .cb_arg=cb_arg, .st=st, .sess=NULL, .is_delete=0, .timeout={0,0}, .next=NULL, .prev=NULL};
+	struct session_event event={.st=st, .sess=NULL, .sesion_event_cb=cb, .cb_arg=cb_arg, .timeout={0,0}, .events=events, .is_delete=0, .is_intrinsic=1,  .next=NULL, .prev=NULL};
 	if(st->intrinsic_session_event_schema_array == NULL)
 	{
 		utarray_new(st->intrinsic_session_event_schema_array, &sesion_event_icd);
@@ -454,7 +454,7 @@ struct session_event *session_get_intrinsic_event(struct session *sess, int plug
 	if(sess->st->intrinsic_session_event_schema_array == NULL)return NULL;
 	unsigned int len = utarray_len(sess->st->intrinsic_session_event_schema_array);
 	if(plugin_id < 0 || plugin_id >= (int)len)return NULL;
-	struct session_event*intrinsic_events=session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
+	struct session_event*intrinsic_events=(struct session_event*)session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
 	return (struct session_event *)(intrinsic_events+plugin_id);
 }
 
