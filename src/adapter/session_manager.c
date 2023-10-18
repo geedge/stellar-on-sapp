@@ -305,7 +305,7 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 	struct session_event  *intrinsic_events = (struct session_event *)session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
 	struct session_event *p = NULL;
 	if(sess->st->plugin_specs_array == NULL)return;
-	unsigned int len = utarray_len(sess->st->plugin_specs_array);
+	unsigned int len = utarray_len(sess->st->intrinsic_session_event_schema_array);
 	sess->state = state;
 	// TODO: improve state to events logic 
 	int events=(1<<state|(sess->type==SESSION_TYPE_TCP?SESS_EV_TCP:SESS_EV_UDP));

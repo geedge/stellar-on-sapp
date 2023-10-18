@@ -1,6 +1,6 @@
 [PLUGINFO]
 PLUGNAME=simple_loader
-SO_PATH=./plug/business/simple_loader/simple_loader.so
+SO_PATH=./plug/platform/simple_loader/simple_loader.so
 INIT_FUNC=SIMPLE_LOADER_INIT
 DESTROY_FUNC=SIMPLE_LOADER_EXIT
 
