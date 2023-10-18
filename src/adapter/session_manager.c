@@ -42,6 +42,7 @@ int stellar_session_get_ex_new_index(struct stellar *st, const char *name, sessi
 	{
 		utarray_new(st->session_exdata_schema_array, &session_exdata_meta_icd);
 	}
+	if(st->session_exdata_schema_array == NULL)return -1;
 	unsigned int len = utarray_len(st->session_exdata_schema_array);
 	struct session_exdata_schema *t_schema;
 	for(unsigned int i = 0; i < len; i++)
@@ -69,16 +70,18 @@ struct session_exdata_runtime
 int session_set_ex_data(struct session *sess, int idx, void *ex_ptr)
 {
 	if(sess->ex_data_rt == NULL)return -1;
+	if(sess->st->session_exdata_schema_array == NULL)return -1;
 	unsigned int len=utarray_len(sess->st->session_exdata_schema_array);
 	if(len < (unsigned int)idx)return -1;
 	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)(sess->ex_data_rt+idx);
 	exdata->data = ex_ptr;
-	return -1;
+	return 0;
 }
 
 void *session_get_ex_data(struct session *sess, int idx)
 {
 	if(sess->ex_data_rt == NULL)return NULL;
+	if(sess->st->session_exdata_schema_array==NULL)return NULL;
 	unsigned int len = utarray_len(sess->st->session_exdata_schema_array);
 	if(len < (unsigned int)idx)return NULL;
 	struct session_exdata_runtime* exdata = (struct session_exdata_runtime*)(sess->ex_data_rt+idx);
@@ -198,6 +201,7 @@ int session_mq_create_topic(struct stellar *st, const char *topic_name, msg_free
 
 int session_mq_destroy_topic(struct stellar *st, int topic_id)
 {
+	if(st->session_mq_schema_array==NULL)return 0;
     unsigned int len = utarray_len(st->session_mq_schema_array);
     if (len <= (unsigned int)topic_id)
         return -1;
@@ -220,6 +224,7 @@ int session_mq_destroy_topic(struct stellar *st, int topic_id)
 
 int session_mq_publish_message(struct session *sess, int topic_id, void *data)
 {
+	if(sess->st->session_mq_schema_array==NULL)return -1;
     unsigned int len = utarray_len(sess->st->session_mq_schema_array);
     if (len <= (unsigned int)topic_id)return -1;
 	struct session_mq *node= CALLOC(struct session_mq,1);
@@ -237,6 +242,7 @@ int session_mq_ignore_message(struct session *sess, int topic_id, int sub_id)
 
 int session_mq_subscribe_topic(struct stellar *st, int topic_id, on_msg_cb_func *sub_cb, void *cb_arg)
 {
+	if(st->session_mq_schema_array==NULL)return -1;
     unsigned int len = utarray_len(st->session_mq_schema_array);
     if (len <= (unsigned int)topic_id)return -1;
     struct session_mq_topic_schema *topic = (struct session_mq_topic_schema *)utarray_eltptr(st->session_mq_schema_array, (unsigned int)topic_id);
@@ -251,6 +257,7 @@ int session_mq_subscribe_topic(struct stellar *st, int topic_id, on_msg_cb_func 
 static struct session_exdata_runtime  *session_new_exdata_rt(struct stellar *st)
 {
 	struct session_exdata_runtime *exdata_rt = NULL;
+	if(st->session_exdata_schema_array==NULL)return NULL;
 	unsigned int len = utarray_len(st->session_exdata_schema_array);
 	if(len > 0)
 	{
@@ -262,6 +269,7 @@ static struct session_exdata_runtime  *session_new_exdata_rt(struct stellar *st)
 static void session_free_exdata_runtime(struct session* sess, struct session_exdata_runtime *exdata_rt)
 {
 	if(exdata_rt==NULL)return;
+	if(sess->st->session_exdata_schema_array==NULL)return;
 	unsigned int len=utarray_len(sess->st->session_exdata_schema_array);
 	for (unsigned int i = 0; i < len; i++)
 	{
@@ -296,6 +304,7 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 {
 	struct session_event  *intrinsic_events = (struct session_event *)session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
 	struct session_event *p = NULL;
+	if(sess->st->plugin_specs_array == NULL)return;
 	unsigned int len = utarray_len(sess->st->plugin_specs_array);
 	sess->state = state;
 	// TODO: improve state to events logic 
@@ -315,6 +324,7 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 
 static struct session_event* session_intrinsic_events_init(struct stellar *st, struct session *sess)
 {
+	if(st->intrinsic_session_event_schema_array == NULL)return NULL;
 	struct session_event *intrinsic_events = CALLOC(struct session_event, utarray_len(st->intrinsic_session_event_schema_array));
 	for(unsigned i = 0; i < utarray_len(st->intrinsic_session_event_schema_array); i++)
 	{
@@ -441,6 +451,7 @@ int stellar_plugin_register(struct stellar *st, int events, session_event_cb_fun
 
 struct session_event *session_get_intrinsic_event(struct session *sess, int plugin_id)
 {
+	if(sess->st->intrinsic_session_event_schema_array == NULL)return NULL;
 	unsigned int len = utarray_len(sess->st->intrinsic_session_event_schema_array);
 	if(plugin_id < 0 || plugin_id >= (int)len)return NULL;
 	struct session_event*intrinsic_events=session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
