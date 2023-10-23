@@ -72,7 +72,7 @@ static struct plugin_specific *load_plugin_specs(const char *toml_conf_path, int
         {
             goto LOAD_PLUGIN_SPEC_ERROR;
         }
-        void* handle = dlopen(path, RTLD_NOW|RTLD_LAZY|RTLD_LOCAL);
+        void* handle = dlopen(path, RTLD_NOW|RTLD_LAZY|RTLD_GLOBAL);
         if (!handle) {
             fprintf(stderr, "Error loading plugin %s: %s\n", path, dlerror());
             goto LOAD_PLUGIN_SPEC_ERROR;
