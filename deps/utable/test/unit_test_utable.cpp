@@ -8,9 +8,9 @@
 
 
 
-void test_utable_assert_arr(const struct utable *table, const char *key, long long expected_arr[], size_t n_expected_arr)
+void test_utable_assert_arr(const struct utable *table, const char *key, int64_t expected_arr[], size_t n_expected_arr)
 {
-    long long *arr = NULL;
+    int64_t *arr = NULL;
     size_t n_arr = 0;
     EXPECT_EQ(utable_get_value_type(table, key), utable_value_type_integer_array);
     utable_get0_integer_value_array(table, key, &arr, &n_arr);
@@ -53,7 +53,7 @@ TEST(utable_test, new_del_when_empty)
 TEST(utable_test, add_1_int_and_query)
 {
     struct utable *table = utable_new();
-    long long int_array[] = { 1 };
+    int64_t int_array[] = { 1 };
     utable_add_integer_array(table, "key", int_array, 1);
     test_utable_assert_arr(table, "key", int_array, 1);
 
@@ -63,7 +63,7 @@ TEST(utable_test, add_1_int_and_query)
 TEST(utable_test, add_2_int_and_query)
 {
     struct utable *table = utable_new();
-    long long int_array[] = { 1, 2 };
+    int64_t int_array[] = { 1, 2 };
     utable_add_integer_array(table, "key", int_array, 2);
     test_utable_assert_arr(table, "key", int_array, 2);
 
@@ -74,7 +74,7 @@ TEST(utable_test, add_string_and_query)
 {
     struct utable *table = utable_new();
     const char *str = "hello world";
-    utable_add_cstring(table, "key", str);
+    utable_add_cstring(table, "key", str, strlen(str));
     test_utable_assert_str(table, "key", str);
 
     utable_free(table);
@@ -98,7 +98,7 @@ void test_utable_check_if_value_in_json(cJSON *tag_obj, const char *key, std::st
     EXPECT_STREQ(tag_val->valuestring, value.c_str());
 }
 
-void test_utable_check_if_value_in_json(cJSON *tag_obj, const char *key, long long value[], size_t n_value)
+void test_utable_check_if_value_in_json(cJSON *tag_obj, const char *key, int64_t value[], size_t n_value)
 {
     cJSON *tag_val = cJSON_GetObjectItem(tag_obj, key);
     EXPECT_NE(tag_val, nullptr);
@@ -127,11 +127,11 @@ void test_utable_check_if_value_in_json(cJSON *tag_obj, const char *key, const c
 TEST(utable_test, export_json)
 {
     struct utable *table = utable_new();
-    long long int_array[] = { 1, 2 };
+    int64_t int_array[] = { 1, 2 };
     const char *str = "hello world";
     const char *blob = "bin hello world";
     utable_add_integer_array(table, "key1", int_array, 2);
-    utable_add_cstring(table, "key2", str);
+    utable_add_cstring(table, "key2", str, strlen(str));
     utable_add_blob(table, "key3", blob, strlen(blob));
     
     char *json = NULL;
@@ -176,7 +176,7 @@ void test_utable_check_if_value_in_mpack(mpack_node_t item, const char *key, std
     free(value_tmp);
 }
 
-void test_utable_check_if_value_in_mpack(mpack_node_t item, const char *key, long long value[], size_t n_value)
+void test_utable_check_if_value_in_mpack(mpack_node_t item, const char *key, int64_t value[], size_t n_value)
 {
     mpack_node_t key_node = mpack_node_map_cstr(item, "key");
     mpack_node_t type_node = mpack_node_map_cstr(item, "type");
@@ -214,11 +214,11 @@ void test_utable_check_if_value_in_mpack(mpack_node_t item, const char *key, con
 TEST(utable_test, export_mpack)
 {
     struct utable *table = utable_new();
-    long long int_array[] = { 1, 2 };
+    int64_t int_array[] = { 1, 2 };
     const char *str = "hello world";
     const char *blob = "bin hello world";
     utable_add_integer_array(table, "key1", int_array, 2);
-    utable_add_cstring(table, "key2", str);
+    utable_add_cstring(table, "key2", str, strlen(str));
     utable_add_blob(table, "key3", blob, strlen(blob));
 
     char *mpack = NULL;
@@ -251,7 +251,7 @@ TEST(utable_test, query_on_wrong_key)
     size_t value_len;
     EXPECT_EQ(utable_get0_blob_value(table, "key", &value, &value_len), -1);
     EXPECT_EQ(utable_get0_cstring_value(table, "key", &value, &value_len), -1);
-    long long *value_array;
+    int64_t *value_array;
     size_t n_value;
     EXPECT_EQ(utable_get0_integer_value_array(table, "key", &value_array, &n_value), -1);
     EXPECT_EQ(utable_get_value_type(table, "key"), utable_value_type_undefined);
@@ -262,10 +262,10 @@ TEST(utable_test, query_on_wrong_key)
 TEST(utable_test, add_on_dup_key)
 {
     struct utable *table = utable_new();
-    long long int_array[] = { 1, 2 };
+    int64_t int_array[] = { 1, 2 };
     const char *str = "hello world";
     utable_add_integer_array(table, "key", int_array, 2);
-    utable_add_cstring(table, "key", str);
+    utable_add_cstring(table, "key", str, strlen(str));
     
     test_utable_assert_arr(table, "key", int_array, 2);
 
@@ -276,10 +276,10 @@ TEST(utable_test, iter_and_query)
 {
     struct utable *table = utable_new();
     
-    long long int_array[] = { 1, 2 };
+    int64_t int_array[] = { 1, 2 };
     const char *str = "hello world";
     utable_add_integer_array(table, "key1", int_array, 2);
-    utable_add_cstring(table, "key2", str);
+    utable_add_cstring(table, "key2", str, strlen(str));
     utable_add_integer_array(table, "key3", int_array, 2);
 
     EXPECT_STREQ(utable_next_key(table), "key1");
@@ -311,8 +311,8 @@ TEST(utable_test, dup_and_query)
     struct utable *table = utable_new();
     
     const char *str = "hello world";
-    utable_add_cstring(table, "key1", str);
-    long long int_array[] = { 1, 2 };
+    utable_add_cstring(table, "key1", str, strlen(str));
+    int64_t int_array[] = { 1, 2 };
     utable_add_integer_array(table, "key2", int_array, 2);
     const char *blob = "bin hello world";
     utable_add_blob(table, "key3", blob, strlen(blob));
@@ -343,8 +343,8 @@ TEST(utable_test, merge_all_new)
     struct utable *table2 = utable_new();
     
     const char *str = "hello world";
-    utable_add_cstring(table, "key1", str);
-    long long int_array[] = { 1, 2 };
+    utable_add_cstring(table, "key1", str, strlen(str));
+    int64_t int_array[] = { 1, 2 };
     utable_add_integer_array(table, "key2", int_array, 2);
 
     const char *blob = "bin hello world";
@@ -363,8 +363,8 @@ TEST(utable_test, merge_all_skip)
 {
     struct utable *table = utable_new();
     const char *str = "hello world";
-    utable_add_cstring(table, "key1", str);
-    long long int_array[] = { 1, 2 };
+    utable_add_cstring(table, "key1", str, strlen(str));
+    int64_t int_array[] = { 1, 2 };
     utable_add_integer_array(table, "key2", int_array, 2);
     struct utable *table2 = utable_duplicate(table);
 
@@ -384,11 +384,11 @@ TEST(utable_test, merge_some_skip_some_new)
     struct utable *table2 = utable_new();
 
     const char *str = "val on tbl1";
-    utable_add_cstring(table, "key_share", str);
+    utable_add_cstring(table, "key_share", str, strlen(str));
     const char *str2 = "val on tbl2";
-    utable_add_cstring(table2, "key_share", str2);
+    utable_add_cstring(table2, "key_share", str2, strlen(str2));
     const char *str3 = "val on tbl1";
-    utable_add_cstring(table, "key1", str3);
+    utable_add_cstring(table, "key1", str3, strlen(str3));
 
     utable_merge(table2, table);
 
@@ -402,11 +402,11 @@ TEST(utable_test, merge_some_skip_some_new)
 TEST(utable_test, serialize_and_deserialize)
 {
     struct utable *table = utable_new();
-    long long int_array[] = { 1, 2 };
+    int64_t int_array[] = { 1, 2 };
     const char *str = "hello world";
     const char *blob = "bin hello world";
     utable_add_integer_array(table, "key1", int_array, 2);
-    utable_add_cstring(table, "key2", str);
+    utable_add_cstring(table, "key2", str, strlen(str));
     utable_add_blob(table, "key3", blob, strlen(blob));
 
     char *blob_out;

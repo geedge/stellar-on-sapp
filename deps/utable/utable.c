@@ -13,7 +13,11 @@ struct utable_item {
     char *key;
     enum utable_value_type value_type;
     union {
-        char *cstring;
+        struct 
+        {
+            char *cstring;
+            size_t cstring_sz;
+        };
         struct
         {
             char *blob;
@@ -21,9 +25,10 @@ struct utable_item {
         };
         struct
         {
-            long long *value_array;
+            int64_t *value_array;
             size_t n_value;
         };
+        int64_t integer;
     };
     UT_hash_handle hh;
 };
@@ -64,7 +69,7 @@ void utable_free(struct utable *table)
     free(table);
 }
 
-void utable_add_cstring(struct utable *table, const char *key, const char *value)
+void utable_add_cstring(struct utable *table, const char *key, const char *value, size_t value_sz)
 {
     // check if key already exists
     struct utable_item *item;
@@ -77,7 +82,9 @@ void utable_add_cstring(struct utable *table, const char *key, const char *value
     item = calloc(1, sizeof(struct utable_item));
     item->key = strdup(key);
     item->value_type = utable_value_type_cstring;
-    item->cstring = strdup(value);
+    item->cstring = malloc(value_sz);
+    memcpy(item->cstring, value, value_sz);
+    item->cstring_sz = value_sz;
     HASH_ADD_KEYPTR(hh, table->items, item->key, strlen(item->key), item);
 }
 
@@ -100,7 +107,24 @@ void utable_add_blob(struct utable *table, const char *key, const char *blob, si
     HASH_ADD_KEYPTR(hh, table->items, item->key, strlen(item->key), item);
 }
 
-void utable_add_integer_array(struct utable *table, const char *key, long long value_array[], size_t n_value)
+void utable_add_integer(struct utable *table, const char *key, int64_t value)
+{
+    // check if key already exists
+    struct utable_item *item;
+    HASH_FIND_STR(table->items, key, item);
+    if (item) {
+        printf("ERR: key %s already exists\n", key);
+        return;
+    }
+
+    item = calloc(1, sizeof(struct utable_item));
+    item->key = strdup(key);
+    item->value_type = utable_value_type_integer;
+    item->integer = value;
+    HASH_ADD_KEYPTR(hh, table->items, item->key, strlen(item->key), item);
+}
+
+void utable_add_integer_array(struct utable *table, const char *key, int64_t value_array[], size_t n_value)
 {
     // check if key already exists
     struct utable_item *item;
@@ -113,8 +137,8 @@ void utable_add_integer_array(struct utable *table, const char *key, long long v
     item = calloc(1, sizeof(struct utable_item));
     item->key = strdup(key);
     item->value_type = utable_value_type_integer_array;
-    item->value_array = malloc(sizeof(long long) * n_value);
-    memcpy(item->value_array, value_array, sizeof(long long) * n_value);
+    item->value_array = malloc(sizeof(int64_t) * n_value);
+    memcpy(item->value_array, value_array, sizeof(int64_t) * n_value);
     item->n_value = n_value;
     HASH_ADD_KEYPTR(hh, table->items, item->key, strlen(item->key), item);
 }
@@ -193,22 +217,37 @@ int utable_get0_cstring_value(const struct utable *table, const char *key, char 
     HASH_FIND_STR(table->items, key, item);
     if (item) {
         if (item->value_type == utable_value_type_cstring) {
-            *value = strdup(item->cstring);
-            *value_len = strlen(item->cstring);
+            char *cstring = malloc(item->cstring_sz);
+            *value = cstring;
+            *value_len = item->cstring_sz;
+            memcpy(cstring, item->cstring, item->cstring_sz);
             return 0;
         }
     }
     return -1;
 }
 
-int utable_get0_integer_value_array(const struct utable *table, const char *key, long long **value_array, size_t *n_value)
+int utable_get0_integer_value(const struct utable *table, const char *key, int64_t *value)
+{
+    struct utable_item *item;
+    HASH_FIND_STR(table->items, key, item);
+    if (item) {
+        if (item->value_type == utable_value_type_integer) {
+            *value = item->integer;
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int utable_get0_integer_value_array(const struct utable *table, const char *key, int64_t **value_array, size_t *n_value)
 {
     struct utable_item *item;
     HASH_FIND_STR(table->items, key, item);
     if (item) {
         if (item->value_type == utable_value_type_integer_array) {
-            *value_array = malloc(sizeof(long long) * item->n_value);
-            memcpy(*value_array, item->value_array, sizeof(long long) * item->n_value);
+            *value_array = malloc(sizeof(int64_t) * item->n_value);
+            memcpy(*value_array, item->value_array, sizeof(int64_t) * item->n_value);
             *n_value = item->n_value;
             return 0;
         }
@@ -223,16 +262,21 @@ struct utable_item *utable_item_dup(const struct utable_item *item)
     new_item->value_type = item->value_type;
     switch (item->value_type) {
         case utable_value_type_cstring:
-            new_item->cstring = strdup(item->cstring);
+            new_item->cstring = malloc(item->cstring_sz);
+            memcpy(new_item->cstring, item->cstring, item->cstring_sz);
+            new_item->cstring_sz = item->cstring_sz;
             break;
         case utable_value_type_blob:
             new_item->blob = malloc(item->blob_sz);
             memcpy(new_item->blob, item->blob, item->blob_sz);
             new_item->blob_sz = item->blob_sz;
             break;
+        case utable_value_type_integer:
+            new_item->integer = item->integer;
+            break;
         case utable_value_type_integer_array:
-            new_item->value_array = malloc(sizeof(long long) * item->n_value);
-            memcpy(new_item->value_array, item->value_array, sizeof(long long) * item->n_value);
+            new_item->value_array = malloc(sizeof(int64_t) * item->n_value);
+            memcpy(new_item->value_array, item->value_array, sizeof(int64_t) * item->n_value);
             new_item->n_value = item->n_value;
             break;
         default:
@@ -280,13 +324,22 @@ int utable_json_export(const struct utable *table, char **blob, size_t *blob_len
     HASH_ITER(hh, table->items, item, tmp) {
         switch (item->value_type) {
             case utable_value_type_cstring:
-                cJSON_AddStringToObject(cjson_root, item->key, item->cstring);
+                {
+                    char *cstring=malloc(item->cstring_sz+1);
+                    memcpy(cstring, item->cstring, item->cstring_sz);
+                    cstring[item->cstring_sz] = '\0';
+                    cJSON_AddStringToObject(cjson_root, item->key, cstring);
+                    free(cstring);
+                }
                 break;
             case utable_value_type_blob: {
                 char *enc = b64_encode((unsigned char *)item->blob, item->blob_sz);
                 cJSON_AddStringToObject(cjson_root, item->key, enc);
                 free(enc);
                 }
+                break;
+            case utable_value_type_integer:
+                cJSON_AddNumberToObject(cjson_root, item->key, item->integer);
                 break;
             case utable_value_type_integer_array: {
                 cJSON *cjson_array = cJSON_CreateArray();
@@ -336,6 +389,9 @@ int utable_msgpack_export(const struct utable *table, char **blob, size_t *blob_
             case utable_value_type_blob:
                 mpack_write_cstr(&writer, "blob");
                 break;
+            case utable_value_type_integer:
+                mpack_write_cstr(&writer, "i");
+                break;
             case utable_value_type_integer_array:
                 mpack_write_cstr(&writer, "i_arr");
                 break;
@@ -346,10 +402,13 @@ int utable_msgpack_export(const struct utable *table, char **blob, size_t *blob_
         mpack_write_cstr(&writer, "value");
         switch (item->value_type) {
             case utable_value_type_cstring:
-                mpack_write_cstr(&writer, item->cstring);
+                mpack_write_bin(&writer, item->cstring, item->cstring_sz);
                 break;
             case utable_value_type_blob:
                 mpack_write_bin(&writer, item->blob, item->blob_sz);
+                break;
+            case utable_value_type_integer:
+                mpack_write_i64(&writer, item->integer);
                 break;
             case utable_value_type_integer_array:
                 mpack_start_array(&writer, item->n_value);
@@ -411,12 +470,17 @@ struct utable *utable_deserialize(const char *blob, size_t blob_len)
     
         if (strcmp(type_str, "c_str") == 0) {
             new_item->value_type = utable_value_type_cstring;
-            new_item->cstring = get_cstring_from_mpack_node(value);
+            new_item->cstring = malloc(mpack_node_bin_size(value));
+            new_item->cstring_sz = mpack_node_bin_size(value);
+            memcpy(new_item->cstring, mpack_node_bin_data(value), mpack_node_bin_size(value));
         } else if (strcmp(type_str, "blob") == 0) {
             new_item->value_type = utable_value_type_blob;
             new_item->blob = malloc(mpack_node_bin_size(value));
             new_item->blob_sz = mpack_node_bin_size(value);
             memcpy(new_item->blob, mpack_node_bin_data(value), mpack_node_bin_size(value));
+        } else if (strcmp(type_str, "i") == 0) {
+            new_item->value_type = utable_value_type_integer;
+            new_item->integer = mpack_node_i64(value);
         } else if (strcmp(type_str, "i_arr") == 0) {
             new_item->value_type = utable_value_type_integer_array;
             new_item->n_value = mpack_node_array_length(value);
