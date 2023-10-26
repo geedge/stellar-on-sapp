@@ -53,7 +53,10 @@ char defer_loader_stream_entry(struct streaminfo *pstream,void **pme, int thread
 		{
 			adapter_session_close(pstream, sess, a_packet);
 		}
-		adapter_session_poll(sess);
+		else
+		{
+			adapter_session_poll(sess);
+		}
 		return APP_STATE_GIVEME;
 	}
 	else
