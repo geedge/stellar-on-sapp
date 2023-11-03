@@ -188,6 +188,19 @@ void adapter_session_active(struct streaminfo *stream, struct session *sess, voi
 	return;
 }
 
+void adapter_session_control(struct streaminfo *stream, struct session *sess, void *a_packet)
+{
+	if (sess)
+	{
+		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
+		pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
+		session_dispatch(sess, SESSION_STATE_CONTROL, pkt);
+	}
+	return;
+
+}
+
+
 //streaminfo close, or firewall active close streaminfo  
 void adapter_session_close(struct streaminfo *stream, struct session *sess, void *a_packet)
 {

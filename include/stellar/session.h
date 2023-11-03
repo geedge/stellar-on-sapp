@@ -18,6 +18,7 @@ enum session_state
 	SESSION_STATE_OPENING = 1 ,
 	SESSION_STATE_ACTIVE = 2,
 	SESSION_STATE_CLOSING = 3,
+	SESSION_STATE_CONTROL = 6,
 	__SESSION_STATE_MAX,
 };
 
@@ -102,9 +103,11 @@ int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
 #define SESS_EV_OPENING 1<<1
 #define SESS_EV_PACKET 1<<2
 #define SESS_EV_CLOSING 1<<3
+#define SESS_EV_CONTROL 1<<6
 
 #define SESS_EV_TCP 1<<4
 #define SESS_EV_UDP 1<<5
+
 
 typedef int session_event_cb_func(struct session *sess, int events, const struct packet *pkt, void *cb_arg);
 

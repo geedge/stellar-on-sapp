@@ -95,7 +95,8 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 {
 	struct simple_stream_ctx *ctx=(struct simple_stream_ctx *)*pme;
 	struct tcpdetail *pdetail=(struct tcpdetail *)pstream->pdetail;
-
+	int is_ctrl_pkt=0;
+	const void *raw_pkt=NULL;
 	if(state == OP_STATE_PENDING && (is_l7_type_tunnels(pstream)==1)) 
 	{
 		return APP_STATE_DROPME;
@@ -125,7 +126,17 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
 		break;
 	case OP_STATE_DATA:
-		adapter_session_active(pstream, ctx->sess, a_packet);
+		raw_pkt = get_rawpkt_from_streaminfo(pstream);
+		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
+		if(is_ctrl_pkt==1)
+		{
+			adapter_session_control(pstream, ctx->sess, a_packet);
+			return APP_STATE_GIVEME|APP_STATE_DROPPKT;
+		}
+		else
+		{
+			adapter_session_active(pstream, ctx->sess, a_packet);
+		}
 		break;
 	case OP_STATE_CLOSE:
 		FREE(*pme);
