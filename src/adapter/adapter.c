@@ -169,7 +169,7 @@ struct session *adapter_session_open(struct stellar *st, struct streaminfo *stre
 		return NULL;
 	}
 	struct packet *pkt=CALLOC(struct packet, 1);
-	pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
+	pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 	pkt->a_stream=stream;
 	struct session *sess=session_new(st, type, stream->threadnum);
 	session_set_current_packet(sess, pkt);
@@ -182,7 +182,7 @@ void adapter_session_active(struct streaminfo *stream, struct session *sess, voi
 	if (sess)
 	{
 		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
+		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 		session_dispatch( sess, SESSION_STATE_ACTIVE, pkt);
 	}
 	return;
@@ -193,7 +193,7 @@ void adapter_session_control(struct streaminfo *stream, struct session *sess, vo
 	if (sess)
 	{
 		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
+		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 		session_dispatch(sess, SESSION_STATE_CONTROL, pkt);
 	}
 	return;
@@ -207,7 +207,7 @@ void adapter_session_close(struct streaminfo *stream, struct session *sess, void
 	if(sess)
 	{
 		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->raw_pkt=(void *)get_rawpkt_from_streaminfo(stream);
+		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 		session_dispatch(sess, SESSION_STATE_CLOSING, a_packet);
 		session_free(sess);
 	}
@@ -302,7 +302,10 @@ int  session_get_direction(const struct session *sess)
 {
 	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
-		int c2s_router_dir=(sess->cur_pkt->a_stream->curdir==DIR_C2S)?(sess->cur_pkt->a_stream->routedir):((sess->cur_pkt->a_stream->routedir)^1);
+		//int c2s_router_dir=(sess->cur_pkt->a_stream->curdir==DIR_C2S)?(sess->cur_pkt->a_stream->routedir):((sess->cur_pkt->a_stream->routedir)^1);
+		u_int8_t c2s_router_dir=0;
+		int dir_len=sizeof(c2s_router_dir);
+		MESA_get_stream_opt(sess->cur_pkt->a_stream, MSO_STREAM_C2S_ROUTE_DIRECTION, (void *)&c2s_router_dir, &dir_len); 
 		int dir=MESA_dir_link_to_human(c2s_router_dir);
 		if(dir == (int)'I')
 		{
@@ -396,4 +399,71 @@ int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 	get_opt_from_rawpkt(pkt->raw_pkt , RAW_PKT_GET_TIMESTAMP, &ts);
 	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
 	return 0;
+}
+
+
+const char *session_get0_current_header(struct session *sess)
+{
+	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL || sess->cur_pkt->raw_pkt == NULL) return NULL;
+	return (const char *)get_this_layer_header(sess->cur_pkt->a_stream);
+}
+
+int session_set_session_id(struct session *sess, uint64_t session_id)
+{
+	return MESA_set_stream_opt(sess->cur_pkt->a_stream, MSO_STREAM_SET_DATAMETA_TRACE_ID, (void *)&session_id, sizeof(uint64_t));
+}
+
+int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, size_t sid_num)
+{
+	struct segment_id_list sid_list;
+	sid_list.sz_sidlist=sid_num;
+	memcpy(sid_list.sid_list, sid, sid_num*sizeof(uint16_t));
+	return MESA_set_stream_opt(sess->cur_pkt->a_stream, MSO_STREAM_PREPLEND_SEGMENT_ID_LIST, (void *)&sid_list, sizeof(struct segment_id_list));
+
+}
+
+const char *session_get0_l2_l3_hdr(struct session *sess, int packet_direction, size_t *l2_l3_hdr_len)
+{
+	int len = sizeof(int);
+	const char *l2_header = NULL;
+	*l2_l3_hdr_len = 0;
+	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	if(packet_direction!=PACKET_DIRECTION_C2S && packet_direction!=PACKET_DIRECTION_S2C) return NULL;
+	enum MESA_stream_opt opt  = (packet_direction == PACKET_DIRECTION_C2S) ? MSO_STREAM_C2S_RAWPKT_HDR : MSO_STREAM_S2C_RAWPKT_HDR;
+    if(MESA_get_stream_opt(sess->cur_pkt->a_stream, opt, (void *)&l2_header, &len) == -1) return NULL;
+	*l2_l3_hdr_len = len;
+	return l2_header;
+}
+
+
+static const void *session_get_rawpkt(struct session *sess, int session_direction)
+{
+	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	int route_direction=(session_direction==SESSION_DIRECTION_IN)?(DIR_ROUTE_UP):(DIR_ROUTE_DOWN);
+	return get_rawpkt_from_streaminfo(sess->cur_pkt->a_stream, route_direction);
+}
+
+uint16_t *session_get0_segment_id_list(struct session *sess, int session_direction, size_t *sid_num)
+{
+	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	*sid_num=0;
+	const void *sapp_rawpkt=session_get_rawpkt(sess, session_direction);
+	if(sapp_rawpkt==NULL)return NULL;
+	struct segment_id_list *sids = NULL;
+	int ret = get_rawpkt_opt_from_streaminfo(sess->cur_pkt->a_stream, RAW_PKT_GET_SID_LIST, &sids);
+	if (ret != sizeof(struct segment_id_list))return NULL;
+	*sid_num=sids->sz_sidlist;
+	return sids->sid_list;
+}
+const char *session_get0_route_ctx(struct session *sess, int session_direction, size_t *route_ctx_len)
+{
+	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	*route_ctx_len=0;
+	const void *sapp_rawpkt=session_get_rawpkt(sess, session_direction);
+	if(sapp_rawpkt==NULL)return NULL;
+	void *route_ctx = NULL;
+	int ret = get_rawpkt_opt_from_streaminfo(sess->cur_pkt->a_stream, RAW_PKT_GET_SID_LIST, &route_ctx);
+	if (ret < 0)return NULL;
+	*route_ctx_len=ret;
+	return (const char *)route_ctx;
 }

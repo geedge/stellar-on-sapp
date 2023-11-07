@@ -91,6 +91,16 @@ struct session_addr *session_get0_addr(struct session *sess, enum session_addr_t
 const char *session_get0_readable_addr(struct session *sess);
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len);
 
+/* ------------session------------------*/
+/*  |l2|l3|header| payload|  */
+const char *session_get0_current_header(struct session *sess);
+
+uint16_t *session_get0_segment_id_list(struct session *sess, int session_direction, size_t *sid_num);
+const char *session_get0_route_ctx(struct session *sess, int session_direction, size_t *route_ctx_len);
+
+int session_set_session_id(struct session *sess, uint64_t session_id);
+int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, size_t sid_num);
+
 struct packet;
 const struct packet *session_get0_current_packet(struct session *sess);
 
@@ -99,6 +109,10 @@ const struct packet *session_get0_current_packet(struct session *sess);
 int packet_get_direction(const struct packet *pkt);   	
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len);
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
+
+const char *session_get0_l2_l3_hdr(struct session *sess, int packet_direction, size_t *l2_l3_hdr_len);
+
+
 
 #define SESS_EV_OPENING 1<<1
 #define SESS_EV_PACKET 1<<2
