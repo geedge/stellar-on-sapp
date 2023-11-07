@@ -95,6 +95,8 @@ const char *session_get0_current_payload(struct session *sess, size_t *payload_l
 /*  |l2|l3|header| payload|  */
 const char *session_get0_current_header(struct session *sess);
 
+const char *session_get0_l2_l3_hdr(struct session *sess, int session_direction, size_t *l2_l3_hdr_len);
+
 uint16_t *session_get0_segment_id_list(struct session *sess, int session_direction, size_t *sid_num);
 const char *session_get0_route_ctx(struct session *sess, int session_direction, size_t *route_ctx_len);
 
@@ -110,7 +112,6 @@ int packet_get_direction(const struct packet *pkt);
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len);
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
 
-const char *session_get0_l2_l3_hdr(struct session *sess, int packet_direction, size_t *l2_l3_hdr_len);
 
 
 

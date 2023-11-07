@@ -422,6 +422,7 @@ int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, s
 
 }
 
+#if 0
 const char *session_get0_l2_l3_hdr(struct session *sess, int packet_direction, size_t *l2_l3_hdr_len)
 {
 	int len = sizeof(int);
@@ -434,6 +435,22 @@ const char *session_get0_l2_l3_hdr(struct session *sess, int packet_direction, s
 	*l2_l3_hdr_len = len;
 	return l2_header;
 }
+
+#else
+const char *session_get0_l2_l3_hdr(struct session *sess, int session_direction, size_t *l2_l3_hdr_len)
+{
+	int len = sizeof(int);
+	const char *l2_header = NULL;
+	*l2_l3_hdr_len = 0;
+	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	if(session_direction!=SESSION_DIRECTION_IN && session_direction!=SESSION_DIRECTION_OUT) return NULL;
+	int c2s_sess_dir=session_get_direction(sess);
+	enum MESA_stream_opt opt=(c2s_sess_dir==session_direction)?(MSO_STREAM_C2S_RAWPKT_HDR):(MSO_STREAM_S2C_RAWPKT_HDR);
+    if(MESA_get_stream_opt(sess->cur_pkt->a_stream, opt, (void *)&l2_header, &len) == -1) return NULL;
+	*l2_l3_hdr_len = len;
+	return l2_header;
+}
+#endif
 
 
 static const void *session_get_rawpkt(struct session *sess, int session_direction)
@@ -458,11 +475,12 @@ uint16_t *session_get0_segment_id_list(struct session *sess, int session_directi
 const char *session_get0_route_ctx(struct session *sess, int session_direction, size_t *route_ctx_len)
 {
 	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	if(session_direction!=SESSION_DIRECTION_IN && session_direction!=SESSION_DIRECTION_OUT) return NULL;
 	*route_ctx_len=0;
 	const void *sapp_rawpkt=session_get_rawpkt(sess, session_direction);
 	if(sapp_rawpkt==NULL)return NULL;
 	void *route_ctx = NULL;
-	int ret = get_rawpkt_opt_from_streaminfo(sess->cur_pkt->a_stream, RAW_PKT_GET_SID_LIST, &route_ctx);
+	int ret = get_rawpkt_opt_from_streaminfo(sess->cur_pkt->a_stream, RAW_PKT_GET_ROUTE_CTX, &route_ctx);
 	if (ret < 0)return NULL;
 	*route_ctx_len=ret;
 	return (const char *)route_ctx;
