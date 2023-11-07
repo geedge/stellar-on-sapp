@@ -31,5 +31,5 @@ else()
 endif()
 
 # Setup %config(noreplace)
-set(CPACK_RPM_USER_FILELIST "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/stellar/stellar.conf")
+# set(CPACK_RPM_USER_FILELIST "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/stellar/stellar.conf")
 include(CPack)

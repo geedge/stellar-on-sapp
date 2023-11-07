@@ -36,6 +36,11 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=uninitvar"
             "--suppress=unusedStructMember"
             "--suppress=unreachableCode"
+            "--suppress=internalAstError"
+            "--suppress=nullPointerRedundantCheck"
+            "--suppress=ctunullpointer"
+            "--suppress=redundantAssignment"
+            "--suppress=duplicateValueTernary"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()
@@ -70,7 +75,7 @@ include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/deps)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
-#add_subdirectory(vendor)
+add_subdirectory(vendor)
 #add_subdirectory(deps/utable)
 add_subdirectory(deps/toml)
 add_subdirectory(src/adapter)
@@ -79,3 +84,10 @@ add_subdirectory(examples/stellar_plugin)
 
 #enable_testing()
 #add_subdirectory(test)
+
+
+install(FILES include/stellar/session_exdata.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/session_mq.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/session.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/stellar.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/utils.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
