@@ -5,8 +5,6 @@
 #include "stellar/stellar.h"
 #include "uthash/utarray.h"
 
-
-struct streaminfo;
 struct session_exdata_runtime;
 struct session_mq;
 struct packet;
