@@ -27,9 +27,9 @@ set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PreUninstall.i
 
 # Must uninstall the debug package before install release package
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CPACK_RPM_PACKAGE_CONFLICTS "stellar")
+    set(CPACK_RPM_PACKAGE_CONFLICTS ${PROJECT_NAME})
 else()
-    set(CPACK_RPM_PACKAGE_CONFLICTS "stellar-debug")
+    set(CPACK_RPM_PACKAGE_CONFLICTS "${PROJECT_NAME}-debug")
 endif()
 
 # Setup %config(noreplace)

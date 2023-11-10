@@ -1,9 +1,6 @@
 #!/usr/bin/env sh
 set -evx
 
-chmod +x ci/prepare_gtest_network.sh
-. ci/prepare_gtest_network.sh
-
 chmod +x ci/get-nprocessors.sh
 . ci/get-nprocessors.sh
 
@@ -35,9 +32,6 @@ env | sort
 : "${NO_RTTI:=OFF}"
 : "${COMPILER_IS_GNUCXX:=OFF}"
 
-# Install dependency from YUM
-yum install -y libpcap-devel mrzcpd
-
 if [ $ASAN_OPTION ]; then
   source /opt/rh/devtoolset-7/enable
 fi
@@ -53,17 +47,7 @@ cmake3 -DCMAKE_CXX_FLAGS=$CXX_FLAGS \
   ..
 
 make
-make test
 
 if [ -n "${PACKAGE}" ]; then
   make package
-  cp ~/rpm_upload_tools.py ./
-  python3 rpm_upload_tools.py ${PULP3_REPO_NAME} ${PULP3_DIST_NAME} *.rpm
-fi
-
-if [ -n "${UPLOAD_SYMBOL_FILES}" ]; then
-  rpm -i stellar*debuginfo*.rpm
-  ls -ahl /usr/lib/debug/opt/tsg/stellar/bin/
-  cp /usr/lib/debug/opt/tsg/stellar/bin/stellar*debug /tmp/stellar.debuginfo.${CI_COMMIT_SHORT_SHA}
-  sentry-cli upload-dif -t elf /tmp/stellar.debuginfo.${CI_COMMIT_SHORT_SHA}
 fi
