@@ -1,6 +1,6 @@
 [PLUGINFO]
 PLUGNAME=stellar_start_loader
-SO_PATH=./plug/platform/stellar_on_sapp/stellar_on_sapp.so
+SO_PATH=./plug/stellar_on_sapp/stellar_on_sapp.so
 INIT_FUNC=STELLAR_START_LOADER_INIT
 DESTROY_FUNC=STELLAR_START_LOADER_EXIT
 
