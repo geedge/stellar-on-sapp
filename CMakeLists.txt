@@ -85,8 +85,8 @@ add_subdirectory(src/stellar_on_sapp)
 add_subdirectory(examples/sapp_plugin)
 add_subdirectory(examples/stellar_plugin)
 
-#enable_testing()
-#add_subdirectory(test)
+enable_testing()
+add_subdirectory(test)
 
 
 install(FILES include/stellar/session_exdata.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)

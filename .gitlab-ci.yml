@@ -13,7 +13,7 @@ variables:
 stages:
 - cppcheck
 - build
-#- test
+- test
 - upload
 
 .everything_before_script: &everything_before_script
@@ -163,7 +163,19 @@ release_build_for_centos8:
 ###############################################################################
 # test 
 ###############################################################################
-
+.setup_test_env_for_centos8:
+  stage: test
+  image: $BUILD_IMAGE_CENTOS8
+  allow_failure: false
+  before_script:
+    - *everything_before_script
+    - ls -l /opt/MESA/lib && echo "/opt/MESA/lib" >> /etc/ld.so.conf
+    - cd build; make test
+  dependencies:
+    - develop_build_for_centos8
+    - release_build_for_centos8
+  tags:
+    - share    
 
 ###############################################################################
 # upload 

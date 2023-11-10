@@ -32,10 +32,6 @@ env | sort
 : "${NO_RTTI:=OFF}"
 : "${COMPILER_IS_GNUCXX:=OFF}"
 
-if [ $ASAN_OPTION ]; then
-  source /opt/rh/devtoolset-7/enable
-fi
-
 mkdir build || true
 cd build
 
