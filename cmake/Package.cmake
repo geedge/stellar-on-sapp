@@ -1,7 +1,7 @@
 ﻿if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CPACK_PACKAGE_NAME "stellar-debug")
+    set(CPACK_PACKAGE_NAME ${PROJECT_NAME}-debug)
 else()
-    set(CPACK_PACKAGE_NAME "stellar")
+    set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
 endif()
 
 message(STATUS "Package: ${CPACK_PACKAGE_NAME}")
@@ -24,13 +24,6 @@ set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PostUninstall
 set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PreInstall.in)
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PreUninstall.in)
 
-
-# Must uninstall the debug package before install release package
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CPACK_RPM_PACKAGE_CONFLICTS ${PROJECT_NAME})
-else()
-    set(CPACK_RPM_PACKAGE_CONFLICTS "${PROJECT_NAME}-debug")
-endif()
 
 # Setup %config(noreplace)
 # set(CPACK_RPM_USER_FILELIST "%config(noreplace) ${CMAKE_INSTALL_PREFIX}/conf/stellar/stellar.conf")
