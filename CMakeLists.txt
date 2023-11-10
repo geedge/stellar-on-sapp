@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.12)
 project(stellar-c)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
+set(CMAKE_INSTALL_PREFIX /opt/tsg/)
+
 include(Version)
 include(Package)
 
@@ -14,7 +16,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-	set (CMAKE_INSTALL_PREFIX "/opt/tsg/sapp" CACHE PATH "default install path" FORCE)
+	set (CMAKE_INSTALL_PREFIX "/opt/tsg/" CACHE PATH "default install path" FORCE)
 endif()
 
 find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
@@ -87,8 +89,8 @@ add_subdirectory(examples/stellar_plugin)
 #add_subdirectory(test)
 
 
-install(FILES include/stellar/session_exdata.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/session_mq.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/session.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/stellar.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/utils.h DESTINATION /opt/tsg/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/session_exdata.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/session_mq.h DESTINATION  ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/session.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/stellar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/utils.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)

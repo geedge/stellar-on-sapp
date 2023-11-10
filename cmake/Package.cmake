@@ -21,7 +21,9 @@ set(CPACK_RPM_PACKAGE_RELEASE_DIST on)
 set(CPACK_RPM_DEBUGINFO_PACKAGE on)
 set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PostInstall.in)
 set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PostUninstall.in)
+set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PreInstall.in)
 set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE ${CMAKE_SOURCE_DIR}/cmake/PreUninstall.in)
+
 
 # Must uninstall the debug package before install release package
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

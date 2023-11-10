@@ -74,7 +74,7 @@ int STELLAR_DEFER_LOADER_INIT()
 	return 0;
 }
 
-char defer_loader_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	if(pstream->pktstate==OP_STATE_PENDING && is_l7_type_tunnels(pstream)==1)
 	{
@@ -147,17 +147,17 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	return APP_STATE_GIVEME;
 }
 
-char stellar_on_sapp_udp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_udp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }
 
-char stellar_on_sapp_tcpall_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_tcpall_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
 }
 
-char stellar_on_sapp_tcp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }

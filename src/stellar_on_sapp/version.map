@@ -1,0 +1,28 @@
+{
+  global: 
+    STELLAR_START_LOADER_INIT;
+	STELLAR_START_LOADER_EXIT;
+	stellar_on_sapp_tcpall_entry;
+	stellar_on_sapp_tcp_entry;
+	stellar_on_sapp_udp_entry;
+	STELLAR_DEFER_LOADER_INIT;
+	STELLAR_DEFER_LOADER_EXIT;
+	stellar_on_sapp_defer_entry;
+
+	stellar_get_worker_thread_num;
+	stellar_get_current_thread_id;
+	stellar_session_get_ex_new_index;
+	stellar_plugin_register;
+
+	session_is_symmetric;
+	session_get_ex_data;
+	session_set_ex_data;
+	session_mq_*;
+	packet_*;
+	session_get*;
+	session_set_*;
+	session_event_*;
+
+  local:
+    *;  /* Hide all other symbols */
+};
