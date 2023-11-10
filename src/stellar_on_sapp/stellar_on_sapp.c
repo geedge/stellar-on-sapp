@@ -46,30 +46,30 @@ static int is_l7_type_tunnels(struct streaminfo *a_stream)
 	return 0;
 }
 
-static void simple_loader_bridge_free(const struct streaminfo *stream, int bridge_id, void *data)
+static void stellar_on_sapp_bridge_free(const struct streaminfo *stream, int bridge_id, void *data)
 {
 	return adapter_session_close((struct streaminfo *)stream, (struct session *)data, NULL);	
 }
 
-int SIMPLE_LOADER_INIT()
+int STELLAR_START_LOADER_INIT()
 {
 	g_stellar = stellar_init(STELLAR_PLUGIN_PATH);
 	if(g_stellar==NULL)return -1;
 	g_session_bridge_id=stream_bridge_build(STELLAR_BRIDEGE_NAME, "w");
 	if(g_session_bridge_id < 0)return -1;
-	stream_bridge_register_data_free_cb(g_session_bridge_id, simple_loader_bridge_free);
+	stream_bridge_register_data_free_cb(g_session_bridge_id, stellar_on_sapp_bridge_free);
 	g_streaminfo_exdata_id=stellar_session_get_ex_new_index(g_stellar, STELLAR_EXDATA_NAME, NULL, NULL); 
 	if(g_streaminfo_exdata_id < 0)return -1;
 	return 0;
 }
 
-void SIMPLE_LOADER_EXIT(void)
+void STELLAR_START_LOADER_EXIT(void)
 {
 	stellar_exit(g_stellar);
 	return;
 }
 
-int DEFER_LOADER_INIT()
+int STELLAR_DEFER_LOADER_INIT()
 {
 	return 0;
 }
@@ -86,7 +86,7 @@ char defer_loader_stream_entry(struct streaminfo *pstream,void **pme, int thread
 	return APP_STATE_GIVEME;
 }
 
-void  DEFER_LOADER_EXIT(void)
+void  STELLAR_DEFER_LOADER_EXIT(void)
 {
 	return;
 }
@@ -147,17 +147,17 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	return APP_STATE_GIVEME;
 }
 
-char simple_loader_udp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_udp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }
 
-char simple_loader_tcpall_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_tcpall_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
 }
 
-char simple_loader_tcp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_tcp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }
