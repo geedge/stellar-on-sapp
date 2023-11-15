@@ -121,9 +121,10 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	switch (state)
 	{
 	case OP_STATE_PENDING:
-		ctx->sess = adapter_session_open(g_stellar, pstream, a_packet);
+		ctx->sess=adapter_session_new(g_stellar, pstream);
 		session_set_ex_data(ctx->sess, g_streaminfo_exdata_id, pstream);
 		stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
+		adapter_session_open(pstream, ctx->sess, a_packet);
 		break;
 	case OP_STATE_DATA:
 		raw_pkt = get_current_rawpkt_from_streaminfo(pstream);

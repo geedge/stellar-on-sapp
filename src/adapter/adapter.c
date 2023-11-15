@@ -153,7 +153,7 @@ struct packet
 	struct streaminfo *a_stream;
 };
 
-struct session *adapter_session_open(struct stellar *st, struct streaminfo *stream, void *a_packet)
+struct session *adapter_session_new(struct stellar *st, struct streaminfo *stream)
 {
 	enum session_type type;
 	if(stream->type==STREAM_TYPE_TCP)
@@ -168,13 +168,17 @@ struct session *adapter_session_open(struct stellar *st, struct streaminfo *stre
 	{
 		return NULL;
 	}
+
+	return session_new(st, type, stream->threadnum);
+}
+
+void adapter_session_open(struct streaminfo *stream, struct session *sess, void *a_packet)
+{
 	struct packet *pkt=CALLOC(struct packet, 1);
 	pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 	pkt->a_stream=stream;
-	struct session *sess=session_new(st, type, stream->threadnum);
 	session_set_current_packet(sess, pkt);
 	session_dispatch(sess, SESSION_STATE_OPENING, pkt);
-	return sess;
 }
 
 void adapter_session_active(struct streaminfo *stream, struct session *sess, void *a_packet)

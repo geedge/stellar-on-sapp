@@ -107,7 +107,8 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	switch (state)
 	{
 	case OP_STATE_PENDING:
-		ctx->sess=adapter_session_open(g_stellar, pstream, a_packet);
+		ctx->sess=adapter_session_new(g_stellar, pstream);
+		adapter_session_open(pstream, ctx->sess, a_packet);
 		break;
 	case OP_STATE_DATA:
 		msg = stream_ctx_dup((const struct simple_stream_ctx *)*pme);
