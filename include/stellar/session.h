@@ -92,8 +92,9 @@ const char *session_get0_readable_addr(struct session *sess);
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len);
 
 /* ------------session------------------*/
-/*  |l2|l3|header| payload|  */
-const char *session_get0_current_header(struct session *sess);
+/*  |l2|l3|l4|session payload|  */
+const char *session_get0_current_l3_header(struct session *sess);
+const char *session_get0_current_l4_header(struct session *sess);
 
 const char *session_get0_l2_l3_hdr(struct session *sess, int session_direction, size_t *l2_l3_hdr_len);
 

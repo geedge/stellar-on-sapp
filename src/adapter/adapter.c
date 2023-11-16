@@ -406,10 +406,16 @@ int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 }
 
 
-const char *session_get0_current_header(struct session *sess)
+const char *session_get0_current_l3_header(struct session *sess)
 {
 	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL || sess->cur_pkt->raw_pkt == NULL) return NULL;
-	return (const char *)get_this_layer_header(sess->cur_pkt->a_stream);
+	return (const char *)get_current_layer3_header(sess->cur_pkt->a_stream);
+}
+
+const char *session_get0_current_l4_header(struct session *sess)
+{
+	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL || sess->cur_pkt->raw_pkt == NULL) return NULL;
+	return (const char *)get_current_layer4_header(sess->cur_pkt->a_stream);
 }
 
 int session_set_session_id(struct session *sess, uint64_t session_id)
