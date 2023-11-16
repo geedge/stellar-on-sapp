@@ -302,7 +302,7 @@ const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 	}
 }
 
-int  session_get_direction(const struct session *sess)
+int  session_get_direction(struct session *sess)
 {
 	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
@@ -323,7 +323,7 @@ int  session_get_direction(const struct session *sess)
 	return -1;
 } 
 
-int session_is_symmetric(const struct session *sess, unsigned char *flag)
+int session_is_symmetric(struct session *sess, unsigned char *flag)
 {
 	int is_symmetric=0;
 	if(sess->cur_pkt && sess->cur_pkt->a_stream)

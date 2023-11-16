@@ -27,7 +27,7 @@ struct session;
 
 #define SESSION_SEEN_C2S_FLOW (1 << 0)
 #define SESSION_SEEN_S2C_FLOW (1 << 1)
-int session_is_symmetric(const struct session *sess, unsigned char *flag);
+int session_is_symmetric(struct session *sess, unsigned char *flag);
 
 
 
@@ -47,7 +47,7 @@ int session_is_outer_tunnel(struct session *sess, uint64_t *flag);
 
 #define SESSION_DIRECTION_IN 0
 #define SESSION_DIRECTION_OUT 1
-int  session_get_direction(const struct session *sess);       	
+int  session_get_direction(struct session *sess);       	
 
 enum session_addr_type
 {
