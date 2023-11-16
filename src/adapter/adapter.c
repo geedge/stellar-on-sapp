@@ -172,48 +172,33 @@ struct session *adapter_session_new(struct stellar *st, struct streaminfo *strea
 	return session_new(st, type, stream->threadnum);
 }
 
-void adapter_session_open(struct streaminfo *stream, struct session *sess, void *a_packet)
+void adapter_session_free(struct session *sess)
 {
-	struct packet *pkt=CALLOC(struct packet, 1);
-	pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
-	pkt->a_stream=stream;
-	session_set_current_packet(sess, pkt);
-	session_dispatch(sess, SESSION_STATE_OPENING, pkt);
+	return session_free(sess);
 }
 
-void adapter_session_active(struct streaminfo *stream, struct session *sess, void *a_packet)
+void adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state)
 {
-	if (sess)
-	{
-		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
-		session_dispatch( sess, SESSION_STATE_ACTIVE, pkt);
-	}
-	return;
-}
-
-void adapter_session_control(struct streaminfo *stream, struct session *sess, void *a_packet)
-{
-	if (sess)
-	{
-		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
-		session_dispatch(sess, SESSION_STATE_CONTROL, pkt);
-	}
-	return;
-
-}
-
-
-//streaminfo close, or firewall active close streaminfo  
-void adapter_session_close(struct streaminfo *stream, struct session *sess, void *a_packet)
-{
+	struct packet *pkt = NULL;
 	if(sess)
 	{
-		struct packet *pkt=(struct packet *)session_get0_current_packet(sess);
+		if(state == SESSION_STATE_OPENING)
+		{
+			pkt=CALLOC(struct packet, 1);
+			session_set_current_packet(sess, pkt);
+			pkt->a_stream=stream;
+		}
+		else
+		{
+			pkt=(struct packet *)session_get0_current_packet(sess);
+		}
 		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
-		session_dispatch(sess, SESSION_STATE_CLOSING, a_packet);
-		session_free(sess);
+		session_dispatch( sess, state, pkt);
+		if(state == SESSION_STATE_CLOSING)
+		{
+			FREE(pkt);
+			session_set_current_packet(sess, NULL);
+		}
 	}
 	return;
 }

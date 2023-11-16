@@ -108,7 +108,7 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	{
 	case OP_STATE_PENDING:
 		ctx->sess=adapter_session_new(g_stellar, pstream);
-		adapter_session_open(pstream, ctx->sess, a_packet);
+		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
 		break;
 	case OP_STATE_DATA:
 		msg = stream_ctx_dup((const struct simple_stream_ctx *)*pme);
@@ -116,10 +116,11 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		{
 			FREE(msg);
 		}
-		adapter_session_active(pstream, ctx->sess, a_packet);
+		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
 		break;
 	case OP_STATE_CLOSE:
-		adapter_session_close(pstream, ctx->sess, a_packet);
+		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CLOSING);
+		adapter_session_free(ctx->sess);
 		print_stream_ctx(pstream, ctx);
 		FREE(*pme);
 		break;

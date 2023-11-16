@@ -48,7 +48,9 @@ static int is_l7_type_tunnels(struct streaminfo *a_stream)
 
 static void stellar_on_sapp_bridge_free(const struct streaminfo *stream, int bridge_id, void *data)
 {
-	return adapter_session_close((struct streaminfo *)stream, (struct session *)data, NULL);	
+	adapter_session_state_update((struct streaminfo *)stream, (struct session *)data, NULL, SESSION_STATE_CLOSING);	
+	adapter_session_free((struct session *)data);
+	return;
 }
 
 int STELLAR_START_LOADER_INIT()
@@ -124,19 +126,19 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		ctx->sess=adapter_session_new(g_stellar, pstream);
 		session_set_ex_data(ctx->sess, g_streaminfo_exdata_id, pstream);
 		stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
-		adapter_session_open(pstream, ctx->sess, a_packet);
+		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
 		break;
 	case OP_STATE_DATA:
 		raw_pkt = get_current_rawpkt_from_streaminfo(pstream);
 		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
 		if(is_ctrl_pkt==1)
 		{
-			adapter_session_control(pstream, ctx->sess, a_packet);
+			adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CONTROL);
 			return APP_STATE_GIVEME|APP_STATE_DROPPKT;
 		}
 		else
 		{
-			adapter_session_active(pstream, ctx->sess, a_packet);
+			adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
 		}
 		break;
 	case OP_STATE_CLOSE:
