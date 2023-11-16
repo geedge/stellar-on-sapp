@@ -177,7 +177,7 @@ void adapter_session_free(struct session *sess)
 	return session_free(sess);
 }
 
-void adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state)
+unsigned char adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state)
 {
 	struct packet *pkt = NULL;
 	if(sess)
@@ -199,8 +199,17 @@ void adapter_session_state_update(struct streaminfo *stream, struct session *ses
 			FREE(pkt);
 			session_set_current_packet(sess, NULL);
 		}
+		if(sess->set_detach_others==1)
+		{
+			return APP_STATE_GIVEME|APP_STATE_KILL_OTHER;
+		}
+		else
+		{
+			return APP_STATE_GIVEME;
+		}
 	}
-	return;
+	else
+		return APP_STATE_DROPME;
 }
 
 const char* session_get0_readable_addr(struct session *sess)

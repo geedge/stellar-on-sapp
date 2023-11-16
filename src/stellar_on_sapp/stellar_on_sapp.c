@@ -93,12 +93,13 @@ void  STELLAR_DEFER_LOADER_EXIT(void)
 	return;
 }
 
-static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet)
+static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet)
 {
 	struct simple_stream_ctx *ctx=(struct simple_stream_ctx *)*pme;
 	struct tcpdetail *pdetail=(struct tcpdetail *)pstream->pdetail;
 	int is_ctrl_pkt=0;
 	const void *raw_pkt=NULL;
+	unsigned char entry_ret=APP_STATE_GIVEME;
 	if(state == OP_STATE_PENDING && (is_l7_type_tunnels(pstream)==1)) 
 	{
 		return APP_STATE_DROPME;
@@ -126,19 +127,19 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		ctx->sess=adapter_session_new(g_stellar, pstream);
 		session_set_ex_data(ctx->sess, g_streaminfo_exdata_id, pstream);
 		stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
-		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
+		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
 		break;
 	case OP_STATE_DATA:
 		raw_pkt = get_current_rawpkt_from_streaminfo(pstream);
 		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
 		if(is_ctrl_pkt==1)
 		{
-			adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CONTROL);
-			return APP_STATE_GIVEME|APP_STATE_DROPPKT;
+			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CONTROL);
+			entry_ret = entry_ret|APP_STATE_DROPPKT;
 		}
 		else
 		{
-			adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
 		}
 		break;
 	case OP_STATE_CLOSE:
@@ -147,20 +148,20 @@ static char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	default:
 		break;
 	}
-	return APP_STATE_GIVEME;
+	return entry_ret;
 }
 
-char stellar_on_sapp_udp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+unsigned char stellar_on_sapp_udp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }
 
-char stellar_on_sapp_tcpall_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+unsigned char stellar_on_sapp_tcpall_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
 }
 
-char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }

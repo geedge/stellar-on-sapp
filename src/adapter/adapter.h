@@ -12,6 +12,6 @@ void stellar_exit(struct stellar *st);
 struct session *adapter_session_new(struct stellar *st, struct streaminfo *stream);
 void adapter_session_free(struct session *sess);
 
-void adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state);
+unsigned char adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state);
 
 void adapter_session_poll(struct session *sess);

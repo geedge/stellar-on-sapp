@@ -17,6 +17,7 @@ struct session
 	struct session_exdata_runtime *ex_data_rt;
 	struct session_mq *mq;
 	struct session_event *ev_list;
+	uint64_t set_detach_others;
 };
 
 struct session *session_new(struct stellar *st, enum session_type type, int thread_id);

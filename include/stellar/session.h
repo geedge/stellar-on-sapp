@@ -132,6 +132,8 @@ struct session_event;
 int stellar_plugin_register(struct stellar *st, int events, session_event_cb_func *cb, void *cb_arg);// register intrinsic event
 struct session_event *session_get_intrinsic_event(struct session *sess, int plugin_id);
 
+void session_plugin_detach_others(struct session *sess, int plugin_id);
+
 #include <sys/time.h>
 
 struct session_event *session_event_new(struct stellar *st, struct session *sess, int events, session_event_cb_func *cb, void *cb_arg);

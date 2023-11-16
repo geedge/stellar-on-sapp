@@ -83,10 +83,11 @@ static struct simple_stream_ctx *stream_ctx_dup(const struct simple_stream_ctx *
 	return ctx;
 }
 
-static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet)
+static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet)
 {
 	struct simple_stream_ctx *ctx=(struct simple_stream_ctx *)*pme;
 	struct tcpdetail *pdetail=(struct tcpdetail *)pstream->pdetail;
+	unsigned char entry_ret=APP_STATE_GIVEME;
 	if(*pme==NULL)
 	{
 		*pme=CALLOC(struct simple_stream_ctx,1);
@@ -108,7 +109,7 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	{
 	case OP_STATE_PENDING:
 		ctx->sess=adapter_session_new(g_stellar, pstream);
-		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
+		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
 		break;
 	case OP_STATE_DATA:
 		msg = stream_ctx_dup((const struct simple_stream_ctx *)*pme);
@@ -116,10 +117,10 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 		{
 			FREE(msg);
 		}
-		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
 		break;
 	case OP_STATE_CLOSE:
-		adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CLOSING);
+		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CLOSING);
 		adapter_session_free(ctx->sess);
 		print_stream_ctx(pstream, ctx);
 		FREE(*pme);
@@ -127,17 +128,15 @@ static void loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state
 	default:
 		break;
 	}	
-	return;
+	return entry_ret;
 }
 
 char publisher_loader_udp_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
-	loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
-	return APP_STATE_GIVEME;
+	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }
 
 char publisher_loader_tcpall_stream_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
-	loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
-	return APP_STATE_GIVEME;
+	return loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
 }
