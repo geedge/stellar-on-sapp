@@ -495,3 +495,9 @@ const char *session_get0_route_ctx(struct session *sess, int session_direction, 
 	*route_ctx_len=len;
 	return (const char *)route_ctx;
 }
+
+enum session_state session_get_current_state(struct session *sess)
+{
+	assert(sess);
+    return sess->state;
+}
