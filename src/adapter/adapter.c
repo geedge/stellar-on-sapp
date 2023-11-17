@@ -488,8 +488,10 @@ const char *session_get0_route_ctx(struct session *sess, int session_direction, 
 	const void *sapp_rawpkt=session_get_rawpkt(sess, session_direction);
 	if(sapp_rawpkt==NULL)return NULL;
 	void *route_ctx = NULL;
-	int ret = get_rawpkt_opt_from_streaminfo(sess->cur_pkt->a_stream, RAW_PKT_GET_ROUTE_CTX, &route_ctx);
+	int len=sizeof(route_ctx);
+	enum MESA_stream_opt opt=((session_direction==SESSION_DIRECTION_IN)?(MSO_STREAM_INBOND_ROUTE_CTX):(MSO_STREAM_OUTBOND_ROUTE_CTX));
+	int ret = MESA_get_stream_opt(sess->cur_pkt->a_stream, opt, &route_ctx, &len);
 	if (ret < 0)return NULL;
-	*route_ctx_len=ret;
+	*route_ctx_len=len;
 	return (const char *)route_ctx;
 }
