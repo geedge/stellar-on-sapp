@@ -83,9 +83,15 @@ char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thre
 		return APP_STATE_DROPME;
 	}
 	struct session *sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
-	assert(sess);
-	adapter_session_poll(sess);
-	return APP_STATE_GIVEME;
+	if(sess)
+	{
+		adapter_session_poll(sess);
+		return APP_STATE_GIVEME;
+	}
+	else
+	{
+		return APP_STATE_DROPME;
+	}
 }
 
 void  STELLAR_DEFER_LOADER_EXIT(void)

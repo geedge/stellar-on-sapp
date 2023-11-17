@@ -2,10 +2,8 @@ cmake_minimum_required(VERSION 3.12)
 project(stellar-c)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-set(CMAKE_INSTALL_PREFIX /opt/tsg/)
 
 include(Version)
-include(Package)
 
 add_definitions(-D_GNU_SOURCE)
 set(CMAKE_CXX_STANDARD 11)
@@ -69,10 +67,6 @@ elseif(ASAN_OPTION STREQUAL "THREAD")
 	add_definitions(-DASAN_ENABLED=1)
 endif()
 
-
-add_custom_target("install-program" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Program -P cmake_install.cmake)
-add_custom_target("install-profile" COMMAND ${CMAKE_COMMAND} ARGS -DCOMPONENT=Profile -P cmake_install.cmake)
-
 include_directories(${CMAKE_SOURCE_DIR})
 include_directories(${CMAKE_SOURCE_DIR}/deps)
 include_directories(${CMAKE_SOURCE_DIR}/include)
@@ -89,8 +83,11 @@ enable_testing()
 add_subdirectory(test)
 
 
-install(FILES include/stellar/session_exdata.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/session_mq.h DESTINATION  ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/session.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/stellar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
-install(FILES include/stellar/utils.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT HEADER)
+install(FILES include/stellar/session_exdata.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
+install(FILES include/stellar/session_mq.h DESTINATION  ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
+install(FILES include/stellar/session.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
+install(FILES include/stellar/stellar.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
+install(FILES include/stellar/utils.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
+
+
+include(Package)

@@ -259,8 +259,12 @@ const char *session_get0_current_payload(struct session *sess, size_t *payload_l
 	return (const char*)sess->cur_pkt->a_stream->ptcpdetail->pdata;
 }
 
+#include <assert.h>
 const struct packet *session_get0_current_packet(struct session *sess)
 {
+	assert(sess->cur_pkt);
+	assert(sess->cur_pkt->a_stream);
+	sess->cur_pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
 	return sess->cur_pkt;
 }
 
