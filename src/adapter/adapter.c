@@ -55,6 +55,7 @@ static struct plugin_specific *load_plugin_specs(const char *toml_conf_path, int
         return NULL;
     }	
     toml_array_t* plugin_array = toml_array_in(conf, "plugin");
+	if(plugin_array==NULL)return NULL;
     *spec_num = toml_array_nelem(plugin_array);
      struct plugin_specific* plugins = CALLOC(struct plugin_specific, *spec_num);
 
@@ -103,14 +104,17 @@ struct stellar *stellar_init(const char *toml_conf_path)
 {
 	int spec_num;
 	struct plugin_specific *specs = load_plugin_specs(toml_conf_path, &spec_num);
-	if(specs == NULL || spec_num == 0)
+	if(spec_num < 0)
 	{
 		return NULL;
 	}
 	struct stellar *st = CALLOC(struct stellar, 1);
 	struct plugin_specific_inernal spec_internal={};
-	utarray_new(st->plugin_specs_array,&plugin_specs_icd);
-	utarray_reserve(st->plugin_specs_array, spec_num);
+	if(spec_num > 0)
+	{
+		utarray_new(st->plugin_specs_array,&plugin_specs_icd);
+		utarray_reserve(st->plugin_specs_array, spec_num);
+	}
 	st->intrinsic_session_event_exdata_idx=stellar_session_get_ex_new_index(st, "__STELLAR__", exdata_plugin_rt_free, NULL);
 	for(int i = 0; i < spec_num; i++)
 	{
