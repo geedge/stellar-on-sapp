@@ -23,6 +23,7 @@
 	session_get*;
 	session_set_*;
 	session_event_*;
+	session_plugin_detach_others;
 
   local:
     *;  /* Hide all other symbols */
