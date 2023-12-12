@@ -44,6 +44,7 @@ int session_is_symmetric(struct session *sess, unsigned char *flag);
 #define	SESSION_IS_TUNNLE_HTTP_PROXY (1 << 9)
 
 int session_is_outer_tunnel(struct session *sess, uint64_t *flag);
+int session_is_inner_most(struct session *sess, uint64_t *flag);
 
 #define SESSION_DIRECTION_IN 0
 #define SESSION_DIRECTION_OUT 1

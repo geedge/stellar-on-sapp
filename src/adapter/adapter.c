@@ -357,20 +357,17 @@ int session_is_outer_tunnel(struct session *sess, uint64_t *flag)
 	struct streaminfo *a_stream = sess->cur_pkt->a_stream;
 	if(flag)*flag=SESSION_IS_TUNNLE_NON;
 
-	int ret=0;
 	unsigned short tunnel_type=0;
 	int tunnel_type_len=sizeof(unsigned short);
-	ret=MESA_get_stream_opt(a_stream, MSO_STREAM_UP_LAYER_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
-	if(ret==0)
-	{
-		if(tunnel_type!=STREAM_TUNNLE_NON)
-		{
-			if(flag)*flag=(uint64_t)tunnel_type;
-			return 1;
-		}
-	}
+	MESA_get_stream_opt(a_stream, MSO_STREAM_UP_LAYER_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
+    if (tunnel_type != STREAM_TUNNLE_NON) // tunnel_type != STREAM_TUNNLE_NON means it is a outer of tunnel
+    {
+        if (flag)
+            *flag = (uint64_t)tunnel_type;
+        return 1;
+    }
 
-	while (t_stream != NULL)
+    while (t_stream != NULL)
 	{
 		if (t_stream->type == STREAM_TYPE_HTTP_PROXY)
 		{
@@ -384,7 +381,14 @@ int session_is_outer_tunnel(struct session *sess, uint64_t *flag)
 		}
 		t_stream = t_stream->pfather;
 	}
+	MESA_get_stream_opt(a_stream, MSO_STREAM_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
+	*flag = (uint64_t)tunnel_type;
 	return 0;
+}
+
+int session_is_inner_most(struct session *sess, uint64_t *flag)
+{
+	return !session_is_outer_tunnel(sess, flag);
 }
 
 int stellar_get_worker_thread_num(struct stellar *st)

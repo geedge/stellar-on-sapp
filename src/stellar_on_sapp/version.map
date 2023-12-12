@@ -14,6 +14,7 @@
 	stellar_session_get_ex_new_index;
 	stellar_plugin_register;
 
+	session_is_inner_most;
 	session_is_outer_tunnel;
 	session_is_symmetric;
 	session_get_ex_data;
