@@ -382,7 +382,7 @@ int session_is_outer_tunnel(struct session *sess, uint64_t *flag)
 		t_stream = t_stream->pfather;
 	}
 	MESA_get_stream_opt(a_stream, MSO_STREAM_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
-	*flag = (uint64_t)tunnel_type;
+	if(flag)*flag = (uint64_t)tunnel_type;
 	return 0;
 }
 
