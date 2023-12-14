@@ -1,0 +1,10 @@
+[
+	{
+		"Tuple4":	"192.168.38.73.50806>192.168.40.137.80",
+		"STREAM_TYPE":	"TCP",
+		"l7_label_id":	[32],
+		"l7_label_name":	["HTTP"],
+		"STREAM_DIR":	"C2S",
+		"name":	"APP_PROTO_IDENTIFY_RESULT_1"
+	} 
+]

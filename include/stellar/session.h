@@ -110,7 +110,7 @@ const struct packet *session_get0_current_packet(struct session *sess);
 
 #define PACKET_DIRECTION_C2S 0
 #define PACKET_DIRECTION_S2C 1
-int packet_get_direction(const struct packet *pkt);   	
+int packet_get_direction(const struct packet *pkt);
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len);
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
 

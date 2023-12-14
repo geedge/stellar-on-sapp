@@ -17,6 +17,8 @@ if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 	set (CMAKE_INSTALL_PREFIX "/opt/tsg/" CACHE PATH "default install path" FORCE)
 endif()
 
+LINK_DIRECTORIES(/opt/MESA/lib /usr/lib64)
+
 find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
 if (CMAKE_CXX_CPPCHECK)
     list(
@@ -76,12 +78,12 @@ add_subdirectory(vendor)
 add_subdirectory(deps/toml)
 add_subdirectory(src/adapter)
 add_subdirectory(src/stellar_on_sapp)
+add_subdirectory(src/http_decoder)
 add_subdirectory(examples/sapp_plugin)
 add_subdirectory(examples/stellar_plugin)
 
 enable_testing()
 add_subdirectory(test)
-
 
 install(FILES include/stellar/session_exdata.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
 install(FILES include/stellar/session_mq.h DESTINATION  ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)

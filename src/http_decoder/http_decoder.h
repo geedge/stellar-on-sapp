@@ -1,0 +1,93 @@
+/*
+**********************************************************************************************
+*	File: http_decoder.h
+*   Description: 
+*	Authors: Liu WenTan <liuwentan@geedgenetworks.com>
+*	Date:    2022-10-31
+*   Copyright: (c) Since 2022 Geedge Networks, Ltd. All rights reserved.
+***********************************************************************************************
+*/
+
+#ifndef _HTTP_DECODER_H_
+#define _HTTP_DECODER_H_
+
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+#include <stddef.h>
+
+enum http_message_type {
+    HTTP_MESSAGE_REQ_LINE,
+    HTTP_MESSAGE_REQ_HEADER,
+    HTTP_MESSAGE_REQ_HEADER_END,
+    HTTP_MESSAGE_REQ_BODY,
+    HTTP_MESSAGE_RES_LINE,
+    HTTP_MESSAGE_RES_HEADER,
+    HTTP_MESSAGE_RES_HEADER_END,
+    HTTP_MESSAGE_RES_BODY,
+    HTTP_MESSAGE_MAX
+};
+
+//http string
+struct hstring {
+    char *str;
+    size_t str_len;
+};
+
+struct http_header {
+    struct hstring key;
+    struct hstring val;
+};
+
+struct http_request_line {
+    struct hstring method;
+    struct hstring uri;
+    struct hstring version;
+
+    int major_version;
+    int minor_version;
+};
+
+struct http_response_line {
+    struct hstring version;
+    struct hstring status;
+
+    int major_version;
+    int minor_version;
+    int status_code;
+};
+
+struct http_message;
+
+enum http_message_type http_message_type(struct http_message *msg);
+
+int http_message_get_request_line(struct http_message *msg, struct http_request_line *line);
+
+int http_message_get_response_line(struct http_message *msg, struct http_response_line *line);
+
+/* same key may has multiple kv */
+int http_message_get_request_header(struct http_message *msg, struct hstring *key,
+                                    struct http_header *header_array, size_t array_size);
+
+int http_message_get_response_header(struct http_message *msg, struct hstring *key,
+                                     struct http_header *header_array, size_t array_size);
+
+int http_message_request_header_next(struct http_message *msg, struct http_header *header);
+
+int http_message_response_header_next(struct http_message *msg, struct http_header *header);
+
+void http_message_get_request_raw_body(struct http_message *msg, struct hstring *body);
+
+void http_message_get_response_raw_body(struct http_message *msg, struct hstring *body);
+
+void http_message_get_request_decompress_body(struct http_message *msg, struct hstring *body);
+
+void http_message_get_response_decompress_body(struct http_message *msg, struct hstring *body);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

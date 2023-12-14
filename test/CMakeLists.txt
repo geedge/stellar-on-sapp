@@ -10,5 +10,7 @@ target_link_libraries(
   gtest
 )
 
+add_subdirectory(http_decoder)
+
 include(GoogleTest)
 gtest_discover_tests(gtest_stellar)

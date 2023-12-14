@@ -3,8 +3,8 @@ variables:
   BUILD_PADDING_PREFIX: /tmp/padding_for_CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX/
   BUILD_IMAGE_CENTOS7: "git.mesalab.cn:7443/mesa_platform/build-env:centos7-for-sapp"
   BUILD_IMAGE_CENTOS8: "git.mesalab.cn:7443/mesa_platform/build-env:rocky8-for-sapp"
-  INSTALL_DEPENDENCY_LIBRARY: 
-    sapp  sapp-devel framework_env 
+  INSTALL_DEPENDENCY_LIBRARY: sapp sapp-devel framework_env libMESA_prof_load-devel
+                              libcjson-devel zlib-devel brotli-devel
   SYMBOL_TARGET: stellar-c
   TEST_NAME: gtest_stellar-c
   INSTALL_PREFIX: "/opt/tsg/"

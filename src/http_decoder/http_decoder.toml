@@ -1,0 +1,4 @@
+[[plugin]]
+path = "./src/http_decoder/http_decoder.so"
+init = "http_decoder_init"
+exit = "http_decoder_exit"

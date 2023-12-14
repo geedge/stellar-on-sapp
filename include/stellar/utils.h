@@ -5,7 +5,9 @@
 
 #define CALLOC(type, number) ((type *)calloc(sizeof(type), number))
 
-#define	FREE(p)	{free(p);p=NULL;}
+#define REALLOC(type, ptr, number) ((type *)realloc(ptr, (number) * sizeof(type)))
+
+#define	FREE(p)	{free(p); p = NULL;}
 
 #define	TRUE	1
 #define	FALSE	0
