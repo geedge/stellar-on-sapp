@@ -76,7 +76,7 @@ void http_decoder_string_reset(struct http_decoder_string *rstr);
 
 enum string_state http_decoder_string_state(struct http_decoder_string *rstr);
 
-void http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out);
+int http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out);
 
 void http_decoder_string_dump(struct http_decoder_string *rstr, const char *desc);
 

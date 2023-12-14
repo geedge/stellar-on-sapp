@@ -1,9 +1,9 @@
 set(DECODER_NAME http_decoder)
 
-add_library(${DECODER_NAME}_test_plug SHARED http_decoder_gtest.cpp)
-add_dependencies(${DECODER_NAME}_test_plug ${DECODER_NAME})
-target_link_libraries(${DECODER_NAME}_test_plug MESA_prof_load cjson)
-set_target_properties(${DECODER_NAME}_test_plug  PROPERTIES PREFIX "")
+add_library(${DECODER_NAME}_test SHARED http_decoder_gtest.cpp)
+add_dependencies(${DECODER_NAME}_test ${DECODER_NAME})
+target_link_libraries(${DECODER_NAME}_test MESA_prof_load cjson)
+set_target_properties(${DECODER_NAME}_test  PROPERTIES PREFIX "")
 
 set(TEST_RUN_DIR ${CMAKE_CURRENT_BINARY_DIR}/sapp)
 set(TEST_MAIN ${TEST_RUN_DIR}/plugin_test_main)
@@ -26,7 +26,7 @@ add_test(NAME UPDATE_SAPP_REORDER COMMAND bash -c "sed -i 's/reorder_pkt_max=32/
 # update plugin to be tested
 add_test(NAME UPDATE_STELLAR_ON_SAPP_SO COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/src/stellar_on_sapp/stellar_on_sapp.so ${TEST_RUN_DIR}/plug/stellar_on_sapp/stellar_on_sapp.so")
 add_test(NAME UPDATE_PLUG_SO COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/src/${DECODER_NAME}/${DECODER_NAME}.so ${TEST_RUN_DIR}/stellar_plugin/${DECODER_NAME}.so")
-add_test(NAME UPDATE_TEST_SO COMMAND sh -c "cp ${CMAKE_CURRENT_BINARY_DIR}/${DECODER_NAME}_test_plug.so ${TEST_RUN_DIR}/stellar_plugin/${DECODER_NAME}_test_plug.so")
+add_test(NAME UPDATE_TEST_SO COMMAND sh -c "cp ${CMAKE_CURRENT_BINARY_DIR}/${DECODER_NAME}_test.so ${TEST_RUN_DIR}/stellar_plugin/${DECODER_NAME}_test.so")
 
 set_tests_properties(INSTALL_TEST_MAIN COPY_TEST_MAIN COPY_CONF COPY_SPEC COPY_CONFLIST COPY_INF
                      UPDATE_SAPP_LOG UPDATE_SAPP_SYN_MODE UPDATE_SAPP_REORDER     
@@ -34,7 +34,7 @@ set_tests_properties(INSTALL_TEST_MAIN COPY_TEST_MAIN COPY_CONF COPY_SPEC COPY_C
                      PROPERTIES FIXTURES_SETUP TestFixture)
 
 # run tests
-# add_test(NAME RUN_HTTP_SIMPLE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/proto_identify_http.json
-#          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name *.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+add_test(NAME RUN_HTTP_SIMPLE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_simple_result.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name *.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-# set_tests_properties(RUN_HTTP_SIMPLE_TEST PROPERTIES FIXTURES_REQUIRED TestFixture)
+set_tests_properties(RUN_HTTP_SIMPLE_TEST PROPERTIES FIXTURES_REQUIRED TestFixture)

@@ -33,120 +33,166 @@ int commit_test_result_json(cJSON *node, const char *name);
 #include "MESA/stream.h"
 
 static int g_result_count = 1;
-int g_test_exdata_idx = 0;
-int g_l7_exdata_idx  = 0;
-int g_test_app_plugin_id = 0;
-int g_stellar_session_bridge_id = -1;
+int g_req_exdata_idx = 0;
+int g_res_exdata_idx = 0;
 
-#define	MAX_PROTO_ID_NUM	10000
-static char *g_proto_id2name[MAX_PROTO_ID_NUM];
-
-struct http_decoder_test_context {
-    int topic_id;
-    int plugin_id;
-};
-
-// static int load_l7_protocol_mapper(const char *filename) {
-//     int ret = 0, proto_id = 0;
-//     char line[1024] = {0};
-//     char type_name[32] = {0};
-//     char proto_name[32] = {0};
-
-//     memset(g_proto_id2name, 0, sizeof(g_proto_id2name));
-// 	FILE *fp = fopen(filename, "r");
-// 	if (NULL == fp) {
-// 		printf("Open %s failed ...", filename);
-// 		return -1;
-// 	}
-
-// 	memset(line, 0, sizeof(line));
-
-// 	while ((fgets(line, sizeof(line), fp)) != NULL) {
-// 		if (line[0] == '#' || line[0] == '\n' ||
-//             line[0] == '\r' || line[0] == '\0') {
-// 			continue;
-// 		}
-		
-// 		ret = sscanf(line, "%30s %30s %d", type_name, proto_name, &proto_id);
-// 		assert(ret == 3 && proto_id < MAX_PROTO_ID_NUM);
-
-// 		g_proto_id2name[proto_id] = (char *)calloc(strlen(proto_name)+1, 1);
-//         strcpy(g_proto_id2name[proto_id], proto_name);
-// 		memset(line, 0, sizeof(line));
-// 	}
-
-// 	fclose(fp);
-// 	fp = NULL;
-
-// 	return ret;
-// }
-
-static void commit_test_result(cJSON *ctx, struct session *sess)
+void output_http_req_line(struct http_request_line *req_line)
 {
-        assert(g_l7_exdata_idx >= 0  && ctx != NULL);
-        struct http_request_line *label = (struct http_request_line *)session_get_ex_data(sess, g_l7_exdata_idx);;
-        // if(label != NULL)
-        // {
-        //     int proto_ids[8];
-        //     const char* proto_names[8];
-        //     for(int i = 0; i < label->protocol_id_num; i++)
-        //     {
-        //         proto_ids[i] = (int)(label->protocol_id[i]);
-        //         proto_names[i] = g_proto_id2name[proto_ids[i]];
+    char tmp_str[2048] = {0};
+    snprintf(tmp_str, req_line->method.str_len + 1, "%s", req_line->method.str);
+    printf("req_method:%s\n", tmp_str);
 
-        //     }
-        //     cJSON *label_ids = cJSON_CreateIntArray(proto_ids, label->protocol_id_num);
-        //     cJSON_AddItemToObject(ctx, "l7_label_id", label_ids);
-        //     cJSON *label_names = cJSON_CreateStringArray(proto_names, label->protocol_id_num);
-        //     cJSON_AddItemToObject(ctx, "l7_label_name", label_names);
-        // }
-        // else
-        // {
-        //         cJSON_AddStringToObject(ctx, "l7_label_id", "UNKNOWN");
-        // }
-        // unsigned char dir_flag;
-        // int is_symmetric=session_is_symmetric(sess, &dir_flag);
-        // if(is_symmetric)
-        // {
-        //    cJSON_AddStringToObject(ctx, "STREAM_DIR", "DOUBLE"); 
-        // }
-        // else if(dir_flag == SESSION_SEEN_C2S_FLOW)
-        // {
-        //     cJSON_AddStringToObject(ctx, "STREAM_DIR", "C2S");
-        // }
-        // else if(dir_flag == SESSION_SEEN_S2C_FLOW)
-        // {
-        //      cJSON_AddStringToObject(ctx, "STREAM_DIR", "S2C");
-        // }
-        // else
-        // {
-        //     assert(0);
-        // }
-        // if (ctx)
-        // {
-        //     char result_name[128] = "";
-        //     sprintf(result_name, "APP_PROTO_IDENTIFY_RESULT_%d", g_result_count);
-        //     commit_test_result_json(ctx, result_name);
-        //     g_result_count += 1;
-        // }
-        return;
+    memset(tmp_str, 0, sizeof(tmp_str));
+    snprintf(tmp_str, req_line->uri.str_len + 1, "%s", req_line->uri.str);
+    printf("req_uri:%s\n", tmp_str);
+
+    memset(tmp_str, 0, sizeof(tmp_str));
+    snprintf(tmp_str, req_line->version.str_len + 1, "%s", req_line->version.str);
+    printf("req_version:%s\n", tmp_str);
+}
+
+void output_http_res_line(struct http_response_line *res_line)
+{
+    char tmp_str[2048] = {0};
+    snprintf(tmp_str, res_line->version.str_len + 1, "%s", res_line->version.str);
+    printf("res_version:%s\n", tmp_str);
+
+    memset(tmp_str, 0, sizeof(tmp_str));
+    snprintf(tmp_str, res_line->status.str_len + 1, "%s", res_line->status.str);
+    printf("res_status:%s\n", tmp_str);
+}
+
+void output_http_header(struct http_header *header)
+{
+    printf("<%s:%s>\n", header->key.str, header->val.str);
+}
+
+void output_http_req_body(struct hstring *body)
+{
+
+}
+
+void output_http_res_body(struct hstring *body)
+{
+
+}
+
+
+int http_field_add_to_json(cJSON *object, const char *name, char *value, char length)
+{
+    if (value != NULL && length > 0) {
+        char *tmp = (char *)calloc(1, length + 1);
+        memcpy(tmp, value, length);
+        cJSON_AddStringToObject(object, name, tmp);
+        free(tmp);
+        tmp = NULL;
+    }
+
+        return 0;
+}
+
+void req_line_to_json(cJSON *ctx, struct http_request_line *req_line)
+{
+    http_field_add_to_json(ctx, "method", req_line->method.str,
+                           req_line->method.str_len);
+    http_field_add_to_json(ctx, "uri", req_line->uri.str,
+                           req_line->uri.str_len);
+    http_field_add_to_json(ctx, "req_version", req_line->version.str,
+                           req_line->version.str_len);
+    cJSON_AddNumberToObject(ctx, "major_version", req_line->major_version);
+    cJSON_AddNumberToObject(ctx, "minor_version", req_line->minor_version);
+}
+
+void res_line_to_json(cJSON *ctx, struct http_response_line *res_line)
+{
+    http_field_add_to_json(ctx, "res_version", res_line->version.str,
+                           res_line->version.str_len);
+    http_field_add_to_json(ctx, "res_status", res_line->status.str,
+                                 res_line->status.str_len);            
+    cJSON_AddNumberToObject(ctx, "major_version", res_line->major_version);
+    cJSON_AddNumberToObject(ctx, "minor_version", res_line->minor_version);
+    cJSON_AddNumberToObject(ctx, "status_code", res_line->status_code);
+}
+
+void http_header_to_json(cJSON *ctx, struct http_header *header)
+{
+    char key[256] = {0};
+    snprintf(key, header->key.str_len + 1, "%s", header->key.str);
+
+    http_field_add_to_json(ctx, key, header->val.str, header->val.str_len);
 }
 
 static int http_decoder_test_entry(struct session *sess, int topic_id, const void *data, void *cb_arg)
 {
     struct http_message *msg = (struct http_message *)data;
-
-    printf("................http_decoder_test_entry................\n");
-    struct http_request_line line;
-    memset(&line, 0, sizeof(line));
+    struct http_request_line req_line = {0};
+    struct http_response_line res_line = {0};
+    struct http_header header = {0};
+    struct hstring body = {0};
+    int exdata_idx = 0;
 
     enum http_message_type msg_type = http_message_type(msg);
+    
+    if (msg_type == HTTP_MESSAGE_REQ_LINE ||
+        msg_type == HTTP_MESSAGE_REQ_HEADER_END ||
+        msg_type == HTTP_MESSAGE_REQ_BODY) {
+        exdata_idx = g_req_exdata_idx;
+    } else {
+        exdata_idx = g_res_exdata_idx;
+    }
+
+    cJSON *ctx = (cJSON *)session_get_ex_data(sess, exdata_idx);
+    if (NULL == ctx) {
+        ctx = cJSON_CreateObject();
+        cJSON_AddStringToObject(ctx, "Tuple4", session_get0_readable_addr(sess));
+        session_set_ex_data(sess, exdata_idx, ctx);
+    }
+
     switch (msg_type) {
     case HTTP_MESSAGE_REQ_LINE:
-        http_message_get_request_line(msg, &line);
+        http_message_get_request_line(msg, &req_line);
+        //output_http_req_line(&req_line);
+        req_line_to_json(ctx, &req_line);
+        break;
+    case HTTP_MESSAGE_REQ_HEADER_END:
+        while (http_message_request_header_next(msg, &header) > 0) {
+            http_header_to_json(ctx, &header);
+        }
+        break;
+    case HTTP_MESSAGE_REQ_BODY:
+        http_message_get_request_raw_body(msg, &body);
+        output_http_req_body(&body);
+        break;
+    case HTTP_MESSAGE_RES_LINE:
+        http_message_get_response_line(msg, &res_line);
+        res_line_to_json(ctx, &res_line);
+        break;
+    case HTTP_MESSAGE_RES_HEADER_END:
+        while (http_message_response_header_next(msg, &header) > 0) {
+            http_header_to_json(ctx, &header);
+        }
+        break;
+    case HTTP_MESSAGE_RES_BODY:
+        http_message_get_response_raw_body(msg, &body);
+        output_http_res_body(&body);
         break;
     default:
         break;
+    }
+
+    char result_name[128] = {0};
+    if (msg_type == HTTP_MESSAGE_REQ_HEADER_END) {
+        sprintf(result_name, "HTTP_DECODER_RESULT_%d", g_result_count);
+        commit_test_result_json(ctx, result_name);
+        session_set_ex_data(sess, exdata_idx, NULL);
+        g_result_count++;
+    }
+
+    if (msg_type == HTTP_MESSAGE_RES_HEADER_END) {
+        sprintf(result_name, "HTTP_DECODER_RESULT_%d", g_result_count);
+        commit_test_result_json(ctx, result_name);
+        session_set_ex_data(sess, exdata_idx, NULL);
+        g_result_count++;
     }
 
     return 0;
@@ -154,13 +200,17 @@ static int http_decoder_test_entry(struct session *sess, int topic_id, const voi
 
 extern "C" void *http_decoder_test_init(struct stellar *st)
 {
-    char l7_label_name[256] = "";
-    char l7_bridge_name[256] = "";
-    char l7_proto_name[256] = "";
+    g_req_exdata_idx = stellar_session_get_ex_new_index(st, "HTTP_DECODER_REQ_TEST", NULL, NULL);
+    if (g_req_exdata_idx < 0) {
+        printf("http_decoder_test_init: can't get http_decoder req exdata index !!!\n");	
+		exit(-1); 
+    }
 
-    MESA_load_profile_string_def("./tsgconf/main.conf", "SYSTEM", "L7_LABEL_NAME", l7_label_name, sizeof(l7_label_name), "L7_PROTOCOL_LABEL");
-	MESA_load_profile_string_def("./tsgconf/main.conf", "SYSTEM", "APP_BRIDGE_NAME", l7_bridge_name, sizeof(l7_bridge_name), "APP_BRIDGE");
-	MESA_load_profile_string_def("./tsgconf/main.conf", "SYSTEM", "L7_PROTOCOL_FILE", l7_proto_name, sizeof(l7_proto_name), "./tsgconf/tsg_l7_protocol.conf");
+    g_res_exdata_idx = stellar_session_get_ex_new_index(st, "HTTP_DECODER_RES_TEST", NULL, NULL);
+    if (g_res_exdata_idx < 0) {
+        printf("http_decoder_test_init: can't get http_decoder res exdata index !!!\n");	
+		exit(-1); 
+    }
 
     int topic_id = session_mq_get_topic_id(st, "HTTP_DECODER_MESSAGE");
     if (topic_id < 0) {

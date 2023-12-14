@@ -4,7 +4,10 @@ variables:
   BUILD_IMAGE_CENTOS7: "git.mesalab.cn:7443/mesa_platform/build-env:centos7-for-sapp"
   BUILD_IMAGE_CENTOS8: "git.mesalab.cn:7443/mesa_platform/build-env:rocky8-for-sapp"
   INSTALL_DEPENDENCY_LIBRARY: sapp sapp-devel framework_env libMESA_prof_load-devel
-                              libcjson-devel zlib-devel brotli-devel
+                              libMESA_htable-devel libMESA_jump_layer
+                              libMESA_handle_logger-devel libMESA_field_stat2-devel
+                              libfieldstat3-devel libbreakpad_mini-devel libcjson-devel
+                              zlib-devel brotli-devel
   SYMBOL_TARGET: stellar-c
   TEST_NAME: gtest_stellar-c
   INSTALL_PREFIX: "/opt/tsg/"

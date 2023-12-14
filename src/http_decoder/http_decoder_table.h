@@ -55,22 +55,22 @@ void http_decoder_table_remove(struct http_decoder_table *table);
 
 void http_decoder_table_dump(struct http_decoder_table *table);
 
-void http_decoder_table_get_uri(struct http_decoder_table *table,
+int http_decoder_table_get_uri(struct http_decoder_table *table,
                                 struct hstring *out);
 
-void http_decoder_table_get_method(struct http_decoder_table *table,
+int http_decoder_table_get_method(struct http_decoder_table *table,
                                    struct hstring *out);
 
-void http_decoder_table_get_status(struct http_decoder_table *table,
+int http_decoder_table_get_status(struct http_decoder_table *table,
                                    struct hstring *out);
 
-void http_decoder_table_get_version(struct http_decoder_table *table,
+int http_decoder_table_get_version(struct http_decoder_table *table,
                                     struct hstring *out);
 
-void http_decoder_table_get_body(struct http_decoder_table *table,
+int http_decoder_table_get_body(struct http_decoder_table *table,
                                  struct hstring *out);
 
-size_t http_decoder_table_get_header(struct http_decoder_table *table, struct hstring *key,
+int http_decoder_table_get_header(struct http_decoder_table *table, struct hstring *key,
                                      struct http_header *header_array, size_t array_size);
 
 int http_decoder_table_iter_header(struct http_decoder_table *table,

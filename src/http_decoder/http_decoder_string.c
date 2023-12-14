@@ -8,8 +8,13 @@
 ***********************************************************************************************
 */
 
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 
+#include "stellar/utils.h"
+#include "http_decoder_utils.h"
 #include "http_decoder_string.h"
 
 static const char *string_state_to_desc(enum string_state state)
@@ -123,7 +128,7 @@ void http_decoder_string_reset(struct http_decoder_string *rstr)
     case STRING_STATE_REFER:
     case STRING_STATE_CACHE:
     case STRING_STATE_COMMIT:
-        safe_free(rstr->cache.str);
+        FREE(rstr->cache.str);
         memset(rstr, 0, sizeof(struct http_decoder_string));
         break;
     default:
@@ -139,10 +144,10 @@ enum string_state http_decoder_string_state(struct http_decoder_string *rstr)
     return rstr->state;
 }
 
-void http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out)
+int http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out)
 {
     if (NULL == rstr || NULL == out) {
-        return;
+        return -1;
     }
 
     if (http_decoder_string_state(rstr) == STRING_STATE_COMMIT) {
@@ -152,6 +157,8 @@ void http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *o
         out->str = NULL;
         out->str_len = 0;
     }
+
+    return 0;
 }
 
 void http_decoder_string_dump(struct http_decoder_string *rstr, const char *desc)

@@ -78,13 +78,13 @@ int http_message_request_header_next(struct http_message *msg, struct http_heade
 
 int http_message_response_header_next(struct http_message *msg, struct http_header *header);
 
-void http_message_get_request_raw_body(struct http_message *msg, struct hstring *body);
+int http_message_get_request_raw_body(struct http_message *msg, struct hstring *body);
 
-void http_message_get_response_raw_body(struct http_message *msg, struct hstring *body);
+int http_message_get_response_raw_body(struct http_message *msg, struct hstring *body);
 
-void http_message_get_request_decompress_body(struct http_message *msg, struct hstring *body);
+int http_message_get_request_decompress_body(struct http_message *msg, struct hstring *body);
 
-void http_message_get_response_decompress_body(struct http_message *msg, struct hstring *body);
+int http_message_get_response_decompress_body(struct http_message *msg, struct hstring *body);
 
 #ifdef __cplusplus
 }
