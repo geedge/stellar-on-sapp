@@ -34,7 +34,48 @@ set_tests_properties(INSTALL_TEST_MAIN COPY_TEST_MAIN COPY_CONF COPY_SPEC COPY_C
                      PROPERTIES FIXTURES_SETUP TestFixture)
 
 # run tests
-add_test(NAME RUN_HTTP_SIMPLE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_simple_result.json
-         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name *.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+add_test(NAME HTTP_GET_SINGLE_TRANS_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_single_trans.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_single_trans.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-set_tests_properties(RUN_HTTP_SIMPLE_TEST PROPERTIES FIXTURES_REQUIRED TestFixture)
+add_test(NAME HTTP_GET_MULTI_TRANS_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_multi_trans.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_multi_trans.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_GET_REQ_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_req_pipeline.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_req_pipeline.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_GET_LONG_COOKIE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_long_cookie.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_long_cookie.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_GET_ENCODED_URI_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_encoded_uri.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_encoded_uri.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_RES_GZIP_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_res_gzip.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_res_gzip.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_CHUNKED_RES_GZIP_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_chunked_res_gzip.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_chunked_res_gzip.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_OVER_TCP_KEEPALIVE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_over_tcp_keepalive.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_over_tcp_keepalive.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_TUNNEL_FOR_POP3_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_tunnel_for_pop3.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_tunnel_for_pop3.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_OVER_PPPOE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_over_pppoe.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_over_pppoe.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_OVER_TLS_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_over_tls.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_over_tls.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
+                     HTTP_GET_MULTI_TRANS_TEST
+                     HTTP_GET_REQ_PIPELINE_TEST
+                     HTTP_GET_LONG_COOKIE_TEST
+                     HTTP_GET_ENCODED_URI_TEST
+                     HTTP_RES_GZIP_TEST
+                     HTTP_CHUNKED_RES_GZIP_TEST
+                     HTTP_OVER_TCP_KEEPALIVE_TEST
+                     HTTP_TUNNEL_FOR_POP3_TEST
+                     HTTP_OVER_PPPOE_TEST
+                     HTTP_OVER_TLS_TEST
+                     PROPERTIES FIXTURES_REQUIRED TestFixture)

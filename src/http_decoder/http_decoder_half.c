@@ -635,7 +635,19 @@ int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
 
     half->http_ev_ctx = http_ev_ctx;
     half->error = llhttp_execute(&half->parser, data, data_len);
-    if (half->error != HPE_OK) {
+
+    int ret = 0;
+    switch (half->error) {
+    case HPE_OK:
+    case HPE_PAUSED_UPGRADE:
+        ret = 0;
+        break;
+    default:
+        ret = -1;
+        break;
+    }
+
+    if (ret < 0) {
         printf("llhttp_execute parse error: %s %s\n",
                 llhttp_errno_name(half->error), half->parser.reason);
         return -1;

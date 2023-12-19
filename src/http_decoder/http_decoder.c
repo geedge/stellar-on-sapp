@@ -330,64 +330,78 @@ static int http_protocol_identify(const char *data, size_t data_len)
 
 int http_decoder_entry(struct session *sess, int events, const struct packet *pkt, void *cb_arg)
 {
-	int ret = 0;
-	size_t payload_len = 0;
-	struct http_decoder_context *ctx = (struct http_decoder_context *)cb_arg;
+    int ret = 0;
+    size_t payload_len = 0;
+    struct http_decoder_context *ctx = (struct http_decoder_context *)cb_arg;
+    struct http_decoder_result_queue *queue = NULL;
 
-	const char *payload = session_get0_current_payload(sess, &payload_len);
-    if (NULL == payload || 0 == payload_len) {
-        return 0;
-    }
+    if (events & SESS_EV_TCP) {
+        const char *payload = session_get0_current_payload(sess, &payload_len);
+        if (NULL == payload || 0 == payload_len) {
+            return 0;
+        }
 
-	struct http_decoder_result_queue *queue = session_get_ex_data(sess, ctx->ex_data_idx);
-	if (NULL == queue) {
-        size_t http_identify_len = payload_len > HTTP_IDENTIFY_LEN ? HTTP_IDENTIFY_LEN : payload_len;
-		ret = http_protocol_identify(payload, http_identify_len);
-		if (ret < 0) {
-			//ignore this session's event
-			struct session_event *s_event = session_get_intrinsic_event(sess, ctx->plugin_id);
-			session_event_assign(s_event, ctx->st, sess, 0, http_decoder_entry, ctx);
-			return 0;
-		}
+        queue = session_get_ex_data(sess, ctx->ex_data_idx);
+        if (NULL == queue) {
+            size_t http_identify_len = payload_len > HTTP_IDENTIFY_LEN
+                                           ? HTTP_IDENTIFY_LEN
+                                           : payload_len;
+            ret = http_protocol_identify(payload, http_identify_len);
+            if (ret < 0) {
+                // ignore this session's event
+                struct session_event *s_event =
+                    session_get_intrinsic_event(sess, ctx->plugin_id);
+                session_event_assign(s_event, ctx->st, sess, 0,
+                                     http_decoder_entry, ctx);
+                return 0;
+            }
 
-		queue = http_decoder_result_queue_new(HTTP_DECODER_RESULT_QUEUE_SIZE);
-        queue->ref_session = sess;
-        session_set_ex_data(sess, ctx->ex_data_idx, queue);
-    }
+            queue = http_decoder_result_queue_new(HTTP_DECODER_RESULT_QUEUE_SIZE);
+            queue->ref_session = sess;
+            session_set_ex_data(sess, ctx->ex_data_idx, queue);
+        }
 
-    int dir = packet_get_direction(pkt);
-    if (dir < 0) {
-        return -1;
-    }
+        int dir = packet_get_direction(pkt);
+        if (dir < 0) {
+            return -1;
+        }
 
-    // printf("\n-------------------------------------------\n");
-    // for (size_t i = 0; i < payload_len; i++) {
-    //     printf(" %x", payload[i]);
-    // }
-    // printf("\n-------------------------------------------\n");
+        // printf("\n-------------------------------------------\n");
+        // for (size_t i = 0; i < payload_len; i++) {
+        //     printf(" %x", payload[i]);
+        // }
+        // printf("\n-------------------------------------------\n");
 
-    if (NULL == ctx->decoder) {
-        ctx->decoder = http_decoder_new(http_event_handler, HTTP_DECODER_IS_CACHE_LINE,
-                                        HTTP_DECODER_IS_CACHE_HEADER, HTTP_DECODER_IS_CACHE_BODY);
-    }
+        if (NULL == ctx->decoder) {
+            ctx->decoder = http_decoder_new(http_event_handler, HTTP_DECODER_IS_CACHE_LINE,
+                                            HTTP_DECODER_IS_CACHE_HEADER, HTTP_DECODER_IS_CACHE_BODY);
+        }
 
-    struct http_decoder_half *cur_half = NULL;
-    if (dir == PACKET_DIRECTION_C2S) {
-        cur_half = ctx->decoder->c2s_half;
-    } else {
-        cur_half = ctx->decoder->s2c_half;
-    }
-
-    ctx->http_ev_ctx->topic_id = ctx->topic_id;
-    ctx->http_ev_ctx->ref_queue = queue;
-    ctx->http_ev_ctx->ref_session = sess;
-
-    ret = http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
-    if (ret < 0) {
+        struct http_decoder_half *cur_half = NULL;
         if (dir == PACKET_DIRECTION_C2S) {
-            http_decoder_result_queue_pop(queue, queue->req_index);
+            cur_half = ctx->decoder->c2s_half;
         } else {
-            http_decoder_result_queue_pop(queue, queue->res_index);
+            cur_half = ctx->decoder->s2c_half;
+        }
+
+        ctx->http_ev_ctx->topic_id = ctx->topic_id;
+        ctx->http_ev_ctx->ref_queue = queue;
+        ctx->http_ev_ctx->ref_session = sess;
+
+        ret = http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
+        if (ret < 0) {
+            if (dir == PACKET_DIRECTION_C2S) {
+                http_decoder_result_queue_pop(queue, queue->req_index);
+            } else {
+                http_decoder_result_queue_pop(queue, queue->res_index);
+            }
+        }
+    }
+
+    if (events & SESS_EV_CLOSING) {
+        if (queue != NULL) {
+            http_decoder_result_queue_free(queue);
+            session_set_ex_data(sess, ctx->ex_data_idx, NULL); 
         }
     }
 
@@ -422,7 +436,7 @@ void *http_decoder_init(struct stellar *st)
     ctx->ex_data_idx = stellar_session_get_ex_new_index(st, "HTTP_DECODER",
 														http_decoder_ex_data_free, NULL);
 
-    int plugin_id = stellar_plugin_register(st, SESS_EV_TCP, http_decoder_entry, ctx);
+    int plugin_id = stellar_plugin_register(st, SESS_EV_TCP|SESS_EV_CLOSING, http_decoder_entry, ctx);
     if (plugin_id >= 0) {
         ctx->plugin_id = plugin_id;
     }
@@ -468,8 +482,7 @@ enum http_message_type http_message_type(struct http_message *msg)
 
 int http_message_get_request_line(struct http_message *msg, struct http_request_line *line)
 {
-	if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_LINE ||
-	    NULL == line) {
+	if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_LINE || NULL == line) {
 		return -1;
 	}
 
@@ -478,8 +491,7 @@ int http_message_get_request_line(struct http_message *msg, struct http_request_
 
 int http_message_get_response_line(struct http_message *msg, struct http_response_line *line)
 {
-	if (NULL == msg || msg->type != HTTP_MESSAGE_RES_LINE ||
-		NULL == line) {
+	if (NULL == msg || msg->type != HTTP_MESSAGE_RES_LINE || NULL == line) {
 		return -1;
 	}
 
