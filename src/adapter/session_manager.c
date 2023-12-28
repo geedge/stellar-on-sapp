@@ -427,7 +427,10 @@ int session_event_add(struct session_event *ev, const struct timeval *timeout)
 	{
 		ev->timeout = *timeout;
 	}
-	DL_APPEND(ev->sess->ev_list, ev);
+	if(ev->sess)
+	{
+		DL_APPEND(ev->sess->ev_list, ev);
+	}
 	return 0;
 }
 
@@ -445,7 +448,9 @@ int session_event_assign(struct session_event *ev, struct stellar *st, struct se
 
 int session_event_del(struct session_event *ev)
 {
+	if(ev->is_delete==1)return 0;
 	ev->is_delete=1;
+
 	if(ev->is_intrinsic==0 && (ev->prev != NULL || ev->next != NULL))
 	{
 		DL_DELETE(ev->sess->ev_list, ev);
@@ -479,38 +484,45 @@ struct session_event *session_get_intrinsic_event(struct session *sess, int plug
 void session_defer_loop(struct session *sess)
 {
 
-	struct session_event *ev=NULL, *ev_tmp=NULL;
-	int events=(1<<sess->state|(sess->type==SESSION_TYPE_TCP?SESS_EV_TCP:SESS_EV_UDP));
-	const struct packet *pkt= session_get0_current_packet(sess);
-	DL_FOREACH_SAFE(sess->ev_list, ev, ev_tmp)
-	{
-		if(ev->session_event_cb != NULL && (ev->events & events) && (ev->is_delete == 0))
-		{
-			ev->session_event_cb(sess, events, pkt, ev->cb_arg);
-		}
-	}
-
 	struct session_mq *mq_elt=NULL, *mq_tmp=NULL;
 	struct session_mq_subscriber *sub_elt, *sub_tmp;
 	struct session_mq_topic_schema *topic;
-	DL_FOREACH_SAFE(sess->mq, mq_elt, mq_tmp)
+
+	struct session_event *ev=NULL, *ev_tmp=NULL;
+	int events=(1<<sess->state|(sess->type==SESSION_TYPE_TCP?SESS_EV_TCP:SESS_EV_UDP));
+	const struct packet *pkt= session_get0_current_packet(sess);
+
+    while (sess->mq != NULL || sess->ev_list != NULL)
     {
-		topic=(struct session_mq_topic_schema *)utarray_eltptr(sess->st->session_mq_schema_array,(unsigned int)(mq_elt->topic_id));
-		if(topic)
-		{
-			DL_FOREACH_SAFE(topic->subscribers, sub_elt, sub_tmp)
-			{
-				sub_elt->sub_cb(sess, mq_elt->topic_id, mq_elt->message, sub_elt->cb_arg);
-			}
-			if(topic->free_cb)
-			{
-				topic->free_cb(mq_elt->message, topic->cb_arg);
-			}
-		}
-        DL_DELETE(sess->mq, mq_elt);
-        free(mq_elt);
+        DL_FOREACH_SAFE(sess->mq, mq_elt, mq_tmp)
+        {
+            topic = (struct session_mq_topic_schema *)utarray_eltptr(sess->st->session_mq_schema_array,
+                                                                    (unsigned int)(mq_elt->topic_id));
+            if (topic)
+            {
+                DL_FOREACH_SAFE(topic->subscribers, sub_elt, sub_tmp)
+                {
+                    sub_elt->sub_cb(sess, mq_elt->topic_id, mq_elt->message, sub_elt->cb_arg);
+                }
+                if (topic->free_cb)
+                {
+                    topic->free_cb(mq_elt->message, topic->cb_arg);
+                }
+            }
+            DL_DELETE(sess->mq, mq_elt);
+            free(mq_elt);
+        }
+
+        DL_FOREACH_SAFE(sess->ev_list, ev, ev_tmp)
+        {
+            if (ev->session_event_cb != NULL && (ev->events & events) && (ev->is_delete == 0))
+            {
+                ev->session_event_cb(sess, events, pkt, ev->cb_arg);
+                DL_DELETE(sess->ev_list, ev);
+            }
+        }
     }
-	return;
+    return;
 }
 
 int stellar_worker_thread_periodic_add(struct stellar *st, stellar_periodic_cb_func *periodic_cb, void *cb_arg, const struct timeval *interval)

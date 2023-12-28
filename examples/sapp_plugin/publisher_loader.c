@@ -110,6 +110,7 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 	case OP_STATE_PENDING:
 		ctx->sess=adapter_session_new(g_stellar, pstream);
 		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
+		adapter_session_poll(ctx->sess);
 		break;
 	case OP_STATE_DATA:
 		msg = stream_ctx_dup((const struct simple_stream_ctx *)*pme);
@@ -118,9 +119,11 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 			FREE(msg);
 		}
 		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+		adapter_session_poll(ctx->sess);
 		break;
 	case OP_STATE_CLOSE:
 		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CLOSING);
+		adapter_session_poll(ctx->sess);
 		adapter_session_free(ctx->sess);
 		print_stream_ctx(pstream, ctx);
 		FREE(*pme);

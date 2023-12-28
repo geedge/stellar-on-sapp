@@ -18,6 +18,7 @@ struct mq_message_stat
 	uint32_t c2s_bytes;
 	uint32_t s2c_pkts;
 	uint32_t s2c_bytes;
+	struct session_event* ud_ev;
 };
 
 extern int simple_mq_plugin_entry(struct session *sess, int events, const struct packet *pkt, void *cb_arg);
@@ -51,6 +52,16 @@ static void print_session_ctx(struct session *sess, struct mq_message_stat *ctx,
 	return;
 }
 
+int simple_event_plugin_user_defined_ev(struct session *sess, int events, const struct packet *pkt, void *cb_arg)
+{
+	if(cb_arg == NULL)return -1;
+	struct simple_stellar_plugin_ctx *plugin_ctx=(struct simple_stellar_plugin_ctx *)cb_arg;
+	struct mq_message_stat *mg_stat = (struct mq_message_stat *)session_get_ex_data(sess, plugin_ctx->exdata_idx);
+	printf("%s(plug:%d)trigger-----------%20s\n", __FUNCTION__, plugin_ctx->plugin_id, session_get0_readable_addr(sess));
+	print_session_ctx(sess, mg_stat, plugin_ctx->plugin_id);
+	return 0;
+}
+
 int simple_event_plugin_entry(struct session *sess, int events, const struct packet *pkt, void *cb_arg)
 {
 	if(cb_arg == NULL)return -1;
@@ -60,6 +71,12 @@ int simple_event_plugin_entry(struct session *sess, int events, const struct pac
 	{
 		mg_stat = CALLOC(struct mq_message_stat, 1);
 		session_set_ex_data(sess, plugin_ctx->exdata_idx, mg_stat);
+	}
+
+ 	if ((events & SESS_EV_OPENING))
+	{
+		mg_stat->ud_ev=session_event_new(plugin_ctx->st, sess, (SESS_EV_TCP|SESS_EV_UDP|SESS_EV_OPENING|SESS_EV_PACKET|SESS_EV_CLOSING), simple_event_plugin_user_defined_ev, cb_arg);
+		session_event_add(mg_stat->ud_ev, NULL);
 	}
 
 	if (pkt)
@@ -81,6 +98,7 @@ int simple_event_plugin_entry(struct session *sess, int events, const struct pac
     if (mg_stat != NULL && (events & SESS_EV_CLOSING))
     {
         print_session_ctx(sess, mg_stat, plugin_ctx->plugin_id);
+		session_event_free(mg_stat->ud_ev);
     }
     return 0;
 }
