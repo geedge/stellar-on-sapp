@@ -76,6 +76,16 @@ void http_decoder_table_free(struct http_decoder_table *table)
     }
 
     if (table->headers != NULL) {
+        for (size_t i = 0; i < table->header_size; i++) {
+            if (table->headers[i].key.cache.str != NULL) {
+                FREE(table->headers[i].key.cache.str);
+            }
+
+            if (table->headers[i].val.cache.str != NULL) {
+                FREE(table->headers[i].val.cache.str);
+            }
+        }
+
         FREE(table->headers);
     }
 

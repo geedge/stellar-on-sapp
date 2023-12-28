@@ -37,7 +37,9 @@ static int g_result_count = 1;
 int g_header_count = 1;
 int g_req_exdata_idx = 0;
 int g_res_exdata_idx = 0;
+int g_topic_id = 0;
 
+#if 0
 void output_http_req_line(struct http_request_line *req_line)
 {
     char tmp_str[MAX_KEY_STR_LEN] = {0};
@@ -68,17 +70,27 @@ void output_http_header(struct http_header *header)
 {
     printf("<%s:%s>\n", header->key.str, header->val.str);
 }
+#endif
 
-void output_http_req_body(struct hstring *body)
+void output_http_body(struct hstring *body, int decompress_flag)
 {
+    int counter = 0;
 
+    if (1 == decompress_flag) {
+        printf("\n\n----------------decompress body---------------\n");
+    } else {
+        printf("\n\n----------------raw body---------------\n");
+    }
+
+    for (size_t i = 0; i < body->str_len; i++) {
+        if (counter % 16 == 0) {
+            printf("\n");
+        }
+        printf("%02x ", (unsigned char)body->str[i]);
+        counter++;
+    }
+    printf("\n");
 }
-
-void output_http_res_body(struct hstring *body)
-{
-
-}
-
 
 int http_field_to_json(cJSON *object, const char *key, char *val, size_t val_len)
 {
@@ -141,24 +153,28 @@ static int http_decoder_test_entry(struct session *sess, int topic_id, const voi
     enum http_message_type msg_type = http_message_type(msg);
     
     if (msg_type == HTTP_MESSAGE_REQ_LINE ||
-        msg_type == HTTP_MESSAGE_REQ_HEADER_END ||
-        msg_type == HTTP_MESSAGE_REQ_BODY) {
+        msg_type == HTTP_MESSAGE_REQ_HEADER_END) {
         exdata_idx = g_req_exdata_idx;
     } else {
         exdata_idx = g_res_exdata_idx;
     }
-
     cJSON *ctx = (cJSON *)session_get_ex_data(sess, exdata_idx);
+
+    if (msg_type == HTTP_MESSAGE_REQ_BODY ||
+        msg_type == HTTP_MESSAGE_RES_BODY) {
+        goto next;
+    }
+    
     if (NULL == ctx) {
         ctx = cJSON_CreateObject();
         cJSON_AddStringToObject(ctx, "Tuple4", session_get0_readable_addr(sess));
         session_set_ex_data(sess, exdata_idx, ctx);
     }
 
+next:
     switch (msg_type) {
     case HTTP_MESSAGE_REQ_LINE:
         http_message_get_request_line(msg, &req_line);
-        //output_http_req_line(&req_line);
         req_line_to_json(ctx, &req_line);
         break;
     case HTTP_MESSAGE_REQ_HEADER_END:
@@ -169,7 +185,10 @@ static int http_decoder_test_entry(struct session *sess, int topic_id, const voi
         break;
     case HTTP_MESSAGE_REQ_BODY:
         http_message_get_request_raw_body(msg, &body);
-        output_http_req_body(&body);
+        //output_http_body(&body, 0);
+
+        http_message_get_request_decompress_body(msg, &body);
+        //output_http_body(&body, 1);
         break;
     case HTTP_MESSAGE_RES_LINE:
         http_message_get_response_line(msg, &res_line);
@@ -183,7 +202,10 @@ static int http_decoder_test_entry(struct session *sess, int topic_id, const voi
         break;
     case HTTP_MESSAGE_RES_BODY:
         http_message_get_response_raw_body(msg, &body);
-        output_http_res_body(&body);
+        //output_http_body(&body, 0);
+
+        http_message_get_response_decompress_body(msg, &body);
+        //output_http_body(&body, 1);
         break;
     default:
         break;
@@ -223,13 +245,13 @@ extern "C" void *http_decoder_test_init(struct stellar *st)
 		exit(-1); 
     }
 
-    int topic_id = session_mq_get_topic_id(st, "HTTP_DECODER_MESSAGE");
-    if (topic_id < 0) {
+    g_topic_id = session_mq_get_topic_id(st, "HTTP_DECODER_MESSAGE");
+    if (g_topic_id < 0) {
         printf("http_decoder_test_init: can't get http_decoder topic id !!!\n");	
 		exit(-1); 
     }
 
-    session_mq_subscribe_topic(st, topic_id, http_decoder_test_entry, NULL);
+    session_mq_subscribe_topic(st, g_topic_id, http_decoder_test_entry, NULL);
     printf("http_decoder_test_init OK!\n");	
 
     return NULL;

@@ -23,9 +23,9 @@
 #define HTTP_IDENTIFY_LEN 16
 #define HTTP_DECODER_RESULT_QUEUE_SIZE 16
 
-#define HTTP_DECODER_IS_CACHE_LINE 1
-#define HTTP_DECODER_IS_CACHE_BODY 1
-#define HTTP_DECODER_IS_CACHE_HEADER 1
+#define HD_IS_CACHE_LINE 1
+#define HD_IS_CACHE_BODY 1
+#define HD_IS_CACHE_HEADER 1
 
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
 
@@ -330,78 +330,89 @@ static int http_protocol_identify(const char *data, size_t data_len)
 
 int http_decoder_entry(struct session *sess, int events, const struct packet *pkt, void *cb_arg)
 {
-    int ret = 0;
-    size_t payload_len = 0;
     struct http_decoder_context *ctx = (struct http_decoder_context *)cb_arg;
-    struct http_decoder_result_queue *queue = NULL;
+    size_t payload_len = 0;
+    uint64_t inner_flag = 0;
 
-    if (events & SESS_EV_TCP) {
-        const char *payload = session_get0_current_payload(sess, &payload_len);
-        if (NULL == payload || 0 == payload_len) {
-            return 0;
-        }
-
-        queue = session_get_ex_data(sess, ctx->ex_data_idx);
-        if (NULL == queue) {
-            size_t http_identify_len = payload_len > HTTP_IDENTIFY_LEN
-                                           ? HTTP_IDENTIFY_LEN
-                                           : payload_len;
-            ret = http_protocol_identify(payload, http_identify_len);
-            if (ret < 0) {
-                // ignore this session's event
-                struct session_event *s_event =
-                    session_get_intrinsic_event(sess, ctx->plugin_id);
-                session_event_assign(s_event, ctx->st, sess, 0,
-                                     http_decoder_entry, ctx);
-                return 0;
-            }
-
-            queue = http_decoder_result_queue_new(HTTP_DECODER_RESULT_QUEUE_SIZE);
-            queue->ref_session = sess;
-            session_set_ex_data(sess, ctx->ex_data_idx, queue);
-        }
-
-        int dir = packet_get_direction(pkt);
-        if (dir < 0) {
-            return -1;
-        }
-
-        // printf("\n-------------------------------------------\n");
-        // for (size_t i = 0; i < payload_len; i++) {
-        //     printf(" %x", payload[i]);
-        // }
-        // printf("\n-------------------------------------------\n");
-
-        if (NULL == ctx->decoder) {
-            ctx->decoder = http_decoder_new(http_event_handler, HTTP_DECODER_IS_CACHE_LINE,
-                                            HTTP_DECODER_IS_CACHE_HEADER, HTTP_DECODER_IS_CACHE_BODY);
-        }
-
-        struct http_decoder_half *cur_half = NULL;
-        if (dir == PACKET_DIRECTION_C2S) {
-            cur_half = ctx->decoder->c2s_half;
-        } else {
-            cur_half = ctx->decoder->s2c_half;
-        }
-
-        ctx->http_ev_ctx->topic_id = ctx->topic_id;
-        ctx->http_ev_ctx->ref_queue = queue;
-        ctx->http_ev_ctx->ref_session = sess;
-
-        ret = http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
-        if (ret < 0) {
-            if (dir == PACKET_DIRECTION_C2S) {
-                http_decoder_result_queue_pop(queue, queue->req_index);
-            } else {
-                http_decoder_result_queue_pop(queue, queue->res_index);
-            }
-        }
+    int ret = session_is_inner_most(sess, &inner_flag);
+    if (0 == ret) {
+        return 0;
     }
+
+    struct http_decoder_result_queue *queue = session_get_ex_data(sess, ctx->ex_data_idx);;
+
+    const char *tmp_payload = session_get0_current_payload(sess, &payload_len);
 
     if (events & SESS_EV_CLOSING) {
         if (queue != NULL) {
             http_decoder_result_queue_free(queue);
             session_set_ex_data(sess, ctx->ex_data_idx, NULL); 
+        }
+
+        return 0;
+    }
+
+    const char *payload = session_get0_current_payload(sess, &payload_len);
+    if (events & SESS_EV_OPENING) {
+        if (queue != NULL) {
+            fprintf(stderr, "http_decoder_result_queue should be null for new session\n");
+            return -1;
+        }
+
+        //If not http, ignore this session
+        if (payload_len > 0) {
+            size_t http_identify_len = payload_len > HTTP_IDENTIFY_LEN ? HTTP_IDENTIFY_LEN : payload_len;
+            ret = http_protocol_identify(payload, http_identify_len);
+            if (ret < 0) {
+                // ignore this session's event
+                struct session_event *s_event = session_get_intrinsic_event(sess, ctx->plugin_id);
+                session_event_assign(s_event, ctx->st, sess, 0, http_decoder_entry, ctx);
+                return 0;
+            }
+        }
+
+        queue = http_decoder_result_queue_new(HTTP_DECODER_RESULT_QUEUE_SIZE);
+        queue->ref_session = sess;
+        session_set_ex_data(sess, ctx->ex_data_idx, queue);
+    }
+
+    if (0 == payload_len) {
+        return 0;
+    }
+
+    int dir = packet_get_direction(pkt);
+    if (dir < 0) {
+        return -1;
+    }
+
+    // printf("\n-------------------------------------------\n");
+    // for (size_t i = 0; i < payload_len; i++) {
+    //     printf(" %x", payload[i]);
+    // }
+    // printf("\n-------------------------------------------\n");
+
+    if (NULL == ctx->decoder) {
+        ctx->decoder = http_decoder_new(http_event_handler, HD_IS_CACHE_LINE,
+                                        HD_IS_CACHE_HEADER, 0);
+    }
+
+    struct http_decoder_half *cur_half = NULL;
+    if (dir == PACKET_DIRECTION_C2S) {
+        cur_half = ctx->decoder->c2s_half;
+    } else {
+        cur_half = ctx->decoder->s2c_half;
+    }
+
+    ctx->http_ev_ctx->topic_id = ctx->topic_id;
+    ctx->http_ev_ctx->ref_queue = queue;
+    ctx->http_ev_ctx->ref_session = sess;
+
+    ret = http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
+    if (ret < 0) {
+        if (dir == PACKET_DIRECTION_C2S) {
+            http_decoder_result_queue_pop(queue, queue->req_index);
+        } else {
+            http_decoder_result_queue_pop(queue, queue->res_index);
         }
     }
 
@@ -466,6 +477,10 @@ void http_decoder_exit(void *decoder_ctx)
     if (ctx->decoder != NULL) {
         http_decoder_free(ctx->decoder);
         ctx->decoder = NULL;
+    }
+
+    if (ctx->topic_id >= 0) {
+        session_mq_destroy_topic(ctx->st, ctx->topic_id);
     }
 
     FREE(decoder_ctx);

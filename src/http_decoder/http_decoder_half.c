@@ -111,16 +111,11 @@ static int on_message_complete(llhttp_t *http)
 
     // if enable  cache_body, trigger body_data/body_end event
     // if disable cache_body, trigger body_end event
-    if (half->is_cache_body) {
-        if (half->ref_data) {
-            if (http_decoder_table_state(half->ref_data->table,
-                                         HTTP_ITEM_BODY) ==
-                STRING_STATE_CACHE) {
-                http_decoder_table_commit(half->ref_data->table,
-                                          HTTP_ITEM_BODY);
-
-                http_decoder_half_data_decompress(half->ref_data);
-            }
+    if (half->is_cache_body ||
+        (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY) == STRING_STATE_CACHE) {
+            http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
+            http_decoder_half_data_decompress(half->ref_data);
         }
 
         if (half->parser.type == HTTP_REQUEST) {
@@ -517,11 +512,10 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
 
     // if enable  cache_body, trigger body_data event on_message_complete
     // if disable cache_body, trigger body_data event on_body
-    if (half->is_cache_body) {
-        if (half->ref_data) {
-            http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY, at, length);
-            http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_BODY);
-        }
+    if (half->is_cache_body ||
+        (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY, at, length);
+        http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_BODY);
     } else {
         if (half->ref_data != NULL) {
             if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY) == STRING_STATE_COMMIT) {
@@ -530,8 +524,6 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
 
             http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY, at, length);
             http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
-
-            http_decoder_half_data_decompress(half->ref_data);
         }
 
         if (half->parser.type == HTTP_REQUEST) {
@@ -616,11 +608,6 @@ void http_decoder_half_free(struct http_decoder_half *half)
 {
     if (NULL == half) {
         return;
-    }
-
-    if (half->ref_data != NULL) {
-        http_decoder_half_data_free(half->ref_data);
-        half->ref_data = NULL;
     }
 
     FREE(half);
@@ -799,13 +786,16 @@ int http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
 int http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *data,
                                                struct hstring *body)
 {
-    if (NULL == data || NULL == data->decompress_body || 
-        0 == data->decompress_body_len || NULL == body) {
+    if (NULL == data || NULL == body) {
         return -1;
     }
 
+    if (HTTP_CONTENT_ENCODING_NONE == data->content_encoding) {
+        return http_decoder_table_get_body(data->table, body);
+    }
+
+
     body->str = data->decompress_body;
     body->str_len = data->decompress_body_len;
-
     return 0;
 }

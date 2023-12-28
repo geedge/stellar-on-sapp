@@ -82,6 +82,9 @@ int http_message_get_request_raw_body(struct http_message *msg, struct hstring *
 
 int http_message_get_response_raw_body(struct http_message *msg, struct hstring *body);
 
+/**
+ * @brief If the body hasn't been compressed, return raw body
+*/
 int http_message_get_request_decompress_body(struct http_message *msg, struct hstring *body);
 
 int http_message_get_response_decompress_body(struct http_message *msg, struct hstring *body);
