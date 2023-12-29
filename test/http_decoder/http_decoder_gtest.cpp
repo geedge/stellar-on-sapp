@@ -129,6 +129,7 @@ void res_line_to_json(cJSON *ctx, struct http_response_line *res_line)
 void http_header_to_json(cJSON *ctx, struct http_header *header)
 {
     char key[MAX_KEY_STR_LEN] = {0};
+
     snprintf(key, header->key.str_len + 1, "%s", header->key.str);
 
     if (cJSON_HasObjectItem(ctx, key) == FALSE) {

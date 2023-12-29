@@ -232,6 +232,8 @@ static void http_event_handler(enum http_event event,
     case HTTP_EVENT_RES_BODY_END:
         break;
     case HTTP_EVENT_RES_END:
+        http_decoder_result_queue_inc_res_index(queue);
+		http_decoder_result_queue_gc(queue, queue->res_index);
         break;
     default:
         assert(0);

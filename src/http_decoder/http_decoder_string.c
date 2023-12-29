@@ -68,7 +68,12 @@ void http_decoder_string_cache(struct http_decoder_string *rstr)
     switch (rstr->state) {
         case STRING_STATE_REFER:
             if (rstr->refer.str_len > 0) {
-                rstr->cache.str = (char *)realloc(rstr->cache.str, rstr->cache.str_len + rstr->refer.str_len);
+                if (NULL == rstr->cache.str) {
+                    rstr->cache.str = CALLOC(char, rstr->refer.str_len + 1);
+                } else {
+                    rstr->cache.str = REALLOC(char, rstr->cache.str, rstr->cache.str_len + rstr->refer.str_len + 2);
+                }
+                
                 memcpy(rstr->cache.str + rstr->cache.str_len, rstr->refer.str, rstr->refer.str_len);
                 rstr->cache.str_len += rstr->refer.str_len;
 
