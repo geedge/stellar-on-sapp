@@ -343,8 +343,6 @@ int http_decoder_entry(struct session *sess, int events, const struct packet *pk
 
     struct http_decoder_result_queue *queue = session_get_ex_data(sess, ctx->ex_data_idx);;
 
-    const char *tmp_payload = session_get0_current_payload(sess, &payload_len);
-
     if (events & SESS_EV_CLOSING) {
         if (queue != NULL) {
             http_decoder_result_queue_free(queue);
