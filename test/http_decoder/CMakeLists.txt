@@ -70,11 +70,11 @@ add_test(NAME HTTP_OVER_TLS_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR
 add_test(NAME NON_HTTP_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/non_http.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name non_http.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-add_test(NAME HTTP_REQ_WINDOW_1_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_req_window_1.json
-         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_req_window_1.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+add_test(NAME HTTP_REQ_1BYTE_SLIDING_WINDOW_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_req_1byte_sliding_window.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_req_1byte_sliding_window.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-add_test(NAME HTTP_RES_WINDOW_1_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_res_window_1.json
-         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_res_window_1.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+add_test(NAME HTTP_RES_1BYTE_SLIDING_WINDOW_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_res_1byte_sliding_window.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_res_1byte_sliding_window.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
 set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_GET_MULTI_TRANS_TEST
@@ -88,6 +88,6 @@ set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_OVER_PPPOE_TEST
                      HTTP_OVER_TLS_TEST
                      NON_HTTP_TEST
-                     HTTP_REQ_WINDOW_1_TEST
-                     HTTP_RES_WINDOW_1_TEST
+                     HTTP_REQ_1BYTE_SLIDING_WINDOW_TEST
+                     HTTP_RES_1BYTE_SLIDING_WINDOW_TEST
                      PROPERTIES FIXTURES_REQUIRED TestFixture)

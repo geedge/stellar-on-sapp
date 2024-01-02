@@ -50,8 +50,7 @@ struct http_decoder_half_data;
 typedef void http_event_cb(enum http_event event, struct http_decoder_half_data **data, void *cb_args);
 
 struct http_decoder_half *
-http_decoder_half_new(http_event_cb *event_cb, int is_cache_line,
-                      int is_cache_header, int is_cache_body);
+http_decoder_half_new(http_event_cb *event_cb, int is_cache_body);
 
 void http_decoder_half_free(struct http_decoder_half *half);
 

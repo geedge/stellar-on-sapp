@@ -22,10 +22,7 @@
 
 #define HTTP_IDENTIFY_LEN 16
 #define HTTP_DECODER_RESULT_QUEUE_SIZE 16
-
-#define HD_IS_CACHE_LINE 1
 #define HD_IS_CACHE_BODY 1
-#define HD_IS_CACHE_HEADER 1
 
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
 
@@ -185,7 +182,7 @@ static void http_event_handler(enum http_event event,
         break;
     case HTTP_EVENT_REQ_HDR_END:
         msg = CALLOC(struct http_message, 1);
-	    msg->type = HTTP_MESSAGE_REQ_HEADER_END;
+	    msg->type = HTTP_MESSAGE_REQ_HEADER;
         msg->data = *data;
         session_mq_publish_message(ctx->ref_session, ctx->topic_id, msg);
         break;
@@ -217,7 +214,7 @@ static void http_event_handler(enum http_event event,
         break;
     case HTTP_EVENT_RES_HDR_END:
         msg = CALLOC(struct http_message, 1);
-	    msg->type = HTTP_MESSAGE_RES_HEADER_END;
+	    msg->type = HTTP_MESSAGE_RES_HEADER;
         msg->data = *data;
         session_mq_publish_message(ctx->ref_session, ctx->topic_id, msg); 
         break;
@@ -241,14 +238,13 @@ static void http_event_handler(enum http_event event,
     }
 }
 
-static struct http_decoder *http_decoder_new(http_event_cb *ev_cb, int is_cache_line,
-                                             int is_cache_header, int is_cache_body)
+static struct http_decoder *http_decoder_new(http_event_cb *ev_cb, int is_cache_body)
 {
 	struct http_decoder *decoder = CALLOC(struct http_decoder, 1);
 	assert(decoder);
 
-	decoder->c2s_half = http_decoder_half_new(ev_cb, is_cache_line, is_cache_header, is_cache_body);
-	decoder->s2c_half = http_decoder_half_new(ev_cb, is_cache_line, is_cache_header, is_cache_body);
+	decoder->c2s_half = http_decoder_half_new(ev_cb, is_cache_body);
+	decoder->s2c_half = http_decoder_half_new(ev_cb, is_cache_body);
 
 	return decoder;
 }
@@ -376,7 +372,7 @@ int http_decoder_entry(struct session *sess, int events, const struct packet *pk
         session_set_ex_data(sess, ctx->ex_data_idx, queue);
     }
 
-    if (0 == payload_len) {
+    if (0 == payload_len || NULL == queue) {
         return 0;
     }
 
@@ -385,15 +381,8 @@ int http_decoder_entry(struct session *sess, int events, const struct packet *pk
         return -1;
     }
 
-    // printf("\n-------------------------------------------\n");
-    // for (size_t i = 0; i < payload_len; i++) {
-    //     printf(" %x", payload[i]);
-    // }
-    // printf("\n-------------------------------------------\n");
-
     if (NULL == ctx->decoder) {
-        ctx->decoder = http_decoder_new(http_event_handler, HD_IS_CACHE_LINE,
-                                        HD_IS_CACHE_HEADER, 0);
+        ctx->decoder = http_decoder_new(http_event_handler, 0);
     }
 
     struct http_decoder_half *cur_half = NULL;
@@ -516,8 +505,7 @@ int http_message_get_response_line(struct http_message *msg, struct http_respons
 int http_message_get_request_header(struct http_message *msg, struct hstring *key,
 									struct http_header *header_array, size_t array_size)
 {
-	if (NULL == msg ||
-		(msg->type != HTTP_MESSAGE_REQ_HEADER && msg->type != HTTP_MESSAGE_REQ_HEADER_END) ||
+	if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_HEADER ||
 		NULL == key || NULL == header_array || 0 == array_size) {
 		return -1;
 	}
@@ -528,8 +516,7 @@ int http_message_get_request_header(struct http_message *msg, struct hstring *ke
 int http_message_get_response_header(struct http_message *msg, struct hstring *key,
 									 struct http_header *header_array, size_t array_size)
 {
-	if (NULL == msg ||
-		(msg->type != HTTP_MESSAGE_RES_HEADER && msg->type != HTTP_MESSAGE_RES_HEADER_END) ||
+	if (NULL == msg || msg->type != HTTP_MESSAGE_RES_HEADER ||
 		NULL == key || NULL == header_array || 0 == array_size) {
 		return -1;
 	}
@@ -539,9 +526,7 @@ int http_message_get_response_header(struct http_message *msg, struct hstring *k
 
 int http_message_request_header_next(struct http_message *msg, struct http_header *header)
 {
-    if (NULL == msg ||
-		(msg->type != HTTP_MESSAGE_REQ_HEADER && msg->type != HTTP_MESSAGE_REQ_HEADER_END) ||
-		NULL == header) {
+    if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_HEADER || NULL == header) {
 		return -1;
 	}
 
@@ -550,9 +535,7 @@ int http_message_request_header_next(struct http_message *msg, struct http_heade
 
 int http_message_response_header_next(struct http_message *msg, struct http_header *header)
 {
-    if (NULL == msg ||
-		(msg->type != HTTP_MESSAGE_RES_HEADER && msg->type != HTTP_MESSAGE_RES_HEADER_END) ||
-		NULL == header) {
+    if (NULL == msg || msg->type != HTTP_MESSAGE_RES_HEADER || NULL == header) {
 		return -1;
 	}
 

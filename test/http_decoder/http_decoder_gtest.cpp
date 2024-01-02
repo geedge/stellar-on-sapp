@@ -72,6 +72,19 @@ void output_http_header(struct http_header *header)
 }
 #endif
 
+void output_http_header(struct http_header *header, int res)
+{
+    char key[MAX_KEY_STR_LEN] = {0};
+
+    snprintf(key, header->key.str_len + 1, "%s", header->key.str);
+    if (0 == res) {
+        printf("<ouput_http_req_header> header:%s\n", key);
+    } else {
+        printf("<ouput_http_res_header> header:%s\n", key);
+    }
+    
+}
+
 void output_http_body(struct hstring *body, int decompress_flag)
 {
     int counter = 0;
@@ -150,11 +163,10 @@ static int http_decoder_test_entry(struct session *sess, int topic_id, const voi
     struct http_header header = {0};
     struct hstring body = {0};
     int exdata_idx = 0;
-
     enum http_message_type msg_type = http_message_type(msg);
     
     if (msg_type == HTTP_MESSAGE_REQ_LINE ||
-        msg_type == HTTP_MESSAGE_REQ_HEADER_END) {
+        msg_type == HTTP_MESSAGE_REQ_HEADER) {
         exdata_idx = g_req_exdata_idx;
     } else {
         exdata_idx = g_res_exdata_idx;
@@ -178,7 +190,7 @@ next:
         http_message_get_request_line(msg, &req_line);
         req_line_to_json(ctx, &req_line);
         break;
-    case HTTP_MESSAGE_REQ_HEADER_END:
+    case HTTP_MESSAGE_REQ_HEADER:
         while (http_message_request_header_next(msg, &header) > 0) {
             http_header_to_json(ctx, &header);
         }
@@ -195,7 +207,7 @@ next:
         http_message_get_response_line(msg, &res_line);
         res_line_to_json(ctx, &res_line);
         break;
-    case HTTP_MESSAGE_RES_HEADER_END:
+    case HTTP_MESSAGE_RES_HEADER:
         while (http_message_response_header_next(msg, &header) > 0) {
             http_header_to_json(ctx, &header);
         }
@@ -213,7 +225,7 @@ next:
     }
 
     char result_name[MAX_KEY_STR_LEN] = {0};
-    if (msg_type == HTTP_MESSAGE_REQ_HEADER_END) {
+    if (msg_type == HTTP_MESSAGE_REQ_HEADER) {
         sprintf(result_name, "HTTP_DECODER_RESULT_%d", g_result_count);
         commit_test_result_json(ctx, result_name);
         //printf("req json:%s\n", cJSON_Print(ctx));
@@ -221,7 +233,7 @@ next:
         g_result_count++;
     }
 
-    if (msg_type == HTTP_MESSAGE_RES_HEADER_END) {
+    if (msg_type == HTTP_MESSAGE_RES_HEADER) {
         sprintf(result_name, "HTTP_DECODER_RESULT_%d", g_result_count);
         commit_test_result_json(ctx, result_name);
         //printf("res json:%s\n", cJSON_Print(ctx));

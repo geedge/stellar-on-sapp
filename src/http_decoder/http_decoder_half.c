@@ -35,8 +35,6 @@ struct http_decoder_half {
     llhttp_settings_t settings;
     enum llhttp_errno error;
 
-    int is_cache_line;
-    int is_cache_header;
     int is_cache_body;
 
     struct http_decoder_half_data *ref_data;
@@ -248,8 +246,7 @@ static int on_uri_complete(llhttp_t *http)
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (half->is_cache_line && 
-            http_decoder_table_state(half->ref_data->table, HTTP_ITEM_URI) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_URI) == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_URI);
         }
 
@@ -290,8 +287,7 @@ static int on_version_complete(llhttp_t *http)
     assert(half);
 
     if (half->ref_data) {
-        if (half->is_cache_line && 
-            http_decoder_table_state(half->ref_data->table, HTTP_ITEM_VERSION) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_VERSION) == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_VERSION);
         }
         http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_VERSION);
@@ -334,8 +330,7 @@ static int on_status_complete(llhttp_t *http)
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (half->is_cache_line &&
-            http_decoder_table_state(half->ref_data->table, HTTP_ITEM_STATUS) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_STATUS) == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_STATUS);
         }
 
@@ -375,8 +370,7 @@ static int on_header_field_complete(llhttp_t *http)
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (half->is_cache_header &&
-            http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY) == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRKEY);
         }
 
@@ -410,9 +404,7 @@ static int on_header_value_complete(llhttp_t *http)
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (half->is_cache_header &&
-            http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL) ==
-                STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL) == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRVAL);
         }
         http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_HDRVAL);
@@ -543,7 +535,6 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
 }
 
 void http_decoder_half_init(struct http_decoder_half *half, http_event_cb *http_ev_cb, 
-                            int is_cache_line, int is_cache_header,
                             int is_cache_body)
 {
     if (NULL == half) {
@@ -585,22 +576,18 @@ void http_decoder_half_init(struct http_decoder_half *half, http_event_cb *http_
     half->error = HPE_OK;
 
     half->http_ev_cb = http_ev_cb;
-    half->is_cache_line = is_cache_line;
-    half->is_cache_header = is_cache_header;
     half->is_cache_body = is_cache_body;
 
     half->ref_data = NULL;
 }
 
 struct http_decoder_half *
-http_decoder_half_new(http_event_cb *ev_cb, int is_cache_line,
-                      int is_cache_header, int is_cache_body)
+http_decoder_half_new(http_event_cb *ev_cb, int is_cache_body)
 {
     struct http_decoder_half *half = CALLOC(struct http_decoder_half, 1);
     assert(half);
 
-    http_decoder_half_init(half, ev_cb, is_cache_line,
-                           is_cache_header, is_cache_body);
+    http_decoder_half_init(half, ev_cb, is_cache_body);
     return half;
 }
 
