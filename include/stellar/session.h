@@ -92,6 +92,9 @@ struct session_addr *session_get0_addr(struct session *sess, enum session_addr_t
 const char *session_get0_readable_addr(struct session *sess);
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len);
 enum session_state session_get_current_state(struct session *sess);
+
+int session_get_current_thread_id(struct session *sess);
+
 /* ------------session------------------*/
 /*  |l2|l3|l4|session payload|  */
 const char *session_get0_current_l3_header(struct session *sess);

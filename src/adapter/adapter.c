@@ -509,3 +509,16 @@ enum session_state session_get_current_state(struct session *sess)
 	assert(sess);
     return sess->state;
 }
+
+int session_get_current_thread_id(struct session *sess)
+{
+	int thread_id = -1;
+	if(sess)
+	{
+		if(sess->cur_pkt && sess->cur_pkt->a_stream)
+		{
+			thread_id = sess->cur_pkt->a_stream->threadnum;
+		}
+	}
+	return thread_id;
+}
