@@ -157,6 +157,15 @@ struct packet
 	struct streaminfo *a_stream;
 };
 
+static void adapter_packet_free(struct session *sess, struct packet *pkt, void *arg)
+{
+	if(pkt)
+	{
+		FREE(pkt);
+	}
+	return;
+}
+
 struct session *adapter_session_new(struct stellar *st, struct streaminfo *stream)
 {
 	enum session_type type;
@@ -172,8 +181,14 @@ struct session *adapter_session_new(struct stellar *st, struct streaminfo *strea
 	{
 		return NULL;
 	}
-
-	return session_new(st, type, stream->threadnum);
+	struct session *sess = session_new(st, type, stream->threadnum);
+	if(sess)
+	{
+    	struct packet *pkt = CALLOC(struct packet, 1);
+    	session_set_current_packet(sess, pkt,adapter_packet_free, NULL);
+    	pkt->a_stream = stream;
+	}
+	return sess;
 }
 
 void adapter_session_free(struct session *sess)
@@ -186,23 +201,9 @@ unsigned char adapter_session_state_update(struct streaminfo *stream, struct ses
 	struct packet *pkt = NULL;
 	if(sess)
 	{
-		if(state == SESSION_STATE_OPENING)
-		{
-			pkt=CALLOC(struct packet, 1);
-			session_set_current_packet(sess, pkt);
-			pkt->a_stream=stream;
-		}
-		else
-		{
-			pkt=(struct packet *)session_get0_current_packet(sess);
-		}
+		pkt=(struct packet *)session_get0_current_packet(sess);
 		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 		session_dispatch( sess, state, pkt);
-		if(state == SESSION_STATE_CLOSING)
-		{
-			FREE(pkt);
-			session_set_current_packet(sess, NULL);
-		}
 		if(sess->set_detach_others==1)
 		{
 			return APP_STATE_GIVEME|APP_STATE_KILL_OTHER;
