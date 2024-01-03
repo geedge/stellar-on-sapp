@@ -1,0 +1,37 @@
+[
+    {
+        "Tuple4": "10.0.0.2.1087>10.0.0.1.2082",
+        "method": "GET",
+        "uri": "/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/xxx/xxxxxxxxxxxxxxxxxxxx.js",
+        "req_version": "1.1",
+        "major_version": 1,
+        "minor_version": 1,
+        "Host": "10.000.000.001:1234",
+        "User-Agent": "Mozilla/5.0 (Windows NT 5.1; rv:32.0) Gecko/20100101 Firefox/32.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-GB,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate",
+        "Referer": "http://10.000.000.001:1234/zzzzzzzzzzzzzzzz/zzzzzzzz/zz/zzzzzzzzz/index.html",
+        "Cookie": "zzzzzzzzzzzzzzzzzz=auto; cprelogin=no; cpsession=zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz; langedit=; lang=",
+        "Authorization": "Basic dXNlcnJycnI6cGFzc3dvcmRkZGRk",
+        "Connection": "keep-alive",
+        "If-Modified-Since": "Wed, 29 Oct 2014 01:11:13 GMT",
+        "name": "HTTP_DECODER_RESULT_1"
+    },
+    {
+        "Tuple4": "10.0.0.2.1087>10.0.0.1.2082",
+        "res_version": "1.1",
+        "res_status": "Not Modified",
+        "major_version": 1,
+        "minor_version": 1,
+        "status_code": 304,
+        "Server": "cpsrvd/11.44.1.19",
+        "X-Keep-Alive-Count": "1",
+        "Connection": "Keep-Alive",
+        "Keep-Alive": "timeout=70, max=200",
+        "Date": "Wed, 29 Oct 2014 17:35:08 GMT",
+        "Cache-Control": "max-age=5184000, public",
+        "Expires": "Sun, 28 Dec 2014 17:35:07 GMT",
+        "name": "HTTP_DECODER_RESULT_2"
+    }
+]

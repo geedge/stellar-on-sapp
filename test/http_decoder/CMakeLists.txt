@@ -76,6 +76,21 @@ add_test(NAME HTTP_REQ_1BYTE_SLIDING_WINDOW_TEST COMMAND ${TEST_MAIN} ${CMAKE_CU
 add_test(NAME HTTP_RES_1BYTE_SLIDING_WINDOW_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_res_1byte_sliding_window.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_res_1byte_sliding_window.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
+add_test(NAME HTTP_BASIC_AUTH_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_basic_auth.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_basic_auth.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_NO_LENGTH_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_no_length.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_no_length.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_POST_FORM_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_post_form.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_post_form.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_TCP_SEQ_ISSUE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_tcp_seq_issue.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_tcp_seq_issue.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_WRAPPED_HEADER_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_wrapped_header.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_wrapped_header.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
 set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_GET_MULTI_TRANS_TEST
                      HTTP_GET_REQ_PIPELINE_TEST
@@ -90,4 +105,9 @@ set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      NON_HTTP_TEST
                      HTTP_REQ_1BYTE_SLIDING_WINDOW_TEST
                      HTTP_RES_1BYTE_SLIDING_WINDOW_TEST
+                     HTTP_BASIC_AUTH_TEST
+                     HTTP_NO_LENGTH_TEST
+                     HTTP_POST_FORM_TEST
+                     HTTP_TCP_SEQ_ISSUE_TEST
+                     HTTP_WRAPPED_HEADER_TEST
                      PROPERTIES FIXTURES_REQUIRED TestFixture)

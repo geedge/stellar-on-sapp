@@ -98,17 +98,17 @@ void http_decoder_string_commit(struct http_decoder_string *rstr)
     switch (rstr->state) {
         case STRING_STATE_REFER:
             if (rstr->cache.str_len) {
-            http_decoder_string_cache(rstr);
+                http_decoder_string_cache(rstr);
 
-            rstr->commit.str = rstr->cache.str;
-            rstr->commit.str_len = rstr->cache.str_len;
-            // not overwrite rstr->cache.str
+                rstr->commit.str = rstr->cache.str;
+                rstr->commit.str_len = rstr->cache.str_len;
+                // not overwrite rstr->cache.str
             } else {
-            rstr->commit.str = rstr->refer.str;
-            rstr->commit.str_len = rstr->refer.str_len;
+                rstr->commit.str = rstr->refer.str;
+                rstr->commit.str_len = rstr->refer.str_len;
 
-            rstr->refer.str = NULL;
-            rstr->refer.str_len = 0;
+                rstr->refer.str = NULL;
+                rstr->refer.str_len = 0;
             }
             break;
         case STRING_STATE_CACHE:

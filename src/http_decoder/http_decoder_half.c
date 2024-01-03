@@ -786,3 +786,12 @@ int http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *da
     body->str_len = data->decompress_body_len;
     return 0;
 }
+
+void http_decoder_half_data_dump(struct http_decoder_half *half)
+{
+    if (NULL == half || NULL == half->ref_data) {
+        return;
+    }
+
+    http_decoder_table_dump(half->ref_data->table);
+}

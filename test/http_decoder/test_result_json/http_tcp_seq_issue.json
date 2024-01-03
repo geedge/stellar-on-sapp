@@ -1,0 +1,42 @@
+[
+    {
+        "Tuple4": "10.11.12.13.54162>13.12.11.10.80",
+        "method": "POST",
+        "uri": "/xxxxxxxxx/xxxxxx/xxxxxxxxxxx/xxxxxxxxxx/xxx/xxxxxxxxx.xxx?Command=FileUpload&Type=File&CurrentFolder=%2F",
+        "req_version": "1.1",
+        "major_version": 1,
+        "minor_version": 1,
+        "Connection": "Keep-Alive",
+        "Content-Type": "multipart/form-data; boundary=----7df271da040a",
+        "Accept": "*/*",
+        "Referer": "http://xxx.xxxxxxxxxxxx.xxx.xx/xxxxxxxxx/xxxxxx/xxxxxxxxxxx/xxxxxxxxxx/xxx/xxxxxxxxx.xxx?Command=FileUpload&Type=File&CurrentFolder=%2F",
+        "User-Agent": "Mozilla/5.0 (compatible; MSIE 10.0; Windows NT 6.2)",
+        "Content-Length": "300",
+        "Host": "xxx.xxxxxxxxxxxx.xxx.xx",
+        "name": "HTTP_DECODER_RESULT_1"
+    },
+    {
+        "Tuple4": "10.11.12.13.54162>13.12.11.10.80",
+        "res_version": "1.1",
+        "res_status": "OK",
+        "major_version": 1,
+        "minor_version": 1,
+        "status_code": 200,
+        "Date": "Tue, 28 May 2019 00:51:19 GMT",
+        "P3P": "policyref=\"https://policies.xxxxx.com/w3c/p3p.xml\", CP=\"CAO DSP COR CUR ADM DEV TAI PSA PSD IVAi IVDi CONi TELo OTPi OUR DELi SAMi OTRi UNRi PUBi IND PHY ONL UNI PUR FIN COM NAV INT DEM CNT STA POL HEA PRE LOC GOV\"",
+        "Set-Cookie": "xx=xxxxxxxxxxxxx&x=x&x=xx; expires=Wed, 27-May-2020 00:51:19 GMT; path=/; domain=.xxx.xx; secure",
+        "Cache-Control": "max-age=3600, private",
+        "Vary": "Accept-Encoding",
+        "Content-Length": "3388",
+        "Content-Type": "text/html; charset=UTF-8",
+        "Age": "0",
+        "Connection": "keep-alive",
+        "Server": "ATS",
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Content-Security-Policy": "sandbox; default-src 'self'; script-src 'none'; object-src 'none'; report-uri https://xxx.xxxxx.xxx/xxxxxx/xxx?xxx=xxxxxxx",
+        "name": "HTTP_DECODER_RESULT_2"
+    }
+]

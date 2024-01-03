@@ -51,8 +51,6 @@ void http_decoder_table_commit(struct http_decoder_table *table,
 void http_decoder_table_reset(struct http_decoder_table *table,
                               enum http_item type);
 
-void http_decoder_table_remove(struct http_decoder_table *table);
-
 void http_decoder_table_dump(struct http_decoder_table *table);
 
 int http_decoder_table_get_uri(struct http_decoder_table *table,

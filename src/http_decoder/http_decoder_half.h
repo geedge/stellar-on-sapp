@@ -80,7 +80,9 @@ int http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
                                         struct hstring *body);
 
 int http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *data,
-                                                       struct hstring *body);
+                                               struct hstring *body);
+
+void http_decoder_half_data_dump(struct http_decoder_half *half);
 
 #ifdef __cplusplus
 }
