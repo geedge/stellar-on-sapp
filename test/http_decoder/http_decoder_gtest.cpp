@@ -198,10 +198,10 @@ next:
         break;
     case HTTP_MESSAGE_REQ_BODY:
         http_message_get_request_raw_body(msg, &body);
-        //output_http_body(&body, 0);
+        // output_http_body(&body, 0);
 
         http_message_get_request_decompress_body(msg, &body);
-        //output_http_body(&body, 1);
+        // output_http_body(&body, 1);
         break;
     case HTTP_MESSAGE_RES_LINE:
         http_message_get_response_line(msg, &res_line);
@@ -215,10 +215,10 @@ next:
         break;
     case HTTP_MESSAGE_RES_BODY:
         http_message_get_response_raw_body(msg, &body);
-        //output_http_body(&body, 0);
+        // output_http_body(&body, 0);
 
         http_message_get_response_decompress_body(msg, &body);
-        //output_http_body(&body, 1);
+        // output_http_body(&body, 1);
         break;
     default:
         break;

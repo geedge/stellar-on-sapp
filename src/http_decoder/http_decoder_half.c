@@ -614,6 +614,7 @@ int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     switch (half->error) {
     case HPE_OK:
     case HPE_PAUSED_UPGRADE:
+        llhttp_resume_after_upgrade(&half->parser);
         ret = 0;
         break;
     default:
@@ -622,7 +623,7 @@ int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     }
 
     if (ret < 0) {
-        printf("llhttp_execute parse error: %s %s\n",
+        fprintf(stderr, "llhttp_execute parse error: %s %s\n",
                 llhttp_errno_name(half->error), half->parser.reason);
         return -1;
     }
