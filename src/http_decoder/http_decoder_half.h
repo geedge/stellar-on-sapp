@@ -8,6 +8,7 @@
 ***********************************************************************************************
 */
 
+
 #ifndef _HTTP_DECODER_HALF_H_
 #define _HTTP_DECODER_HALF_H_
 
@@ -20,6 +21,7 @@ extern "C"
 
 #include "http_decoder.h"
 #include "http_content_decompress.h"
+
 
 // only one http event is fired at a time
 enum http_event {
@@ -47,42 +49,53 @@ enum http_event {
 struct http_decoder_half;
 struct http_decoder_half_data;
 
-typedef void http_event_cb(enum http_event event, struct http_decoder_half_data **data, void *cb_args);
+typedef void http_event_cb(enum http_event event,
+    struct http_decoder_half_data **data, void *cb_args);
 
 struct http_decoder_half *
 http_decoder_half_new(http_event_cb *event_cb, int is_cache_body);
 
-void http_decoder_half_free(struct http_decoder_half *half);
+void
+http_decoder_half_free(struct http_decoder_half *half);
 
-int http_decoder_half_parse(struct http_decoder_half *half, void *ev_ctx,
-                            const char *data, size_t len);
+int
+http_decoder_half_parse(struct http_decoder_half *half, void *ev_ctx,
+    const char *data, size_t len);
 
 //http decoder half data API
-struct http_decoder_half_data *http_decoder_half_data_new();
+struct http_decoder_half_data *
+http_decoder_half_data_new();
 
-void http_decoder_half_data_free(struct http_decoder_half_data *data);
+void
+http_decoder_half_data_free(struct http_decoder_half_data *data);
 
-int http_decoder_half_data_get_request_line(struct http_decoder_half_data *data,
-                                            struct http_request_line *line);
+int
+http_decoder_half_data_get_request_line(struct http_decoder_half_data *data,
+    struct http_request_line *line);
 
-int http_decoder_half_data_get_response_line(struct http_decoder_half_data *data,
-                                             struct http_response_line *line);
+int
+http_decoder_half_data_get_response_line(struct http_decoder_half_data *data,
+    struct http_response_line *line);
 
-int http_decoder_half_data_get_header(struct http_decoder_half_data *data,
-                                      struct hstring *key,
-                                      struct http_header *header_array,
-                                      size_t array_size);
+int
+http_decoder_half_data_get_header(struct http_decoder_half_data *data,
+    struct hstring *key, struct http_header *header_array,
+    size_t array_size);
 
-int http_decoder_half_data_iter_header(struct http_decoder_half_data *data,
-                                       struct http_header *header);
+int
+http_decoder_half_data_iter_header(struct http_decoder_half_data *data,
+    struct http_header *header);
 
-int http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
-                                        struct hstring *body);
+int
+http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
+    struct hstring *body);
 
-int http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *data,
-                                               struct hstring *body);
+int
+http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *data,
+    struct hstring *body);
 
-void http_decoder_half_data_dump(struct http_decoder_half *half);
+void
+http_decoder_half_data_dump(struct http_decoder_half *half);
 
 #ifdef __cplusplus
 }

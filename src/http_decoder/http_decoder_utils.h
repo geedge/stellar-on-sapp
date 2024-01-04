@@ -8,6 +8,7 @@
 ***********************************************************************************************
 */
 
+
 #ifndef _HTTP_DECODER_UTILS_H_
 #define _HTTP_DECODER_UTILS_H_
 
@@ -19,14 +20,15 @@ extern "C"
 #include <stdlib.h>
 #include <stdio.h>
 
-char *safe_dup(const char *str, size_t len);
+
+char *
+safe_dup(const char *str, size_t len);
 
 /******************************************************************************
  * Logger
  ******************************************************************************/
 
-enum http_decoder_log_level
-{
+enum http_decoder_log_level {
     DEBUG = 0x11,
     WARN = 0x12,
     INFO = 0x13,

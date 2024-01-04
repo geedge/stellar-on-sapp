@@ -8,6 +8,7 @@
 ***********************************************************************************************
 */
 
+
 #include <zlib.h>
 #include <string.h>
 #include <assert.h>
@@ -23,13 +24,14 @@ struct http_content_decompress {
     enum http_content_encoding encoding;
 
     z_stream *z_stream_ptr;
-    BrotliDecoderState *brdec_state;
+    BrotliDecoderState *br_state;
 
     char *buffer;
     size_t buffer_size;
 };
 
-enum http_content_encoding http_content_encoding_str2int(const char *content_encoding)
+enum http_content_encoding
+http_content_encoding_str2int(const char *content_encoding)
 {
     if (strcasestr(content_encoding, "gzip") != NULL) {
         return HTTP_CONTENT_ENCODING_GZIP;
@@ -46,7 +48,8 @@ enum http_content_encoding http_content_encoding_str2int(const char *content_enc
     return HTTP_CONTENT_ENCODING_NONE;
 }
 
-const char *http_content_encoding_int2str(enum http_content_encoding content_encoding)
+const char *
+http_content_encoding_int2str(enum http_content_encoding content_encoding)
 {
     if (content_encoding == HTTP_CONTENT_ENCODING_GZIP) {
         return "gzip";
@@ -66,19 +69,20 @@ const char *http_content_encoding_int2str(enum http_content_encoding content_enc
 struct http_content_decompress *
 http_content_decompress_create(enum http_content_encoding encoding)
 {
-    struct http_content_decompress *decompress = CALLOC(struct http_content_decompress, 1);
+    struct http_content_decompress *decompress =
+        CALLOC(struct http_content_decompress, 1);
     assert(decompress);
 
     decompress->encoding = encoding;
     decompress->z_stream_ptr = NULL;
-    decompress->brdec_state = NULL;
+    decompress->br_state = NULL;
 
     decompress->buffer = CALLOC(char, BUFFER_SIZE);
     assert(decompress->buffer);
     decompress->buffer_size = BUFFER_SIZE;
 
-    if (encoding == HTTP_CONTENT_ENCODING_GZIP || 
-        encoding == HTTP_CONTENT_ENCODING_DEFLATE) {
+    if (encoding == HTTP_CONTENT_ENCODING_GZIP
+        || encoding == HTTP_CONTENT_ENCODING_DEFLATE) {
         decompress->z_stream_ptr = CALLOC(z_stream, 1);
         assert(decompress->z_stream_ptr);
 
@@ -89,7 +93,8 @@ http_content_decompress_create(enum http_content_encoding encoding)
         decompress->z_stream_ptr->next_in = Z_NULL;
 
         if (encoding == HTTP_CONTENT_ENCODING_GZIP) {
-            if (inflateInit2(decompress->z_stream_ptr, MAX_WBITS + 16) != Z_OK) {
+            if (inflateInit2(decompress->z_stream_ptr, MAX_WBITS + 16)
+                != Z_OK) {
                 goto error;
             }
         }
@@ -102,8 +107,8 @@ http_content_decompress_create(enum http_content_encoding encoding)
     }
 
     if (encoding == HTTP_CONTENT_ENCODING_BR) {
-        decompress->brdec_state = BrotliDecoderCreateInstance(NULL, NULL, NULL);
-        if (decompress->brdec_state == NULL) {
+        decompress->br_state = BrotliDecoderCreateInstance(NULL, NULL, NULL);
+        if (decompress->br_state == NULL) {
             goto error;
         }
     }
@@ -115,7 +120,8 @@ error:
     return NULL;
 }
 
-void http_content_decompress_destroy(struct http_content_decompress *decompress)
+void
+http_content_decompress_destroy(struct http_content_decompress *decompress)
 {
     if (NULL == decompress) {
         return;
@@ -126,18 +132,18 @@ void http_content_decompress_destroy(struct http_content_decompress *decompress)
         FREE(decompress->z_stream_ptr);
     }
 
-    if (decompress->brdec_state) {
-        BrotliDecoderDestroyInstance(decompress->brdec_state);
-        decompress->brdec_state = NULL;
+    if (decompress->br_state) {
+        BrotliDecoderDestroyInstance(decompress->br_state);
+        decompress->br_state = NULL;
     }
 
     FREE(decompress->buffer);
     FREE(decompress);
 }
 
-static int http_content_decompress_write_zlib(struct http_content_decompress *decompress,
-                                              const char *indata, size_t indata_len, 
-                                              char **outdata, size_t *outdata_len)
+static int
+http_content_decompress_write_zlib(struct http_content_decompress *decompress,
+    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len)
 {
     z_stream *z_stream_ptr = decompress->z_stream_ptr;
     z_stream_ptr->avail_in = (unsigned int)indata_len;
@@ -152,8 +158,8 @@ static int http_content_decompress_write_zlib(struct http_content_decompress *de
         z_stream_ptr->next_out = (unsigned char *)decompress->buffer;
 
         ret = inflate(z_stream_ptr, Z_NO_FLUSH);
-        if (ret == Z_STREAM_ERROR || ret == Z_NEED_DICT || 
-            ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
+        if (ret == Z_STREAM_ERROR || ret == Z_NEED_DICT
+            || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
             (void)inflateEnd(z_stream_ptr);
             return -1;
         }
@@ -162,13 +168,14 @@ static int http_content_decompress_write_zlib(struct http_content_decompress *de
         if (have > 0) {
             if (NULL == *outdata) {
                 http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes", 
-                                 http_content_encoding_int2str(decompress->encoding), have);
+                                 http_content_encoding_int2str(decompress->encoding),
+                                 have);
                 *outdata = safe_dup(decompress->buffer, have);
                 *outdata_len = have;
             } else {
                 http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes", 
-                                http_content_encoding_int2str(decompress->encoding), 
-                                *outdata_len + have + 1);
+                                 http_content_encoding_int2str(decompress->encoding), 
+                                 *outdata_len + have + 1);
                 *outdata = REALLOC(char, *outdata, *outdata_len + have + 1);
                 memcpy(*outdata + *outdata_len, decompress->buffer, have);
                 *outdata_len = *outdata_len + have;
@@ -180,9 +187,9 @@ static int http_content_decompress_write_zlib(struct http_content_decompress *de
     return 0;
 }
 
-static int http_content_decompress_write_br(struct http_content_decompress *decompress, 
-                                            const char *indata, size_t indata_len,
-                                            char **outdata, size_t *outdata_len)
+static int
+http_content_decompress_write_br(struct http_content_decompress *decompress, 
+    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len)
 {
     size_t available_out;
     size_t available_in = indata_len;
@@ -197,13 +204,14 @@ static int http_content_decompress_write_br(struct http_content_decompress *deco
         available_out = decompress->buffer_size;
         next_out = (unsigned char *)decompress->buffer;
 
-        ret = BrotliDecoderDecompressStream(decompress->brdec_state, &available_in, 
+        ret = BrotliDecoderDecompressStream(decompress->br_state, &available_in, 
                                             &next_in, &available_out, &next_out, 0);
         size_t have = decompress->buffer_size - available_out;
         if (have > 0) {
             if (NULL == *outdata) {
                 http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes",
-                                http_content_encoding_int2str(decompress->encoding), have);
+                                http_content_encoding_int2str(decompress->encoding),
+                                have);
                 *outdata = safe_dup(decompress->buffer, have);
                 *outdata_len = have;
             } else {
@@ -217,14 +225,16 @@ static int http_content_decompress_write_br(struct http_content_decompress *deco
             }
         }
 
-        if (ret == BROTLI_DECODER_RESULT_SUCCESS || 
-            ret == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT) {
+        if (ret == BROTLI_DECODER_RESULT_SUCCESS
+            || ret == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT) {
             return 0;
         }
 
         if (ret == BROTLI_DECODER_RESULT_ERROR) {
-            BrotliDecoderErrorCode errcode = BrotliDecoderGetErrorCode(decompress->brdec_state);
-            http_decoder_log(ERROR, "BrotliDecoderDecompressStream() failed: errno = %d, %s",
+            BrotliDecoderErrorCode errcode =
+                BrotliDecoderGetErrorCode(decompress->br_state);
+            http_decoder_log(ERROR,
+                             "BrotliDecoderDecompressStream() failed: errno = %d, %s",
                              errcode, BrotliDecoderErrorString(errcode));
             return -1;
         }
@@ -233,8 +243,9 @@ static int http_content_decompress_write_br(struct http_content_decompress *deco
     }
 }
 
-int http_content_decompress_write(struct http_content_decompress *decompress, const char *indata, 
-                                  size_t indata_len, char **outdata, size_t *outdata_len)
+int
+http_content_decompress_write(struct http_content_decompress *decompress,
+    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len)
 {
     assert(decompress);
     assert(indata);
@@ -245,8 +256,8 @@ int http_content_decompress_write(struct http_content_decompress *decompress, co
     *outdata = NULL;
     *outdata_len = 0;
 
-    if (decompress->encoding == HTTP_CONTENT_ENCODING_GZIP || 
-        decompress->encoding == HTTP_CONTENT_ENCODING_DEFLATE) {
+    if (decompress->encoding == HTTP_CONTENT_ENCODING_GZIP
+        || decompress->encoding == HTTP_CONTENT_ENCODING_DEFLATE) {
         return http_content_decompress_write_zlib(decompress, indata, indata_len,
                                                   outdata, outdata_len);
     }

@@ -8,6 +8,7 @@
 ***********************************************************************************************
 */
 
+
 #ifndef _HTTP_DECODER_STRING_H_
 #define _HTTP_DECODER_STRING_H_
 
@@ -17,6 +18,7 @@ extern "C"
 #endif
 
 #include "http_decoder.h"
+
 
 enum string_state {
     STRING_STATE_INIT,
@@ -66,19 +68,27 @@ struct http_decoder_string {
     enum string_state state;
 };
 
-void http_decoder_string_refer(struct http_decoder_string *rstr, const char *at, size_t length);
+void
+http_decoder_string_refer(struct http_decoder_string *rstr,
+    const char *at, size_t length);
 
-void http_decoder_string_cache(struct http_decoder_string *rstr);
+void
+http_decoder_string_cache(struct http_decoder_string *rstr);
 
-void http_decoder_string_commit(struct http_decoder_string *rstr);
+void
+http_decoder_string_commit(struct http_decoder_string *rstr);
 
-void http_decoder_string_reset(struct http_decoder_string *rstr);
+void
+http_decoder_string_reset(struct http_decoder_string *rstr);
 
-enum string_state http_decoder_string_state(struct http_decoder_string *rstr);
+enum string_state
+http_decoder_string_state(struct http_decoder_string *rstr);
 
-int http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out);
+int
+http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out);
 
-void http_decoder_string_dump(struct http_decoder_string *rstr, const char *desc);
+void
+http_decoder_string_dump(struct http_decoder_string *rstr, const char *desc);
 
 #ifdef __cplusplus
 }

@@ -8,6 +8,7 @@
 ***********************************************************************************************
 */
 
+
 #include <assert.h>
 #include <stdio.h>
 
@@ -17,6 +18,7 @@
 #include "http_decoder_half.h"
 #include "http_decoder_table.h"
 #include "http_content_decompress.h"
+
 
 struct http_decoder_half_data {
     struct http_decoder_table *table;
@@ -61,7 +63,8 @@ static void printf_debug_info(const char *desc, const char *at, size_t length)
 #define printf_debug_info(desc, at, length)
 #endif
 
-static void http_decoder_half_data_decompress(struct http_decoder_half_data *data)
+static void
+http_decoder_half_data_decompress(struct http_decoder_half_data *data)
 {
     assert(data);
 
@@ -78,7 +81,8 @@ static void http_decoder_half_data_decompress(struct http_decoder_half_data *dat
         return;
     }
 
-    struct http_content_decompress *decompress = http_content_decompress_create(data->content_encoding);
+    struct http_content_decompress *decompress =
+        http_content_decompress_create(data->content_encoding);
     assert(decompress);
     if (http_content_decompress_write(decompress, raw_body.str, raw_body.str_len,
                                       &data->decompress_body,
@@ -89,29 +93,34 @@ static void http_decoder_half_data_decompress(struct http_decoder_half_data *dat
 }
 
 /* Possible return values 0, -1, `HPE_PAUSED` */
-static int on_message_begin(llhttp_t *http)
+static int
+on_message_begin(llhttp_t *http)
 {
     printf_debug_info("on_message_begin", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     half->event = HTTP_EVENT_INIT;
     return 0;
 }
 
-static int on_message_complete(llhttp_t *http)
+static int
+on_message_complete(llhttp_t *http)
 {
     printf_debug_info("on_message_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     // if enable  cache_body, trigger body_data/body_end event
     // if disable cache_body, trigger body_end event
-    if (half->is_cache_body ||
-        (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY) == STRING_STATE_CACHE) {
+    if (half->is_cache_body
+        || (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY)
+            == STRING_STATE_CACHE) {
             http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
             http_decoder_half_data_decompress(half->ref_data);
         }
@@ -120,24 +129,28 @@ static int on_message_complete(llhttp_t *http)
             if (half->event == HTTP_EVENT_REQ_BODY_BEGIN) {
                 half->event = HTTP_EVENT_REQ_BODY_DATA;
                 if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                    half->http_ev_cb(half->event, &half->ref_data,
+                                     half->http_ev_ctx);
                 }
 
                 half->event = HTTP_EVENT_REQ_BODY_END;
                 if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                    half->http_ev_cb(half->event, &half->ref_data,
+                                     half->http_ev_ctx);
                 }
             }
         } else {
             if (half->event == HTTP_EVENT_RES_BODY_BEGIN) {
                 half->event = HTTP_EVENT_RES_BODY_DATA;
                 if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                    half->http_ev_cb(half->event, &half->ref_data,
+                                     half->http_ev_ctx);
                 }
 
                 half->event = HTTP_EVENT_RES_BODY_END;
                 if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                    half->http_ev_cb(half->event, &half->ref_data,
+                                     half->http_ev_ctx);
                 }
             }
         }
@@ -147,14 +160,16 @@ static int on_message_complete(llhttp_t *http)
             if (half->event == HTTP_EVENT_REQ_BODY_DATA) {
                 half->event = HTTP_EVENT_REQ_BODY_END;
                 if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                    half->http_ev_cb(half->event, &half->ref_data,
+                                     half->http_ev_ctx);
                 }
             }
         } else {
             if (half->event == HTTP_EVENT_RES_BODY_DATA) {
                 half->event = HTTP_EVENT_RES_BODY_END;
                 if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                    half->http_ev_cb(half->event, &half->ref_data,
+                                     half->http_ev_ctx);
                 }
             }
         }
@@ -176,18 +191,21 @@ static int on_message_complete(llhttp_t *http)
     return 0;
 }
 
-static int on_reset(llhttp_t *http)
+static int
+on_reset(llhttp_t *http)
 {
     printf_debug_info("on_reset", NULL, 0);
 
     return 0;
 }
 
-static int on_method(llhttp_t *http, const char *at, size_t length)
+static int
+on_method(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_method", at, length);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->parser.type == HTTP_REQUEST) {
@@ -198,22 +216,26 @@ static int on_method(llhttp_t *http, const char *at, size_t length)
     }
 
     if (half->ref_data != NULL) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_METHOD, at, length);
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_METHOD,
+                                 at, length);
     }
 
     return 0;
 }
 
 /* Information-only callbacks, return value is ignored */
-static int on_method_complete(llhttp_t *http)
+static int
+on_method_complete(llhttp_t *http)
 {
     printf_debug_info("on_method_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_METHOD) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_METHOD)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_METHOD);
         }
         http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_METHOD);
@@ -223,30 +245,36 @@ static int on_method_complete(llhttp_t *http)
 }
 
 /* Possible return values 0, -1, HPE_USER */
-static int on_uri(llhttp_t *http, const char *at, size_t length)
+static int
+on_uri(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_uri", at, length);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_URI, at, length);
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_URI,
+                                 at, length);
     }
 
     return 0;
 }
 
 /* Information-only callbacks, return value is ignored */
-static int on_uri_complete(llhttp_t *http)
+static int
+on_uri_complete(llhttp_t *http)
 {
     printf_debug_info("on_uri_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_URI) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_URI)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_URI);
         }
 
@@ -257,11 +285,13 @@ static int on_uri_complete(llhttp_t *http)
 }
 
 /* Possible return values 0, -1, HPE_USER */
-static int on_version(llhttp_t *http, const char *at, size_t length)
+static int
+on_version(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_version", at, length);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->parser.type == HTTP_RESPONSE) {
@@ -272,22 +302,26 @@ static int on_version(llhttp_t *http, const char *at, size_t length)
     }
     
     if (half->ref_data != NULL) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_VERSION, at, length);
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_VERSION,
+                                 at, length);
     }
 
     return 0;
 }
 
 /* Information-only callbacks, return value is ignored */
-static int on_version_complete(llhttp_t *http)
+static int
+on_version_complete(llhttp_t *http)
 {
      printf_debug_info("on_version_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_VERSION) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_VERSION)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_VERSION);
         }
         http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_VERSION);
@@ -307,30 +341,36 @@ static int on_version_complete(llhttp_t *http)
 }
 
 /* Possible return values 0, -1, HPE_USER */
-static int on_status(llhttp_t *http, const char *at, size_t length)
+static int
+on_status(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_status", at, length);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_STATUS, at, length);
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_STATUS,
+                                 at, length);
     }
 
     return 0;
 }
 
 /* Information-only callbacks, return value is ignored */
-static int on_status_complete(llhttp_t *http)
+static int
+on_status_complete(llhttp_t *http)
 {
     printf_debug_info("on_status_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_STATUS) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_STATUS)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_STATUS);
         }
 
@@ -347,30 +387,36 @@ static int on_status_complete(llhttp_t *http)
 }
 
 /* Possible return values 0, -1, HPE_USER */
-static int on_header_field(llhttp_t *http, const char *at, size_t length)
+static int
+on_header_field(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_header_field", at, length);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_HDRKEY, at, length);
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_HDRKEY,
+                                 at, length);
     }
 
     return 0;
 }
 
 /* Information-only callbacks, return value is ignored */
-static int on_header_field_complete(llhttp_t *http)
+static int
+on_header_field_complete(llhttp_t *http)
 {
     printf_debug_info("on_header_field_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRKEY);
         }
 
@@ -381,30 +427,36 @@ static int on_header_field_complete(llhttp_t *http)
 }
 
 /* Possible return values 0, -1, HPE_USER */
-static int on_header_value(llhttp_t *http, const char *at, size_t length)
+static int
+on_header_value(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_header_value", at, length);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_HDRVAL, at, length);
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_HDRVAL,
+                                 at, length);
     }
 
     return 0;
 }
 
 /* Information-only callbacks, return value is ignored */
-static int on_header_value_complete(llhttp_t *http)
+static int
+on_header_value_complete(llhttp_t *http)
 {
     printf_debug_info("on_header_value_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->ref_data != NULL) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL) == STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRVAL);
         }
         http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_HDRVAL);
@@ -413,10 +465,16 @@ static int on_header_value_complete(llhttp_t *http)
     if (half->ref_data != NULL) {
         if (half->ref_data->content_encoding == HTTP_CONTENT_ENCODING_NONE) {
             struct http_header http_hdr = {0};
-            struct hstring key = {.str = (char *)"Content-Encoding", .str_len = 16};
-            if (http_decoder_table_get_header(half->ref_data->table, &key, &http_hdr, 1) == 1) {
+            struct hstring key = {
+                .str = (char *)"Content-Encoding",
+                .str_len = 16
+            };
+
+            if (http_decoder_table_get_header(half->ref_data->table, &key,
+                                              &http_hdr, 1) == 1) {
                 char *str = safe_dup(http_hdr.val.str, http_hdr.val.str_len);
-                half->ref_data->content_encoding = http_content_encoding_str2int(str);
+                half->ref_data->content_encoding =
+                    http_content_encoding_str2int(str);
                 FREE(str);
             }
         }
@@ -429,7 +487,8 @@ static int on_header_value_complete(llhttp_t *http)
  * in parser->content_length.
  * Possible return values 0, -1, `HPE_PAUSED`
  */
-static int on_chunk_header(llhttp_t *http)
+static int
+on_chunk_header(llhttp_t *http)
 {
     printf_debug_info("on_chunk_header", NULL, 0);
 
@@ -440,7 +499,8 @@ static int on_chunk_header(llhttp_t *http)
  * in parser->content_length.
  * Possible return values 0, -1, `HPE_PAUSED`
  */
-static int on_chunk_header_complete(llhttp_t *http)
+static int
+on_chunk_header_complete(llhttp_t *http)
 {
     printf_debug_info("on_chunk_header_complete", NULL, 0);
 
@@ -453,11 +513,13 @@ static int on_chunk_header_complete(llhttp_t *http)
  *  2  - Assume absence of body (as above) and make `llhttp_execute()` return `HPE_PAUSED_UPGRADE`
  * -1  - Error `HPE_PAUSED`
  */
-static int on_headers_complete(llhttp_t *http)
+static int
+on_headers_complete(llhttp_t *http)
 {
     printf_debug_info("on_headers_complete", NULL, 0);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     if (half->parser.type == HTTP_REQUEST) {
@@ -478,11 +540,13 @@ static int on_headers_complete(llhttp_t *http)
 }
 
 /* Possible return values 0, -1, HPE_USER */
-static int on_body(llhttp_t *http, const char *at, size_t length)
+static int
+on_body(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_body", at, length);
 
-    struct http_decoder_half *half = container_of(http, struct http_decoder_half, parser);
+    struct http_decoder_half *half =
+        container_of(http, struct http_decoder_half, parser);
     assert(half);
 
     // trigger body_begin event
@@ -490,43 +554,50 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
         if (half->event == HTTP_EVENT_REQ_HDR_END) {
             half->event = HTTP_EVENT_REQ_BODY_BEGIN;
             if (half->http_ev_cb) {
-                half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                half->http_ev_cb(half->event, &half->ref_data,
+                                 half->http_ev_ctx);
             }
         }
     } else {
         if (half->event == HTTP_EVENT_RES_HDR_END) {
             half->event = HTTP_EVENT_RES_BODY_BEGIN;
             if (half->http_ev_cb) {
-                half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                half->http_ev_cb(half->event, &half->ref_data,
+                                 half->http_ev_ctx);
             }
         }
     }
 
     // if enable  cache_body, trigger body_data event on_message_complete
     // if disable cache_body, trigger body_data event on_body
-    if (half->is_cache_body ||
-        (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY, at, length);
+    if (half->is_cache_body
+        || (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY,
+                                 at, length);
         http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_BODY);
     } else {
         if (half->ref_data != NULL) {
-            if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY) == STRING_STATE_COMMIT) {
+            if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY)
+                == STRING_STATE_COMMIT) {
                 http_decoder_table_reset(half->ref_data->table, HTTP_ITEM_BODY);
             }
 
-            http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY, at, length);
+            http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY,
+                                     at, length);
             http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
         }
 
         if (half->parser.type == HTTP_REQUEST) {
             half->event = HTTP_EVENT_REQ_BODY_DATA;
             if (half->http_ev_cb) {
-                half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                half->http_ev_cb(half->event, &half->ref_data,
+                                 half->http_ev_ctx);
             }
         } else {
             half->event = HTTP_EVENT_RES_BODY_DATA;
             if (half->http_ev_cb) {
-                half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+                half->http_ev_cb(half->event, &half->ref_data,
+                                 half->http_ev_ctx);
             }
         }
     }
@@ -534,8 +605,9 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
     return 0;
 }
 
-void http_decoder_half_init(struct http_decoder_half *half, http_event_cb *http_ev_cb, 
-                            int is_cache_body)
+void
+http_decoder_half_init(struct http_decoder_half *half,
+    http_event_cb *http_ev_cb, int is_cache_body)
 {
     if (NULL == half) {
         return;
@@ -591,7 +663,8 @@ http_decoder_half_new(http_event_cb *ev_cb, int is_cache_body)
     return half;
 }
 
-void http_decoder_half_free(struct http_decoder_half *half)
+void
+http_decoder_half_free(struct http_decoder_half *half)
 {
     if (NULL == half) {
         return;
@@ -600,8 +673,9 @@ void http_decoder_half_free(struct http_decoder_half *half)
     FREE(half);
 }
 
-int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
-                            const char *data, size_t data_len)
+int
+http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
+    const char *data, size_t data_len)
 {
     if (NULL == half || NULL == data || 0 == data_len) {
         return -1;
@@ -611,11 +685,12 @@ int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     half->error = llhttp_execute(&half->parser, data, data_len);
 
     int ret = 0;
+
     switch (half->error) {
     case HPE_OK:
+        break;
     case HPE_PAUSED_UPGRADE:
         llhttp_resume_after_upgrade(&half->parser);
-        ret = 0;
         break;
     default:
         ret = -1;
@@ -629,38 +704,38 @@ int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     }
 
     if (half->ref_data != NULL) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_URI) ==
-            STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_URI)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_URI);
         }
 
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_STATUS) ==
-            STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_STATUS)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_STATUS);
         }
 
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_METHOD) ==
-            STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_METHOD)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_METHOD);
         }
 
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_VERSION) ==
-            STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_VERSION)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_VERSION);
         }
 
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY) ==
-            STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRKEY);
         }
 
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL) ==
-            STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRVAL);
         }
 
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY) ==
-            STRING_STATE_REFER) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY)
+            == STRING_STATE_REFER) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_BODY);
         }
     }
@@ -668,9 +743,11 @@ int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     return 0;
 }
 
-struct http_decoder_half_data *http_decoder_half_data_new()
+struct http_decoder_half_data *
+http_decoder_half_data_new()
 {
-    struct http_decoder_half_data *data = CALLOC(struct http_decoder_half_data, 1);
+    struct http_decoder_half_data *data =
+        CALLOC(struct http_decoder_half_data, 1);
     assert(data);
 
     data->table = http_decoder_table_new();
@@ -687,7 +764,8 @@ struct http_decoder_half_data *http_decoder_half_data_new()
     return data;
 }
 
-void http_decoder_half_data_free(struct http_decoder_half_data *data)
+void
+http_decoder_half_data_free(struct http_decoder_half_data *data)
 {
     if (NULL == data) {
         return;
@@ -705,8 +783,9 @@ void http_decoder_half_data_free(struct http_decoder_half_data *data)
     FREE(data);
 }
 
-int http_decoder_half_data_get_request_line(struct http_decoder_half_data *data,
-                                            struct http_request_line *line)
+int
+http_decoder_half_data_get_request_line(struct http_decoder_half_data *data,
+    struct http_request_line *line)
 {
     if (NULL == data || NULL == line) {
         return -1;
@@ -722,8 +801,9 @@ int http_decoder_half_data_get_request_line(struct http_decoder_half_data *data,
     return 0;
 }
 
-int http_decoder_half_data_get_response_line(struct http_decoder_half_data *data,
-                                             struct http_response_line *line)
+int
+http_decoder_half_data_get_response_line(struct http_decoder_half_data *data,
+    struct http_response_line *line)
 {
     if (NULL == data || NULL == line) {
         return -1;
@@ -739,20 +819,21 @@ int http_decoder_half_data_get_response_line(struct http_decoder_half_data *data
     return 0;
 }
 
-int http_decoder_half_data_get_header(struct http_decoder_half_data *data,
-                                      struct hstring *key,
-                                      struct http_header *header_array,
-                                      size_t array_size)
+int
+http_decoder_half_data_get_header(struct http_decoder_half_data *data,
+    struct hstring *key, struct http_header *header_array, size_t array_size)
 {
     if (NULL == data) {
         return -1;
     }
 
-    return http_decoder_table_get_header(data->table, key, header_array, array_size);
+    return http_decoder_table_get_header(data->table, key, header_array,
+                                         array_size);
 }
 
-int http_decoder_half_data_iter_header(struct http_decoder_half_data *data,
-                                       struct http_header *header)
+int
+http_decoder_half_data_iter_header(struct http_decoder_half_data *data,
+    struct http_header *header)
 {
     if (NULL == data || NULL == header) {
         return -1;
@@ -761,8 +842,9 @@ int http_decoder_half_data_iter_header(struct http_decoder_half_data *data,
     return http_decoder_table_iter_header(data->table, header);
 }
 
-int http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
-                                        struct hstring *body)
+int
+http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
+    struct hstring *body)
 {
     if (NULL == data || NULL == body) {
         return -1;
@@ -771,8 +853,9 @@ int http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
     return http_decoder_table_get_body(data->table, body);
 }
 
-int http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *data,
-                                               struct hstring *body)
+int
+http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *data,
+    struct hstring *body)
 {
     if (NULL == data || NULL == body) {
         return -1;
@@ -788,7 +871,8 @@ int http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *da
     return 0;
 }
 
-void http_decoder_half_data_dump(struct http_decoder_half *half)
+void
+http_decoder_half_data_dump(struct http_decoder_half *half)
 {
     if (NULL == half || NULL == half->ref_data) {
         return;

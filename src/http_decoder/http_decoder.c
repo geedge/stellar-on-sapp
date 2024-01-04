@@ -8,6 +8,7 @@
 ***********************************************************************************************
 */
 
+
 #include <assert.h>
 #include <stdio.h>
 
@@ -23,6 +24,7 @@
 #define HTTP_IDENTIFY_LEN 16
 #define HTTP_DECODER_RESULT_QUEUE_SIZE 16
 #define HD_IS_CACHE_BODY 1
+
 
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
 
@@ -68,9 +70,11 @@ struct http_decoder_context {
     struct http_event_context *http_ev_ctx;
 };
 
-struct http_decoder_result *http_decoder_result_new()
+static struct http_decoder_result *
+http_decoder_result_new()
 {
-    struct http_decoder_result *result = CALLOC(struct http_decoder_result, 1);
+    struct http_decoder_result *result =
+        CALLOC(struct http_decoder_result, 1);
     assert(result);
 
     result->req_data = NULL;
@@ -79,7 +83,8 @@ struct http_decoder_result *http_decoder_result_new()
     return result;
 }
 
-void http_decoder_result_free(struct http_decoder_result *result)
+static void
+http_decoder_result_free(struct http_decoder_result *result)
 {
 	if (NULL == result) {
 		return;
@@ -99,7 +104,9 @@ void http_decoder_result_free(struct http_decoder_result *result)
 }
 
 // Create a new http result and add it to the queue
-static void http_decoder_result_queue_push(struct http_decoder_result_queue *queue, size_t index)
+static void
+http_decoder_result_queue_push(struct http_decoder_result_queue *queue,
+    size_t index)
 {
     assert(queue);
     assert(index < queue->queue_size);
@@ -111,7 +118,9 @@ static void http_decoder_result_queue_push(struct http_decoder_result_queue *que
 }
 
 // Remove the http result from the queue but not destroy it
-static void http_decoder_result_queue_pop(struct http_decoder_result_queue *queue, size_t index)
+static void
+http_decoder_result_queue_pop(struct http_decoder_result_queue *queue,
+    size_t index)
 {
     assert(queue);
     assert(index < queue->queue_size);
@@ -122,7 +131,8 @@ static void http_decoder_result_queue_pop(struct http_decoder_result_queue *queu
     }
 }
 
-static void http_decoder_result_queue_inc_req_index(struct http_decoder_result_queue *queue)
+static void
+http_decoder_result_queue_inc_req_index(struct http_decoder_result_queue *queue)
 {
     assert(queue);
 
@@ -130,7 +140,8 @@ static void http_decoder_result_queue_inc_req_index(struct http_decoder_result_q
     queue->req_index = queue->req_index % queue->queue_size;
 }
 
-static void http_decoder_result_queue_inc_res_index(struct http_decoder_result_queue *queue)
+static void
+http_decoder_result_queue_inc_res_index(struct http_decoder_result_queue *queue)
 {
     assert(queue);
 
@@ -138,7 +149,8 @@ static void http_decoder_result_queue_inc_res_index(struct http_decoder_result_q
     queue->res_index = queue->res_index % queue->queue_size;
 }
 
-static void http_decoder_result_queue_inc_del_index(struct http_decoder_result_queue *queue)
+static void
+http_decoder_result_queue_inc_del_index(struct http_decoder_result_queue *queue)
 {
     assert(queue);
 
@@ -146,7 +158,9 @@ static void http_decoder_result_queue_inc_del_index(struct http_decoder_result_q
     queue->del_index = queue->del_index % queue->queue_size;
 }
 
-static void http_decoder_result_queue_gc(struct http_decoder_result_queue *queue, size_t index)
+static void
+http_decoder_result_queue_gc(struct http_decoder_result_queue *queue,
+    size_t index)
 {
     assert(queue);
     assert(index < queue->queue_size);
@@ -157,9 +171,9 @@ static void http_decoder_result_queue_gc(struct http_decoder_result_queue *queue
     }
 }
 
-static void http_event_handler(enum http_event event,
-                               struct http_decoder_half_data **data,
-                               void *http_ev_ctx)
+static void
+http_event_handler(enum http_event event, struct http_decoder_half_data **data,
+    void *http_ev_ctx)
 {
     struct http_event_context *ctx = (struct http_event_context *)http_ev_ctx;
     assert(ctx);
@@ -238,7 +252,8 @@ static void http_event_handler(enum http_event event,
     }
 }
 
-static struct http_decoder *http_decoder_new(http_event_cb *ev_cb, int is_cache_body)
+static struct http_decoder *
+http_decoder_new(http_event_cb *ev_cb, int is_cache_body)
 {
 	struct http_decoder *decoder = CALLOC(struct http_decoder, 1);
 	assert(decoder);
@@ -249,7 +264,8 @@ static struct http_decoder *http_decoder_new(http_event_cb *ev_cb, int is_cache_
 	return decoder;
 }
 
-void http_decoder_free(struct http_decoder *decoder)
+static void
+http_decoder_free(struct http_decoder *decoder)
 {
     if (NULL == decoder) {
         return;
@@ -268,9 +284,11 @@ void http_decoder_free(struct http_decoder *decoder)
     FREE(decoder);
 }
 
-static struct http_decoder_result_queue *http_decoder_result_queue_new(size_t queue_size)
+static struct http_decoder_result_queue *
+http_decoder_result_queue_new(size_t queue_size)
 {
-    struct http_decoder_result_queue *queue = CALLOC(struct http_decoder_result_queue, 1);
+    struct http_decoder_result_queue *queue =
+        CALLOC(struct http_decoder_result_queue, 1);
     assert(queue);
 
     queue->del_index = 0;
@@ -288,7 +306,8 @@ static struct http_decoder_result_queue *http_decoder_result_queue_new(size_t qu
     return queue;
 }
 
-static void http_decoder_result_queue_free(struct http_decoder_result_queue *queue)
+static void
+http_decoder_result_queue_free(struct http_decoder_result_queue *queue)
 {
 	if (NULL == queue) {
 		return;
@@ -308,7 +327,8 @@ static void http_decoder_result_queue_free(struct http_decoder_result_queue *que
     FREE(queue);
 }
 
-static int http_protocol_identify(const char *data, size_t data_len)
+static int
+http_protocol_identify(const char *data, size_t data_len)
 {
 	enum llhttp_type type = HTTP_BOTH;
 	llhttp_t parser;
@@ -326,7 +346,8 @@ static int http_protocol_identify(const char *data, size_t data_len)
 	return 0;
 }
 
-int http_decoder_entry(struct session *sess, int events, const struct packet *pkt, void *cb_arg)
+int http_decoder_entry(struct session *sess, int events,
+    const struct packet *pkt, void *cb_arg)
 {
     struct http_decoder_context *ctx = (struct http_decoder_context *)cb_arg;
     size_t payload_len = 0;
@@ -337,7 +358,8 @@ int http_decoder_entry(struct session *sess, int events, const struct packet *pk
         return 0;
     }
 
-    struct http_decoder_result_queue *queue = session_get_ex_data(sess, ctx->ex_data_idx);;
+    struct http_decoder_result_queue *queue =
+        session_get_ex_data(sess, ctx->ex_data_idx);;
 
     if (events & SESS_EV_CLOSING) {
         if (queue != NULL) {
@@ -351,18 +373,23 @@ int http_decoder_entry(struct session *sess, int events, const struct packet *pk
     const char *payload = session_get0_current_payload(sess, &payload_len);
     if (events & SESS_EV_OPENING) {
         if (queue != NULL) {
-            fprintf(stderr, "http_decoder_result_queue should be null for new session\n");
+            fprintf(stderr,
+                    "http_decoder_result_queue should be null for new session\n");
             return -1;
         }
 
         //If not http, ignore this session
         if (payload_len > 0) {
-            size_t http_identify_len = payload_len > HTTP_IDENTIFY_LEN ? HTTP_IDENTIFY_LEN : payload_len;
+            size_t http_identify_len =
+                payload_len > HTTP_IDENTIFY_LEN ? HTTP_IDENTIFY_LEN : payload_len;
             ret = http_protocol_identify(payload, http_identify_len);
             if (ret < 0) {
                 // ignore this session's event
-                struct session_event *s_event = session_get_intrinsic_event(sess, ctx->plugin_id);
-                session_event_assign(s_event, ctx->st, sess, 0, http_decoder_entry, ctx);
+                struct session_event *s_event =
+                    session_get_intrinsic_event(sess, ctx->plugin_id);
+
+                session_event_assign(s_event, ctx->st, sess, 0,
+                                     http_decoder_entry, ctx);
                 return 0;
             }
         }
@@ -396,7 +423,8 @@ int http_decoder_entry(struct session *sess, int events, const struct packet *pk
     ctx->http_ev_ctx->ref_queue = queue;
     ctx->http_ev_ctx->ref_session = sess;
 
-    ret = http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
+    ret = http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload,
+                                  payload_len);
     if (ret < 0) {
         if (dir == PACKET_DIRECTION_C2S) {
             http_decoder_result_queue_pop(queue, queue->req_index);
@@ -408,14 +436,16 @@ int http_decoder_entry(struct session *sess, int events, const struct packet *pk
     return 0;
 }
 
-static void http_decoder_ex_data_free(struct session *s, int idx, void *ex_ptr, void *arg)
+static void
+http_decoder_ex_data_free(struct session *s, int idx, void *ex_ptr, void *arg)
 {
 	if (ex_ptr != NULL) {
 		FREE(ex_ptr);
 	}
 }
 
-void http_message_free(void *msg, void *cb_arg)
+static void
+http_message_free(void *msg, void *cb_arg)
 {
 	if (NULL == msg) {
 		return;
@@ -434,21 +464,25 @@ void *http_decoder_init(struct stellar *st)
     ctx->http_ev_ctx = CALLOC(struct http_event_context, 1);
     ctx->st = st;
     ctx->ex_data_idx = stellar_session_get_ex_new_index(st, "HTTP_DECODER",
-														http_decoder_ex_data_free, NULL);
+														http_decoder_ex_data_free,
+                                                        NULL);
 
-    int plugin_id = stellar_plugin_register(st, SESS_EV_TCP|SESS_EV_CLOSING, http_decoder_entry, ctx);
+    int plugin_id = stellar_plugin_register(st, SESS_EV_TCP|SESS_EV_CLOSING,
+                                            http_decoder_entry, ctx);
     if (plugin_id >= 0) {
         ctx->plugin_id = plugin_id;
     }
 
     int topic_id = session_mq_get_topic_id(st, http_decoder_topic);
     if (topic_id < 0) {
-        topic_id = session_mq_create_topic(st, http_decoder_topic, http_message_free, NULL);
+        topic_id = session_mq_create_topic(st, http_decoder_topic,
+                                           http_message_free, NULL);
     }
     ctx->topic_id = topic_id;
 
     printf("http_decoder_init: ex_data_idx:%d, plugin_id:%d, topic_id:%d\n",
            ctx->ex_data_idx, ctx->plugin_id, ctx->topic_id);
+
     return ctx;
 }
 
@@ -458,7 +492,9 @@ void http_decoder_exit(void *decoder_ctx)
         return;
     }
 
-    struct http_decoder_context *ctx = (struct http_decoder_context *)decoder_ctx;
+    struct http_decoder_context *ctx =
+        (struct http_decoder_context *)decoder_ctx;
+
     if (ctx->http_ev_ctx != NULL) {
         FREE(ctx->http_ev_ctx);
     }
@@ -475,7 +511,8 @@ void http_decoder_exit(void *decoder_ctx)
     FREE(decoder_ctx);
 }
 
-enum http_message_type http_message_type(struct http_message *msg)
+enum http_message_type
+http_message_type(struct http_message *msg)
 {
 	if (NULL == msg) {
 		return HTTP_MESSAGE_MAX;
@@ -484,7 +521,9 @@ enum http_message_type http_message_type(struct http_message *msg)
 	return msg->type;
 }
 
-int http_message_get_request_line(struct http_message *msg, struct http_request_line *line)
+int
+http_message_get_request_line(struct http_message *msg,
+    struct http_request_line *line)
 {
 	if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_LINE || NULL == line) {
 		return -1;
@@ -493,7 +532,9 @@ int http_message_get_request_line(struct http_message *msg, struct http_request_
 	return http_decoder_half_data_get_request_line(msg->data, line);
 }
 
-int http_message_get_response_line(struct http_message *msg, struct http_response_line *line)
+int
+http_message_get_response_line(struct http_message *msg,
+    struct http_response_line *line)
 {
 	if (NULL == msg || msg->type != HTTP_MESSAGE_RES_LINE || NULL == line) {
 		return -1;
@@ -502,76 +543,99 @@ int http_message_get_response_line(struct http_message *msg, struct http_respons
 	return http_decoder_half_data_get_response_line(msg->data, line);
 }
 
-int http_message_get_request_header(struct http_message *msg, struct hstring *key,
-									struct http_header *header_array, size_t array_size)
+int
+http_message_get_request_header(struct http_message *msg, struct hstring *key,
+	struct http_header *header_array, size_t array_size)
 {
-	if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_HEADER ||
-		NULL == key || NULL == header_array || 0 == array_size) {
+	if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_HEADER
+        || NULL == key || NULL == header_array || 0 == array_size) {
 		return -1;
 	}
 
-	return http_decoder_half_data_get_header(msg->data, key, header_array, array_size);
+	return http_decoder_half_data_get_header(msg->data, key, header_array,
+                                             array_size);
 }
 
-int http_message_get_response_header(struct http_message *msg, struct hstring *key,
-									 struct http_header *header_array, size_t array_size)
+int
+http_message_get_response_header(struct http_message *msg, struct hstring *key,
+	struct http_header *header_array, size_t array_size)
 {
-	if (NULL == msg || msg->type != HTTP_MESSAGE_RES_HEADER ||
-		NULL == key || NULL == header_array || 0 == array_size) {
+	if (NULL == msg || msg->type != HTTP_MESSAGE_RES_HEADER
+        || NULL == key || NULL == header_array
+        || 0 == array_size) {
 		return -1;
 	}
 
-	return http_decoder_half_data_get_header(msg->data, key, header_array, array_size);
+	return http_decoder_half_data_get_header(msg->data, key, header_array,
+                                             array_size);
 }
 
-int http_message_request_header_next(struct http_message *msg, struct http_header *header)
+int
+http_message_request_header_next(struct http_message *msg,
+    struct http_header *header)
 {
-    if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_HEADER || NULL == header) {
+    if (NULL == msg || msg->type != HTTP_MESSAGE_REQ_HEADER
+        || NULL == header) {
 		return -1;
 	}
 
     return http_decoder_half_data_iter_header(msg->data, header);
 }
 
-int http_message_response_header_next(struct http_message *msg, struct http_header *header)
+int
+http_message_response_header_next(struct http_message *msg,
+    struct http_header *header)
 {
-    if (NULL == msg || msg->type != HTTP_MESSAGE_RES_HEADER || NULL == header) {
+    if (NULL == msg || msg->type != HTTP_MESSAGE_RES_HEADER
+        || NULL == header) {
 		return -1;
 	}
 
     return http_decoder_half_data_iter_header(msg->data, header);
 }
 
-int http_message_get_request_raw_body(struct http_message *msg, struct hstring *body)
+int
+http_message_get_request_raw_body(struct http_message *msg,
+    struct hstring *body)
 {
-    if (NULL == msg || (msg->type != HTTP_MESSAGE_REQ_BODY) || NULL == body) {
+    if (NULL == msg || (msg->type != HTTP_MESSAGE_REQ_BODY)
+        || NULL == body) {
         return -1;
     }
 
     return http_decoder_half_data_get_raw_body(msg->data, body);
 }
 
-int http_message_get_response_raw_body(struct http_message *msg, struct hstring *body)
+int
+http_message_get_response_raw_body(struct http_message *msg,
+    struct hstring *body)
 {
-    if (NULL == msg || (msg->type != HTTP_MESSAGE_RES_BODY) || NULL == body) {
+    if (NULL == msg || (msg->type != HTTP_MESSAGE_RES_BODY)
+        || NULL == body) {
         return -1;
     }
 
     return http_decoder_half_data_get_raw_body(msg->data, body);
 }
 
-int http_message_get_request_decompress_body(struct http_message *msg, struct hstring *body)
+int
+http_message_get_request_decompress_body(struct http_message *msg,
+    struct hstring *body)
 {
-    if (NULL == msg || (msg->type != HTTP_MESSAGE_REQ_BODY) || NULL == body) {
+    if (NULL == msg || (msg->type != HTTP_MESSAGE_REQ_BODY)
+        || NULL == body) {
         return -1;
     }
 
     return http_decoder_half_data_get_decompress_body(msg->data, body);
 }
 
-int http_message_get_response_decompress_body(struct http_message *msg, struct hstring *body)
+int
+http_message_get_response_decompress_body(struct http_message *msg,
+    struct hstring *body)
 {
-    if (NULL == msg || (msg->type != HTTP_MESSAGE_RES_BODY) || NULL == body) {
+    if (NULL == msg || (msg->type != HTTP_MESSAGE_RES_BODY)
+        || NULL == body) {
         return -1;
     }
 

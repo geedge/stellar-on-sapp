@@ -8,6 +8,7 @@
 ***********************************************************************************************
 */
 
+
 #ifndef _HTTP_CONTENT_DECOMPRESS_H_
 #define _HTTP_CONTENT_DECOMPRESS_H_
 
@@ -30,18 +31,23 @@ enum http_content_encoding {
 
 struct http_content_decompress;
 
-enum http_content_encoding http_content_encoding_str2int(const char *content_encoding);
+enum http_content_encoding
+http_content_encoding_str2int(const char *content_encoding);
 
-const char *http_content_encoding_int2str(enum http_content_encoding content_encoding);
+const char *
+http_content_encoding_int2str(enum http_content_encoding content_encoding);
 
-struct http_content_decompress *http_content_decompress_create(enum http_content_encoding encoding);
+struct http_content_decompress *
+http_content_decompress_create(enum http_content_encoding encoding);
 
-void http_content_decompress_destroy(struct http_content_decompress *decompress);
+void
+http_content_decompress_destroy(struct http_content_decompress *decompress);
 
 // return   0 : success
 // return  -1 : error
-int http_content_decompress_write(struct http_content_decompress *decompress, const char *indata, 
-                                  size_t indata_len, char **outdata, size_t *outdata_len);
+int
+http_content_decompress_write(struct http_content_decompress *decompress,
+    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len);
 
 #ifdef __cplusplus
 }
