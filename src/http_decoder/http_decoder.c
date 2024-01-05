@@ -330,13 +330,12 @@ http_decoder_result_queue_free(struct http_decoder_result_queue *queue)
 static int
 http_protocol_identify(const char *data, size_t data_len)
 {
-	enum llhttp_type type = HTTP_BOTH;
 	llhttp_t parser;
 	llhttp_settings_t settings;
 	enum llhttp_errno error;
 
 	llhttp_settings_init(&settings);
-	llhttp_init(&parser, type, &settings);
+	llhttp_init(&parser, HTTP_BOTH, &settings);
 
 	error = llhttp_execute(&parser, data, data_len);
 	if (error != HPE_OK) {
@@ -371,6 +370,7 @@ int http_decoder_entry(struct session *sess, int events,
     }
 
     const char *payload = session_get0_current_payload(sess, &payload_len);
+
     if (events & SESS_EV_OPENING) {
         if (queue != NULL) {
             fprintf(stderr,

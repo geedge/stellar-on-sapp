@@ -88,6 +88,15 @@ add_test(NAME HTTP_HEADERS_EXCEED_MAXIMUM_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURR
 add_test(NAME HTTP_CONNECT_FLOOD_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_connect_flood.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_connect_flood.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
+add_test(NAME HTTP_GET_MALFORMED_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_malformed.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_malformed.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+# add_test(NAME HTTP_POST_NO_HOST_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_post_no_host.json
+#          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_post_no_host.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_HEADER_VALUE_EMPTY_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_header_value_empty.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_header_value_empty.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
 set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_GET_MULTI_TRANS_TEST
                      HTTP_GET_REQ_PIPELINE_TEST
@@ -106,4 +115,6 @@ set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_POST_MULTIPART_FORM_DATA_TEST
                      HTTP_HEADERS_EXCEED_MAXIMUM_TEST
                      HTTP_CONNECT_FLOOD_TEST
+                     HTTP_GET_MALFORMED_TEST
+                     HTTP_HEADER_VALUE_EMPTY_TEST
                      PROPERTIES FIXTURES_REQUIRED TestFixture)

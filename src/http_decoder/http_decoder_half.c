@@ -45,6 +45,7 @@ struct http_decoder_half {
     void *http_ev_ctx;
 };
 
+// #define HTTP_DECODER_DEBUG
 #ifdef HTTP_DECODER_DEBUG
 static void printf_debug_info(const char *desc, const char *at, size_t length)
 {
@@ -204,6 +205,10 @@ on_method(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_method", at, length);
 
+    if (0 == length) {
+        return 0;
+    }
+
     struct http_decoder_half *half =
         container_of(http, struct http_decoder_half, parser);
     assert(half);
@@ -250,6 +255,10 @@ on_uri(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_uri", at, length);
 
+    if (0 == length) {
+        return 0;
+    }
+
     struct http_decoder_half *half =
         container_of(http, struct http_decoder_half, parser);
     assert(half);
@@ -290,6 +299,10 @@ on_version(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_version", at, length);
 
+    if (0 == length) {
+        return 0;
+    }
+
     struct http_decoder_half *half =
         container_of(http, struct http_decoder_half, parser);
     assert(half);
@@ -313,7 +326,7 @@ on_version(llhttp_t *http, const char *at, size_t length)
 static int
 on_version_complete(llhttp_t *http)
 {
-     printf_debug_info("on_version_complete", NULL, 0);
+    printf_debug_info("on_version_complete", NULL, 0);
 
     struct http_decoder_half *half =
         container_of(http, struct http_decoder_half, parser);
@@ -345,6 +358,10 @@ static int
 on_status(llhttp_t *http, const char *at, size_t length)
 {
     printf_debug_info("on_status", at, length);
+
+    if (0 == length) {
+        return 0;
+    }
 
     struct http_decoder_half *half =
         container_of(http, struct http_decoder_half, parser);
@@ -390,6 +407,10 @@ on_status_complete(llhttp_t *http)
 static int
 on_header_field(llhttp_t *http, const char *at, size_t length)
 {
+    if (0 == length) {
+        return 0;
+    }
+
     printf_debug_info("on_header_field", at, length);
 
     struct http_decoder_half *half =
@@ -430,6 +451,10 @@ on_header_field_complete(llhttp_t *http)
 static int
 on_header_value(llhttp_t *http, const char *at, size_t length)
 {
+    if (0 == length) {
+        return 0;
+    }
+
     printf_debug_info("on_header_value", at, length);
 
     struct http_decoder_half *half =
@@ -543,6 +568,10 @@ on_headers_complete(llhttp_t *http)
 static int
 on_body(llhttp_t *http, const char *at, size_t length)
 {
+    if (0 == length) {
+        return 0;
+    }
+
     printf_debug_info("on_body", at, length);
 
     struct http_decoder_half *half =
@@ -613,9 +642,8 @@ http_decoder_half_init(struct http_decoder_half *half,
         return;
     }
 
-    enum llhttp_type type = HTTP_BOTH; // HTTP_BOTH | HTTP_REQUEST | HTTP_RESPONSE
     llhttp_settings_init(&half->settings);
-    llhttp_init(&half->parser, type, &half->settings);
+    llhttp_init(&half->parser, HTTP_BOTH, &half->settings);
 
     half->settings.on_message_begin = on_message_begin;
     half->settings.on_message_complete = on_message_complete;
@@ -689,17 +717,24 @@ http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     switch (half->error) {
     case HPE_OK:
         break;
+    case HPE_PAUSED:
+        llhttp_resume(&half->parser);
+        break;
     case HPE_PAUSED_UPGRADE:
         llhttp_resume_after_upgrade(&half->parser);
+        ret = 0;
         break;
     default:
+        llhttp_init(&half->parser, HTTP_BOTH, &half->settings);
         ret = -1;
         break;
     }
 
     if (ret < 0) {
-        fprintf(stderr, "llhttp_execute parse error: %s %s\n",
-                llhttp_errno_name(half->error), half->parser.reason);
+        fprintf(stderr,
+                "llhttp_execute parse error: %s in position:%s err_reason:%s\n",
+                llhttp_errno_name(half->error), llhttp_get_error_pos(&half->parser),
+                half->parser.reason);
         return -1;
     }
 

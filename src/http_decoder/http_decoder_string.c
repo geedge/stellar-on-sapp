@@ -128,7 +128,7 @@ http_decoder_string_commit(struct http_decoder_string *rstr)
             // not overwrite rstr->cache.str
             break;
         default:
-            abort();
+            //abort();
             break;
     }
 
