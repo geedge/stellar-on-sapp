@@ -43,6 +43,7 @@ struct http_decoder_half {
     enum http_event event;
     http_event_cb *http_ev_cb;
     void *http_ev_ctx;
+    long long trans_counter;
 };
 
 // #define HTTP_DECODER_DEBUG
@@ -105,6 +106,7 @@ on_message_begin(llhttp_t *http)
 
     half->event = HTTP_EVENT_INIT;
     half->ref_data = NULL;
+    half->trans_counter++;
 
     return 0;
 }
@@ -733,9 +735,9 @@ http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     }
 
     if (ret < 0) {
-        fprintf(stderr,
-                "llhttp_execute parse error: %s err_reason:%s\n",
-                llhttp_errno_name(half->error), half->parser.reason);
+        // fprintf(stderr,
+        //         "llhttp_execute parse error: %s err_reason:%s\n",
+        //         llhttp_errno_name(half->error), half->parser.reason);
         return -1;
     }
 
@@ -777,6 +779,18 @@ http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
     }
 
     return 0;
+}
+
+long long http_decoder_half_trans_count(struct http_decoder_half *half)
+{
+    if (NULL == half) {
+        return 0;
+    }
+
+    long long trans_cnt = half->trans_counter;
+    half->trans_counter = 0;
+
+    return trans_cnt;
 }
 
 struct http_decoder_half_data *

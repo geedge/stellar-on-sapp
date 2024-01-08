@@ -62,6 +62,8 @@ int
 http_decoder_half_parse(struct http_decoder_half *half, void *ev_ctx,
     const char *data, size_t len);
 
+long long http_decoder_half_trans_count(struct http_decoder_half *half);
+
 //http decoder half data API
 struct http_decoder_half_data *
 http_decoder_half_data_new();

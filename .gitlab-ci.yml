@@ -6,7 +6,7 @@ variables:
   INSTALL_DEPENDENCY_LIBRARY: sapp sapp-devel framework_env libMESA_prof_load-devel
                               libMESA_htable-devel libMESA_jump_layer
                               libMESA_handle_logger-devel libMESA_field_stat2-devel
-                              libfieldstat3-devel libbreakpad_mini-devel libcjson-devel
+                              libfieldstat3-devel libfieldstat4-devel libbreakpad_mini-devel libcjson-devel
                               zlib-devel brotli-devel
   SYMBOL_TARGET: stellar-c
   TEST_NAME: gtest_stellar-c

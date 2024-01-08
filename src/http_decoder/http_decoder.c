@@ -11,6 +11,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "stellar/utils.h"
 #include "stellar/session.h"
@@ -20,13 +21,16 @@
 #include "http_decoder_half.h"
 #include "http_decoder_table.h"
 #include "llhttp.h"
+#include "fieldstat/fieldstat_easy.h"
 
 #define HTTP_IDENTIFY_LEN 16
-#define HTTP_DECODER_RESULT_QUEUE_SIZE 16
+#define HD_RESULT_QUEUE_SIZE 16
 #define HD_IS_CACHE_BODY 1
 
 
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
+const char *fs_file_name = "http_decoder.fs";
+const struct fieldstat_tag TEST_TAG_INT = {"INT_TAG ", TAG_INTEGER, {.value_longlong = 100}};
 
 struct http_decoder_result {
     struct http_decoder_half_data *req_data;
@@ -65,8 +69,12 @@ struct http_decoder_context {
     int plugin_id;
 	int topic_id;
     int ex_data_idx;
-	struct stellar *st;
-	struct http_decoder *decoder;
+    int fs_incoming_bytes_id;
+    int fs_incoming_pkts_id;
+    int fs_incoming_trans_id;
+    struct fieldstat_easy *fse;
+    struct stellar *st;
+    struct http_decoder *decoder;
     struct http_event_context *http_ev_ctx;
 };
 
@@ -395,7 +403,7 @@ int http_decoder_entry(struct session *sess, int events,
             }
         }
 
-        queue = http_decoder_result_queue_new(HTTP_DECODER_RESULT_QUEUE_SIZE);
+        queue = http_decoder_result_queue_new(HD_RESULT_QUEUE_SIZE);
         queue->ref_session = sess;
         session_set_ex_data(sess, ctx->ex_data_idx, queue);
     }
@@ -403,6 +411,8 @@ int http_decoder_entry(struct session *sess, int events,
     if (0 == payload_len || NULL == queue) {
         return 0;
     }
+
+    
 
     int dir = packet_get_direction(pkt);
     if (dir < 0) {
@@ -425,6 +435,15 @@ int http_decoder_entry(struct session *sess, int events,
     ctx->http_ev_ctx->ref_session = sess;
 
     http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
+
+    long long trans_cnt = http_decoder_half_trans_count(cur_half);
+
+    fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_bytes_id,
+                                  &TEST_TAG_INT, 1, (long long)payload_len);
+    fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_pkts_id,
+                                  &TEST_TAG_INT, 1, 1);
+    fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_trans_id,
+                                  &TEST_TAG_INT, 1, trans_cnt);
 
     return 0;
 }
@@ -450,6 +469,35 @@ http_message_free(void *msg, void *cb_arg)
 	FREE(message);
 }
 
+static void
+_http_decoder_context_free(struct http_decoder_context *ctx)
+{
+    if (NULL == ctx) {
+        return;
+    }
+
+    if (ctx->http_ev_ctx != NULL) {
+        FREE(ctx->http_ev_ctx);
+    }
+
+    if (ctx->fse != NULL) {
+        fieldstat_easy_free(ctx->fse);
+        ctx->fse = NULL;
+    }
+
+    if (ctx->topic_id >= 0) {
+        session_mq_destroy_topic(ctx->st, ctx->topic_id);
+        ctx->topic_id = -1;
+    }
+
+    if (ctx->decoder != NULL) {
+        http_decoder_free(ctx->decoder);
+        ctx->decoder = NULL;
+    }
+
+    FREE(ctx);
+}
+
 void *http_decoder_init(struct stellar *st)
 {
     struct http_decoder_context *ctx = CALLOC(struct http_decoder_context, 1);
@@ -473,10 +521,48 @@ void *http_decoder_init(struct stellar *st)
     }
     ctx->topic_id = topic_id;
 
+    ctx->fse = fieldstat_easy_new(1, "http_decoder_statistics", NULL, 0);
+    if (NULL == ctx->fse) {
+        fprintf(stderr, "fieldstat_easy_new failed.");
+        goto failed;
+    }
+
+    ctx->fs_incoming_bytes_id =
+        fieldstat_easy_register_counter(ctx->fse, "incoming_bytes");
+    if (ctx->fs_incoming_bytes_id < 0) {
+        fprintf(stderr, "fieldstat_easy_register_counter incoming_bytes failed.");
+        goto failed;
+    }
+
+    ctx->fs_incoming_trans_id =
+        fieldstat_easy_register_counter(ctx->fse, "incoming_trans");
+    if (ctx->fs_incoming_trans_id < 0) {
+        fprintf(stderr, "fieldstat_easy_register_counter incoming_trans failed.");
+        goto failed;
+    }
+
+    ctx->fs_incoming_pkts_id =
+        fieldstat_easy_register_counter(ctx->fse, "incoming_pkts");
+    if (ctx->fs_incoming_pkts_id < 0) {
+        fprintf(stderr, "fieldstat_easy_register_counter incoming_pkts failed.");
+        goto failed;
+    }
+
+    int ret = fieldstat_easy_enable_auto_output(ctx->fse, fs_file_name, 3);
+    if (ret < 0) {
+        fprintf(stderr, "fieldstat_easy_enable_auto_output failed.");
+        goto failed;
+    }
+    sleep(3);
+
     printf("http_decoder_init: ex_data_idx:%d, plugin_id:%d, topic_id:%d\n",
            ctx->ex_data_idx, ctx->plugin_id, ctx->topic_id);
 
     return ctx;
+
+failed:
+    _http_decoder_context_free(ctx);
+    return NULL;
 }
 
 void http_decoder_exit(void *decoder_ctx)
@@ -488,20 +574,9 @@ void http_decoder_exit(void *decoder_ctx)
     struct http_decoder_context *ctx =
         (struct http_decoder_context *)decoder_ctx;
 
-    if (ctx->http_ev_ctx != NULL) {
-        FREE(ctx->http_ev_ctx);
-    }
+    _http_decoder_context_free(ctx);
 
-    if (ctx->decoder != NULL) {
-        http_decoder_free(ctx->decoder);
-        ctx->decoder = NULL;
-    }
-
-    if (ctx->topic_id >= 0) {
-        session_mq_destroy_topic(ctx->st, ctx->topic_id);
-    }
-
-    FREE(decoder_ctx);
+    FREE(ctx);
 }
 
 enum http_message_type
