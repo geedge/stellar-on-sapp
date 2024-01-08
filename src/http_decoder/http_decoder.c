@@ -370,6 +370,7 @@ int http_decoder_entry(struct session *sess, int events,
     }
 
     const char *payload = session_get0_current_payload(sess, &payload_len);
+    // printf("session:%s\n", session_get0_readable_addr(sess));
 
     if (events & SESS_EV_OPENING) {
         if (queue != NULL) {
@@ -423,15 +424,7 @@ int http_decoder_entry(struct session *sess, int events,
     ctx->http_ev_ctx->ref_queue = queue;
     ctx->http_ev_ctx->ref_session = sess;
 
-    ret = http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload,
-                                  payload_len);
-    if (ret < 0) {
-        if (dir == PACKET_DIRECTION_C2S) {
-            http_decoder_result_queue_pop(queue, queue->req_index);
-        } else {
-            http_decoder_result_queue_pop(queue, queue->res_index);
-        }
-    }
+    http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
 
     return 0;
 }

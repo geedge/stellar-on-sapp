@@ -228,7 +228,7 @@ next:
     if (msg_type == HTTP_MESSAGE_REQ_HEADER) {
         sprintf(result_name, "HTTP_DECODER_RESULT_%d", g_result_count);
         commit_test_result_json(ctx, result_name);
-        //printf("req json:%s\n", cJSON_Print(ctx));
+        // printf("req json:%s\n", cJSON_Print(ctx));
         session_set_ex_data(sess, exdata_idx, NULL);
         g_result_count++;
     }
@@ -236,7 +236,7 @@ next:
     if (msg_type == HTTP_MESSAGE_RES_HEADER) {
         sprintf(result_name, "HTTP_DECODER_RESULT_%d", g_result_count);
         commit_test_result_json(ctx, result_name);
-        //printf("res json:%s\n", cJSON_Print(ctx));
+        // printf("res json:%s\n", cJSON_Print(ctx));
         session_set_ex_data(sess, exdata_idx, NULL);
         g_result_count++;
     }

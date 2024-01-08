@@ -91,11 +91,14 @@ add_test(NAME HTTP_CONNECT_FLOOD_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURC
 add_test(NAME HTTP_GET_MALFORMED_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_malformed.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_malformed.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-# add_test(NAME HTTP_POST_NO_HOST_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_post_no_host.json
-#          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_post_no_host.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
-
 add_test(NAME HTTP_HEADER_VALUE_EMPTY_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_header_value_empty.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_header_value_empty.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_UPGRADE_WEBSOCKET_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_upgrade_websocket.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_upgrade_websocket.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_MULTI_PARSE_ERROR_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_multi_parse_error.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_multi_parse_error.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
 set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_GET_MULTI_TRANS_TEST
@@ -117,4 +120,6 @@ set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_CONNECT_FLOOD_TEST
                      HTTP_GET_MALFORMED_TEST
                      HTTP_HEADER_VALUE_EMPTY_TEST
+                     HTTP_MULTI_PARSE_ERROR_TEST
+                     HTTP_UPGRADE_WEBSOCKET_TEST
                      PROPERTIES FIXTURES_REQUIRED TestFixture)

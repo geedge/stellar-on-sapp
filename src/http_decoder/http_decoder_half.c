@@ -104,6 +104,8 @@ on_message_begin(llhttp_t *http)
     assert(half);
 
     half->event = HTTP_EVENT_INIT;
+    half->ref_data = NULL;
+
     return 0;
 }
 
@@ -732,9 +734,8 @@ http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
 
     if (ret < 0) {
         fprintf(stderr,
-                "llhttp_execute parse error: %s in position:%s err_reason:%s\n",
-                llhttp_errno_name(half->error), llhttp_get_error_pos(&half->parser),
-                half->parser.reason);
+                "llhttp_execute parse error: %s err_reason:%s\n",
+                llhttp_errno_name(half->error), half->parser.reason);
         return -1;
     }
 
