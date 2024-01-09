@@ -27,10 +27,8 @@
 #define HD_RESULT_QUEUE_SIZE 16
 #define HD_IS_CACHE_BODY 1
 
-
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
 const char *fs_file_name = "http_decoder.fs";
-const struct fieldstat_tag TEST_TAG_INT = {"INT_TAG ", TAG_INTEGER, {.value_longlong = 100}};
 
 struct http_decoder_result {
     struct http_decoder_half_data *req_data;
@@ -439,11 +437,11 @@ int http_decoder_entry(struct session *sess, int events,
     long long trans_cnt = http_decoder_half_trans_count(cur_half);
 
     fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_bytes_id,
-                                  &TEST_TAG_INT, 1, (long long)payload_len);
+                                  NULL, 0, payload_len);
     fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_pkts_id,
-                                  &TEST_TAG_INT, 1, 1);
+                                  NULL, 0, 1);
     fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_trans_id,
-                                  &TEST_TAG_INT, 1, trans_cnt);
+                                  NULL, 0, trans_cnt);
 
     return 0;
 }
@@ -498,6 +496,7 @@ _http_decoder_context_free(struct http_decoder_context *ctx)
     FREE(ctx);
 }
 
+#define FS_OUTPUT_INTERVAL_S 2
 void *http_decoder_init(struct stellar *st)
 {
     struct http_decoder_context *ctx = CALLOC(struct http_decoder_context, 1);
@@ -548,7 +547,8 @@ void *http_decoder_init(struct stellar *st)
         goto failed;
     }
 
-    int ret = fieldstat_easy_enable_auto_output(ctx->fse, fs_file_name, 3);
+    int ret = fieldstat_easy_enable_auto_output(ctx->fse, fs_file_name,
+                                                FS_OUTPUT_INTERVAL_S);
     if (ret < 0) {
         fprintf(stderr, "fieldstat_easy_enable_auto_output failed.");
         goto failed;
@@ -575,8 +575,6 @@ void http_decoder_exit(void *decoder_ctx)
         (struct http_decoder_context *)decoder_ctx;
 
     _http_decoder_context_free(ctx);
-
-    FREE(ctx);
 }
 
 enum http_message_type
