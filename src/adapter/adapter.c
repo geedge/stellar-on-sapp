@@ -115,7 +115,6 @@ struct stellar *stellar_init(const char *toml_conf_path)
 		utarray_new(st->plugin_specs_array,&plugin_specs_icd);
 		utarray_reserve(st->plugin_specs_array, spec_num);
 	}
-	st->intrinsic_session_event_exdata_idx=stellar_session_get_ex_new_index(st, "__STELLAR__", exdata_plugin_rt_free, NULL);
 	for(int i = 0; i < spec_num; i++)
 	{
 		if (specs[i].init_cb != NULL)

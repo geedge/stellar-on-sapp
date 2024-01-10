@@ -302,7 +302,7 @@ typedef struct session_event
 
 void session_dispatch(struct session *sess, enum session_state state,  struct packet *pkt)
 {
-	struct session_event  *intrinsic_events = (struct session_event *)session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
+	struct session_event  *intrinsic_events = sess->intrinsic_events;
 	struct session_event *p = NULL;
 	if(sess->st->plugin_specs_array == NULL)return;
 	if(sess->st->intrinsic_session_event_schema_array == NULL)return;
@@ -325,7 +325,7 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 
 void session_plugin_detach_others(struct session *sess, int plugin_id)
 {
-	struct session_event  *intrinsic_events = (struct session_event *)session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
+	struct session_event  *intrinsic_events = sess->intrinsic_events;
 	if(sess->st->plugin_specs_array == NULL)return;
 	if(sess->st->intrinsic_session_event_schema_array == NULL)return;
 	unsigned int len = utarray_len(sess->st->intrinsic_session_event_schema_array);
@@ -361,8 +361,7 @@ struct session *session_new(struct stellar *st, enum session_type type, int thre
 	sess->mq = NULL;
 	sess->ex_data_rt = session_new_exdata_rt(st);
 	sess->ev_list=NULL;
-	struct session_event*intrinsic_events=session_intrinsic_events_init(st, sess);
-	session_set_ex_data(sess, st->intrinsic_session_event_exdata_idx, intrinsic_events);
+	sess->intrinsic_events=session_intrinsic_events_init(st, sess);
 	return sess;
 
 }
@@ -395,6 +394,10 @@ void session_free(struct session *sess)
 		}
 	}
 	FREE(sess->ex_data_rt);
+	if(sess->intrinsic_events)
+	{
+		FREE(sess->intrinsic_events);
+	}
 	FREE(sess);
 }
 
@@ -482,7 +485,7 @@ struct session_event *session_get_intrinsic_event(struct session *sess, int plug
 	if(sess->st->intrinsic_session_event_schema_array == NULL)return NULL;
 	unsigned int len = utarray_len(sess->st->intrinsic_session_event_schema_array);
 	if(plugin_id < 0 || plugin_id >= (int)len)return NULL;
-	struct session_event*intrinsic_events=(struct session_event*)session_get_ex_data(sess, sess->st->intrinsic_session_event_exdata_idx);
+	struct session_event*intrinsic_events=sess->intrinsic_events;
 	return (struct session_event *)(intrinsic_events+plugin_id);
 }
 

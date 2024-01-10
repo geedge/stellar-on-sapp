@@ -19,6 +19,7 @@ struct session
 	session_packet_free *cur_pkt_free_cb;
 	void *cur_pkt_free_arg;
 	struct stellar *st;
+	struct session_event  *intrinsic_events;
 	struct session_exdata_runtime *ex_data_rt;
 	struct session_mq *mq;
 	struct session_event *ev_list;
