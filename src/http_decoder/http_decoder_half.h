@@ -25,8 +25,6 @@ extern "C"
 
 // only one http event is fired at a time
 enum http_event {
-    HTTP_EVENT_INIT = 0,
-
     HTTP_EVENT_REQ_INIT = 1 << 1,
     HTTP_EVENT_REQ_LINE = 1 << 2,
     HTTP_EVENT_REQ_HDR = 1 << 3,
@@ -53,7 +51,7 @@ typedef void http_event_cb(enum http_event event,
     struct http_decoder_half_data **data, void *cb_args);
 
 struct http_decoder_half *
-http_decoder_half_new(http_event_cb *event_cb, int is_cache_body);
+http_decoder_half_new(http_event_cb *event_cb, int is_cache_body, int type);
 
 void
 http_decoder_half_free(struct http_decoder_half *half);

@@ -132,8 +132,15 @@ http_decoder_result_queue_pop(struct http_decoder_result_queue *queue,
     assert(index < queue->queue_size);
 
     if (queue->array[index] != NULL) {
-        http_decoder_result_free(queue->array[index]);
-        queue->array[index] = NULL;
+        if (queue->array[index]->req_data != NULL) {
+            http_decoder_half_data_free(queue->array[index]->req_data);
+            queue->array[index]->req_data = NULL;
+        }
+
+        if (queue->array[index]->res_data != NULL) {
+            http_decoder_half_data_free(queue->array[index]->res_data);
+            queue->array[index]->res_data = NULL;
+        }
     }
 }
 
@@ -197,8 +204,6 @@ http_event_handler(enum http_event event, struct http_decoder_half_data **data,
 	    msg->type = HTTP_MESSAGE_REQ_LINE;
         msg->data = *data;
         session_mq_publish_message(ctx->ref_session, ctx->topic_id, msg);
-        break;
-    case HTTP_EVENT_REQ_HDR:
         break;
     case HTTP_EVENT_REQ_HDR_END:
         msg = CALLOC(struct http_message, 1);
@@ -264,8 +269,8 @@ http_decoder_new(http_event_cb *ev_cb, int is_cache_body)
 	struct http_decoder *decoder = CALLOC(struct http_decoder, 1);
 	assert(decoder);
 
-	decoder->c2s_half = http_decoder_half_new(ev_cb, is_cache_body);
-	decoder->s2c_half = http_decoder_half_new(ev_cb, is_cache_body);
+	decoder->c2s_half = http_decoder_half_new(ev_cb, is_cache_body, HTTP_REQUEST);
+	decoder->s2c_half = http_decoder_half_new(ev_cb, is_cache_body, HTTP_RESPONSE);
 
 	return decoder;
 }
@@ -377,7 +382,7 @@ int http_decoder_entry(struct session *sess, int events,
 
     const char *payload = session_get0_current_payload(sess, &payload_len);
     // printf("session:%s\n", session_get0_readable_addr(sess));
-
+    //printf("%s\n", payload);
     if (events & SESS_EV_OPENING) {
         if (queue != NULL) {
             fprintf(stderr,
@@ -410,8 +415,6 @@ int http_decoder_entry(struct session *sess, int events,
         return 0;
     }
 
-    
-
     int dir = packet_get_direction(pkt);
     if (dir < 0) {
         return -1;
@@ -434,14 +437,14 @@ int http_decoder_entry(struct session *sess, int events,
 
     http_decoder_half_parse(cur_half, ctx->http_ev_ctx, payload, payload_len);
 
-    long long trans_cnt = http_decoder_half_trans_count(cur_half);
+    // long long trans_cnt = http_decoder_half_trans_count(cur_half);
 
-    fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_bytes_id,
-                                  NULL, 0, payload_len);
-    fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_pkts_id,
-                                  NULL, 0, 1);
-    fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_trans_id,
-                                  NULL, 0, trans_cnt);
+    // fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_bytes_id,
+    //                               NULL, 0, payload_len);
+    // fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_pkts_id,
+    //                               NULL, 0, 1);
+    // fieldstat_easy_counter_incrby(ctx->fse, 0, ctx->fs_incoming_trans_id,
+    //                               NULL, 0, trans_cnt);
 
     return 0;
 }
@@ -520,49 +523,49 @@ void *http_decoder_init(struct stellar *st)
     }
     ctx->topic_id = topic_id;
 
-    ctx->fse = fieldstat_easy_new(1, "http_decoder_statistics", NULL, 0);
-    if (NULL == ctx->fse) {
-        fprintf(stderr, "fieldstat_easy_new failed.");
-        goto failed;
-    }
+    // ctx->fse = fieldstat_easy_new(1, "http_decoder_statistics", NULL, 0);
+    // if (NULL == ctx->fse) {
+    //     fprintf(stderr, "fieldstat_easy_new failed.");
+    //     goto failed;
+    // }
 
-    ctx->fs_incoming_bytes_id =
-        fieldstat_easy_register_counter(ctx->fse, "incoming_bytes");
-    if (ctx->fs_incoming_bytes_id < 0) {
-        fprintf(stderr, "fieldstat_easy_register_counter incoming_bytes failed.");
-        goto failed;
-    }
+    // ctx->fs_incoming_bytes_id =
+    //     fieldstat_easy_register_counter(ctx->fse, "incoming_bytes");
+    // if (ctx->fs_incoming_bytes_id < 0) {
+    //     fprintf(stderr, "fieldstat_easy_register_counter incoming_bytes failed.");
+    //     goto failed;
+    // }
 
-    ctx->fs_incoming_trans_id =
-        fieldstat_easy_register_counter(ctx->fse, "incoming_trans");
-    if (ctx->fs_incoming_trans_id < 0) {
-        fprintf(stderr, "fieldstat_easy_register_counter incoming_trans failed.");
-        goto failed;
-    }
+    // ctx->fs_incoming_trans_id =
+    //     fieldstat_easy_register_counter(ctx->fse, "incoming_trans");
+    // if (ctx->fs_incoming_trans_id < 0) {
+    //     fprintf(stderr, "fieldstat_easy_register_counter incoming_trans failed.");
+    //     goto failed;
+    // }
 
-    ctx->fs_incoming_pkts_id =
-        fieldstat_easy_register_counter(ctx->fse, "incoming_pkts");
-    if (ctx->fs_incoming_pkts_id < 0) {
-        fprintf(stderr, "fieldstat_easy_register_counter incoming_pkts failed.");
-        goto failed;
-    }
+    // ctx->fs_incoming_pkts_id =
+    //     fieldstat_easy_register_counter(ctx->fse, "incoming_pkts");
+    // if (ctx->fs_incoming_pkts_id < 0) {
+    //     fprintf(stderr, "fieldstat_easy_register_counter incoming_pkts failed.");
+    //     goto failed;
+    // }
 
-    int ret = fieldstat_easy_enable_auto_output(ctx->fse, fs_file_name,
-                                                FS_OUTPUT_INTERVAL_S);
-    if (ret < 0) {
-        fprintf(stderr, "fieldstat_easy_enable_auto_output failed.");
-        goto failed;
-    }
-    sleep(3);
+    // int ret = fieldstat_easy_enable_auto_output(ctx->fse, fs_file_name,
+    //                                             FS_OUTPUT_INTERVAL_S);
+    // if (ret < 0) {
+    //     fprintf(stderr, "fieldstat_easy_enable_auto_output failed.");
+    //     goto failed;
+    // }
+    // sleep(3);
 
     printf("http_decoder_init: ex_data_idx:%d, plugin_id:%d, topic_id:%d\n",
            ctx->ex_data_idx, ctx->plugin_id, ctx->topic_id);
 
     return ctx;
 
-failed:
-    _http_decoder_context_free(ctx);
-    return NULL;
+// failed:
+//     _http_decoder_context_free(ctx);
+//     return NULL;
 }
 
 void http_decoder_exit(void *decoder_ctx)

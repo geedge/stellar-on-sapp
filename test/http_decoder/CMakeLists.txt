@@ -40,9 +40,6 @@ add_test(NAME HTTP_GET_SINGLE_TRANS_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SO
 add_test(NAME HTTP_GET_MULTI_TRANS_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_multi_trans.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_multi_trans.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-add_test(NAME HTTP_GET_REQ_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_req_pipeline.json
-         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_req_pipeline.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
-
 add_test(NAME HTTP_GET_LONG_COOKIE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_long_cookie.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_long_cookie.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
@@ -103,9 +100,14 @@ add_test(NAME HTTP_UPGRADE_HTTP2_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURC
 add_test(NAME HTTP_MULTI_PARSE_ERROR_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_multi_parse_error.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_multi_parse_error.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
+add_test(NAME HTTP_GET_REQ_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_req_pipeline.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_req_pipeline.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
+add_test(NAME HTTP_TRANS_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_trans_pipeline.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_trans_pipeline.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
 set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_GET_MULTI_TRANS_TEST
-                     HTTP_GET_REQ_PIPELINE_TEST
                      HTTP_GET_LONG_COOKIE_TEST
                      HTTP_GET_ENCODED_URI_TEST
                      HTTP_RES_GZIP_TEST
@@ -126,4 +128,6 @@ set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_MULTI_PARSE_ERROR_TEST
                      HTTP_UPGRADE_WEBSOCKET_TEST
                      HTTP_UPGRADE_HTTP2_TEST
+                     HTTP_GET_REQ_PIPELINE_TEST
+                     HTTP_TRANS_PIPELINE_TEST
                      PROPERTIES FIXTURES_REQUIRED TestFixture)

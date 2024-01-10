@@ -324,8 +324,12 @@ http_decoder_table_dump(struct http_decoder_table *table)
     http_decoder_string_dump(&table->version, "version");
     http_decoder_string_dump(&table->body, "body");
 
-    for (size_t i = 0; i < table->header_index; i++) {
+    for (size_t i = 0; i < table->header_size; i++) {
         struct http_decoder_header *header = &table->headers[i];
+        if (NULL == header) {
+            continue;
+        }
+
         http_decoder_string_dump(&header->key, "key");
         http_decoder_string_dump(&header->val, "val");
     }
@@ -396,8 +400,12 @@ http_decoder_table_get_header(struct http_decoder_table *table,
     }
 
     int header_cnt = 0;
-    for (int i = 0; i < table->header_index && header_cnt < array_size; i++) {
+    for (int i = 0; i < table->header_size && header_cnt < array_size; i++) {
         struct http_decoder_header *tmp_header = &table->headers[i];
+        if (NULL == tmp_header) {
+            continue;
+        }
+
         if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT
             && http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
             struct hstring tmp_key;
@@ -422,17 +430,19 @@ http_decoder_table_iter_header(struct http_decoder_table *table,
         return -1;
     }
 
-    if (table->header_iter >= table->header_index) {
+    if (table->header_iter >= table->header_size) {
         return 0;
     }
 
     struct http_decoder_header *tmp_header =
         &table->headers[table->header_iter++];
-    if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT
-        && http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
-        http_decoder_string_get(&tmp_header->key, &header->key);
-        http_decoder_string_get(&tmp_header->val, &header->val);
-        return 1;
+    if (tmp_header != NULL) {
+        if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT
+            && http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
+            http_decoder_string_get(&tmp_header->key, &header->key);
+            http_decoder_string_get(&tmp_header->val, &header->val);
+            return 1;
+        }
     }
 
     header->key.str = NULL;
