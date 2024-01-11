@@ -130,18 +130,16 @@ struct stellar *stellar_init(const char *toml_conf_path)
 
 void stellar_exit(struct stellar *st)
 {
+	if(!st)return;
 	struct plugin_specific_inernal *p=NULL;
 	while ((p = (struct plugin_specific_inernal *)utarray_next(st->plugin_specs_array, p)))
 	{
-		if(p->specs.exit_cb != NULL)
-		{
-			p->specs.exit_cb(p->plugin_ctx);
-		}
+		if(p->specs.exit_cb)p->specs.exit_cb(p->plugin_ctx);
 	}
-	utarray_free(st->session_mq_schema_array);
-	utarray_free(st->session_exdata_schema_array);
-	utarray_free(st->intrinsic_session_event_schema_array);
-	utarray_free(st->plugin_specs_array);
+	if(st->session_mq_schema_array)utarray_free(st->session_mq_schema_array);
+	if(st->session_exdata_schema_array)utarray_free(st->session_exdata_schema_array);
+	if(st->intrinsic_session_event_schema_array)utarray_free(st->intrinsic_session_event_schema_array);
+	if(st->plugin_specs_array)utarray_free(st->plugin_specs_array);
 	FREE(st);
 	return;	
 };
