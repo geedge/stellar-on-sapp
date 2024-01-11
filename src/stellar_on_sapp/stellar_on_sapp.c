@@ -149,6 +149,10 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 		}
 		break;
 	case OP_STATE_CLOSE:
+		if(a_packet)
+		{
+			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+		}
 		FREE(*pme);
 		break;
 	default:
