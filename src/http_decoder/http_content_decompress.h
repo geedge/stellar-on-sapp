@@ -19,9 +19,6 @@ extern "C"
 
 #include <stddef.h>
 
-// yum install -y zlib-devel
-// yum install -y brotli-devel
-
 enum http_content_encoding {
     HTTP_CONTENT_ENCODING_NONE = 0,
     HTTP_CONTENT_ENCODING_GZIP = 1 << 1,

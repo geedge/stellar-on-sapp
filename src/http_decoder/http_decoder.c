@@ -1,13 +1,12 @@
 /*
 **********************************************************************************************
-*	File: http_decoder_entry.c
+*	File: http_decoder.c
 *   Description: 
-*	Authors: LuWenPeng <luwenpeng@geedgenetworks.com>
-*	Date:    2022-10-31
+*	Authors: Liu WenTan <liuwentan@geedgenetworks.com>
+*	Date:    2024-01-10
 *   Copyright: (c) Since 2022 Geedge Networks, Ltd. All rights reserved.
 ***********************************************************************************************
 */
-
 
 #include <assert.h>
 #include <stdio.h>

@@ -2,7 +2,7 @@
 **********************************************************************************************
 *	File: http_decoder_half.c
 *   Description: 
-*	Authors: Liuwentan <liuwentan@geedgenetworks.com>
+*	Authors: Liu WenTan <liuwentan@geedgenetworks.com>
 *	Date:    2024-01-10
 *   Copyright: (c) Since 2022 Geedge Networks, Ltd. All rights reserved.
 ***********************************************************************************************
