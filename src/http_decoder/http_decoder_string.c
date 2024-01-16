@@ -8,7 +8,6 @@
 ***********************************************************************************************
 */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,9 +17,7 @@
 #include "http_decoder_utils.h"
 #include "http_decoder_string.h"
 
-
-static const char *
-string_state_to_desc(enum string_state state)
+static const char *string_state_to_desc(enum string_state state)
 {
     switch (state) {
     case STRING_STATE_INIT:
@@ -41,9 +38,8 @@ string_state_to_desc(enum string_state state)
     }
 }
 
-void
-http_decoder_string_refer(struct http_decoder_string *rstr,
-    const char *at, size_t length)
+void http_decoder_string_refer(struct http_decoder_string *rstr,
+                               const char *at, size_t length)
 {
     if (NULL == rstr) {
         return;
@@ -63,8 +59,7 @@ http_decoder_string_refer(struct http_decoder_string *rstr,
     rstr->state = STRING_STATE_REFER;
 }
 
-void
-http_decoder_string_cache(struct http_decoder_string *rstr)
+void http_decoder_string_cache(struct http_decoder_string *rstr)
 {
     if (NULL == rstr) {
         return;
@@ -99,8 +94,7 @@ http_decoder_string_cache(struct http_decoder_string *rstr)
     rstr->state = STRING_STATE_CACHE;
 }
 
-void
-http_decoder_string_commit(struct http_decoder_string *rstr)
+void http_decoder_string_commit(struct http_decoder_string *rstr)
 {
     if (NULL == rstr) {
         return;
@@ -135,8 +129,7 @@ http_decoder_string_commit(struct http_decoder_string *rstr)
     rstr->state = STRING_STATE_COMMIT;
 }
 
-void
-http_decoder_string_reset(struct http_decoder_string *rstr)
+void http_decoder_string_reset(struct http_decoder_string *rstr)
 {
     assert(rstr);
 
@@ -156,14 +149,12 @@ http_decoder_string_reset(struct http_decoder_string *rstr)
     rstr->state = STRING_STATE_INIT;
 }
 
-enum string_state
-http_decoder_string_state(struct http_decoder_string *rstr)
+enum string_state http_decoder_string_state(struct http_decoder_string *rstr)
 {
     return rstr->state;
 }
 
-int
-http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out)
+int http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out)
 {
     if (NULL == rstr || NULL == out) {
         return -1;
@@ -180,8 +171,7 @@ http_decoder_string_get(struct http_decoder_string *rstr, struct hstring *out)
     return 0;
 }
 
-void
-http_decoder_string_dump(struct http_decoder_string *rstr, const char *desc)
+void http_decoder_string_dump(struct http_decoder_string *rstr, const char *desc)
 {
     if (NULL == rstr) {
         return;

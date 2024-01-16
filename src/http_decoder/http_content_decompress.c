@@ -120,8 +120,7 @@ error:
     return NULL;
 }
 
-void
-http_content_decompress_destroy(struct http_content_decompress *decompress)
+void http_content_decompress_destroy(struct http_content_decompress *decompress)
 {
     if (NULL == decompress) {
         return;
@@ -143,7 +142,8 @@ http_content_decompress_destroy(struct http_content_decompress *decompress)
 
 static int
 http_content_decompress_write_zlib(struct http_content_decompress *decompress,
-    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len)
+                                   const char *indata, size_t indata_len,
+                                   char **outdata, size_t *outdata_len)
 {
     z_stream *z_stream_ptr = decompress->z_stream_ptr;
     z_stream_ptr->avail_in = (unsigned int)indata_len;
@@ -167,15 +167,15 @@ http_content_decompress_write_zlib(struct http_content_decompress *decompress,
         size_t have = decompress->buffer_size - z_stream_ptr->avail_out;
         if (have > 0) {
             if (NULL == *outdata) {
-                http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes", 
-                                 http_content_encoding_int2str(decompress->encoding),
-                                 have);
+                // http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes", 
+                //                  http_content_encoding_int2str(decompress->encoding),
+                //                  have);
                 *outdata = safe_dup(decompress->buffer, have);
                 *outdata_len = have;
             } else {
-                http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes", 
-                                 http_content_encoding_int2str(decompress->encoding), 
-                                 *outdata_len + have + 1);
+                // http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes", 
+                //                  http_content_encoding_int2str(decompress->encoding), 
+                //                  *outdata_len + have + 1);
                 *outdata = REALLOC(char, *outdata, *outdata_len + have + 1);
                 memcpy(*outdata + *outdata_len, decompress->buffer, have);
                 *outdata_len = *outdata_len + have;
@@ -188,8 +188,9 @@ http_content_decompress_write_zlib(struct http_content_decompress *decompress,
 }
 
 static int
-http_content_decompress_write_br(struct http_content_decompress *decompress, 
-    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len)
+http_content_decompress_write_br(struct http_content_decompress *decompress,
+                                 const char *indata, size_t indata_len,
+                                 char **outdata, size_t *outdata_len)
 {
     size_t available_out;
     size_t available_in = indata_len;
@@ -209,15 +210,15 @@ http_content_decompress_write_br(struct http_content_decompress *decompress,
         size_t have = decompress->buffer_size - available_out;
         if (have > 0) {
             if (NULL == *outdata) {
-                http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes",
-                                http_content_encoding_int2str(decompress->encoding),
-                                have);
+                // http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes",
+                //                 http_content_encoding_int2str(decompress->encoding),
+                //                 have);
                 *outdata = safe_dup(decompress->buffer, have);
                 *outdata_len = have;
             } else {
-                http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes",
-                                 http_content_encoding_int2str(decompress->encoding),
-                                 *outdata_len + have + 1);
+                // http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes",
+                //                  http_content_encoding_int2str(decompress->encoding),
+                //                  *outdata_len + have + 1);
                 *outdata = REALLOC(char, *outdata, *outdata_len + have + 1);
                 memcpy(*outdata + *outdata_len, decompress->buffer, have);
                 *outdata_len = *outdata_len + have;
@@ -243,9 +244,9 @@ http_content_decompress_write_br(struct http_content_decompress *decompress,
     }
 }
 
-int
-http_content_decompress_write(struct http_content_decompress *decompress,
-    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len)
+int http_content_decompress_write(struct http_content_decompress *decompress,
+                                  const char *indata, size_t indata_len,
+                                  char **outdata, size_t *outdata_len)
 {
     assert(decompress);
     assert(indata);
@@ -256,8 +257,8 @@ http_content_decompress_write(struct http_content_decompress *decompress,
     *outdata = NULL;
     *outdata_len = 0;
 
-    if (decompress->encoding == HTTP_CONTENT_ENCODING_GZIP
-        || decompress->encoding == HTTP_CONTENT_ENCODING_DEFLATE) {
+    if (decompress->encoding == HTTP_CONTENT_ENCODING_GZIP ||
+        decompress->encoding == HTTP_CONTENT_ENCODING_DEFLATE) {
         return http_content_decompress_write_zlib(decompress, indata, indata_len,
                                                   outdata, outdata_len);
     }

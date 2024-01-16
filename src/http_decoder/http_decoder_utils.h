@@ -21,8 +21,7 @@ extern "C"
 #include <stdio.h>
 
 
-char *
-safe_dup(const char *str, size_t len);
+char *safe_dup(const char *str, size_t len);
 
 /******************************************************************************
  * Logger

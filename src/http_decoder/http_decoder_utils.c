@@ -8,14 +8,11 @@
 ***********************************************************************************************
 */
 
-
 #include <string.h>
 
 #include "stellar/utils.h"
 
-
-char *
-safe_dup(const char *str, size_t len)
+char *safe_dup(const char *str, size_t len)
 {
     if (str == NULL || len == 0) {
         return NULL;

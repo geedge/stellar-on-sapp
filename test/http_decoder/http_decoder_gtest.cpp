@@ -119,7 +119,7 @@ http_field_to_json(cJSON *object, const char *key, char *val, size_t val_len)
     memcpy(tmp, val, val_len);
     cJSON_AddStringToObject(object, key, tmp);
     FREE(tmp);
-
+    
     return 0;
 }
 
@@ -154,7 +154,7 @@ http_header_to_json(cJSON *ctx, struct http_header *header)
 {
     char key[MAX_KEY_STR_LEN] = {0};
 
-    snprintf(key, header->key.str_len + 1, "%s", header->key.str);
+    memcpy(key, header->key.str, header->key.str_len);
 
     if (cJSON_HasObjectItem(ctx, key) == FALSE) {
         http_field_to_json(ctx, key, header->val.str, header->val.str_len);

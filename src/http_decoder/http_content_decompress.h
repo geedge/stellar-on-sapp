@@ -40,14 +40,13 @@ http_content_encoding_int2str(enum http_content_encoding content_encoding);
 struct http_content_decompress *
 http_content_decompress_create(enum http_content_encoding encoding);
 
-void
-http_content_decompress_destroy(struct http_content_decompress *decompress);
+void http_content_decompress_destroy(struct http_content_decompress *decompress);
 
 // return   0 : success
 // return  -1 : error
-int
-http_content_decompress_write(struct http_content_decompress *decompress,
-    const char *indata, size_t indata_len, char **outdata, size_t *outdata_len);
+int http_content_decompress_write(struct http_content_decompress *decompress,
+                                  const char *indata, size_t indata_len,
+                                  char **outdata, size_t *outdata_len);
 
 #ifdef __cplusplus
 }

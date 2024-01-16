@@ -34,58 +34,38 @@ enum http_item {
 
 struct http_decoder_table;
 
-struct http_decoder_table *
-http_decoder_table_new();
+struct http_decoder_table *http_decoder_table_new();
 
 void http_decoder_table_free(struct http_decoder_table *table);
 
 enum string_state
 http_decoder_table_state(struct http_decoder_table *table, enum http_item type);
 
-void
-http_decoder_table_refer(struct http_decoder_table *table, enum http_item type,
-    const char *at, size_t len);
+void http_decoder_table_refer(struct http_decoder_table *table, enum http_item type,
+                              const char *at, size_t len);
 
-void
-http_decoder_table_cache(struct http_decoder_table *table, enum http_item type);
+void http_decoder_table_cache(struct http_decoder_table *table, enum http_item type);
 
-void
-http_decoder_table_commit(struct http_decoder_table *table, enum http_item type);
+void http_decoder_table_commit(struct http_decoder_table *table, enum http_item type);
 
-void
-http_decoder_table_reset(struct http_decoder_table *table, enum http_item type);
+void http_decoder_table_reset(struct http_decoder_table *table, enum http_item type);
 
-void
-http_decoder_table_dump(struct http_decoder_table *table);
+void http_decoder_table_dump(struct http_decoder_table *table);
 
-int
-http_decoder_table_get_uri(struct http_decoder_table *table,
-    struct hstring *out);
+int http_decoder_table_get_uri(struct http_decoder_table *table, struct hstring *out);
 
-int
-http_decoder_table_get_method(struct http_decoder_table *table,
-    struct hstring *out);
+int http_decoder_table_get_method(struct http_decoder_table *table, struct hstring *out);
 
-int
-http_decoder_table_get_status(struct http_decoder_table *table,
-    struct hstring *out);
+int http_decoder_table_get_status(struct http_decoder_table *table, struct hstring *out);
 
-int
-http_decoder_table_get_version(struct http_decoder_table *table,
-    struct hstring *out);
+int http_decoder_table_get_version(struct http_decoder_table *table, struct hstring *out);
 
-int
-http_decoder_table_get_body(struct http_decoder_table *table,
-    struct hstring *out);
+int http_decoder_table_get_body(struct http_decoder_table *table, struct hstring *out);
 
-int
-http_decoder_table_get_header(struct http_decoder_table *table,
-    struct hstring *key, struct http_header *header_array,
-    size_t array_size);
+int http_decoder_table_get_header(struct http_decoder_table *table, struct hstring *key,
+                                  struct http_header *hdr_array, size_t array_size);
 
-int
-http_decoder_table_iter_header(struct http_decoder_table *table,
-    struct http_header *header);
+int http_decoder_table_iter_header(struct http_decoder_table *table, struct http_header *hdr);
 
 #ifdef __cplusplus
 }
