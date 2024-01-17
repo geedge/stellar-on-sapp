@@ -40,11 +40,11 @@ struct http_decoder_half {
     struct http_decoder_half_data *ref_data;
     enum http_event event;
     http_event_cb *http_ev_cb;
-    void *http_ev_ctx;
+    struct http_event_context *http_ev_ctx;
     long long trans_counter;
 };
 
-// #define HTTP_DECODER_DEBUG
+//#define HTTP_DECODER_DEBUG
 #ifdef HTTP_DECODER_DEBUG
 static void printf_debug_info(const char *desc, const char *at, size_t length)
 {
@@ -600,7 +600,9 @@ http_decoder_half_new(http_event_cb *ev_cb, int is_cache_body, int type)
     struct http_decoder_half *half = CALLOC(struct http_decoder_half, 1);
     assert(half);
 
+    half->http_ev_ctx = CALLOC(struct http_event_context, 1);
     http_decoder_half_init(half, ev_cb, is_cache_body, type);
+
     return half;
 }
 
@@ -610,17 +612,31 @@ void http_decoder_half_free(struct http_decoder_half *half)
         return;
     }
 
+    if (half->http_ev_ctx != NULL) {
+        FREE(half->http_ev_ctx);
+    }
+
     FREE(half);
 }
 
-int http_decoder_half_parse(struct http_decoder_half *half, void *http_ev_ctx,
+void http_decoder_half_reinit(struct http_decoder_half *half, int topic_id,
+                              struct http_decoder_result_queue *queue,
+                              struct session *sess)
+{
+    assert(half != NULL);
+
+    half->http_ev_ctx->topic_id = topic_id;
+    half->http_ev_ctx->ref_session = sess;
+    half->http_ev_ctx->ref_queue = queue;
+}
+
+int http_decoder_half_parse(struct http_decoder_half *half,
                             const char *data, size_t data_len)
 {
     if (NULL == half || NULL == data || 0 == data_len) {
         return -1;
     }
 
-    half->http_ev_ctx = http_ev_ctx;
     half->error = llhttp_execute(&half->parser, data, data_len);
 
     int ret = 0;

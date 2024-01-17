@@ -19,6 +19,7 @@ extern "C"
 
 #include <stddef.h>
 
+#include "stellar/session.h"
 #include "http_decoder.h"
 #include "http_content_decompress.h"
 #include "http_decoder_result_queue.h"
@@ -44,18 +45,28 @@ enum http_event {
     HTTP_EVENT_RES_END = 1 << 16,
 };
 
+struct http_event_context {
+    int topic_id;
+    struct session *ref_session;
+    struct http_decoder_result_queue *ref_queue;
+};
+
 struct http_decoder_half;
 struct http_decoder_half_data;
 
 typedef void http_event_cb(enum http_event event, struct http_decoder_half_data **data,
-                           void *cb_args);
+                           struct http_event_context *ev_ctx);
 
 struct http_decoder_half *
 http_decoder_half_new(http_event_cb *event_cb, int is_cache_body, int type);
 
 void http_decoder_half_free(struct http_decoder_half *half);
 
-int http_decoder_half_parse(struct http_decoder_half *half, void *ev_ctx,
+void http_decoder_half_reinit(struct http_decoder_half *half, int topic_id,
+                              struct http_decoder_result_queue *queue,
+                              struct session *sess);
+
+int http_decoder_half_parse(struct http_decoder_half *half,
                             const char *data, size_t len);
 
 long long http_decoder_half_trans_count(struct http_decoder_half *half);
