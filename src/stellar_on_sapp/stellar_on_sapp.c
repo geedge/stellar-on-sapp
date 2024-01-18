@@ -171,6 +171,19 @@ unsigned char stellar_on_sapp_tcpall_entry(struct streaminfo *pstream,void **pme
 	return loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
 }
 
+unsigned char stellar_on_sapp_detach_check_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+{
+	struct session *sess=(struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);  
+	if(adapter_session_get_detach_others(sess) == 1)
+	{
+		return APP_STATE_DROPME|APP_STATE_KILL_OTHER;
+	}
+	else
+	{
+		return APP_STATE_GIVEME;
+	}
+}
+
 unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);

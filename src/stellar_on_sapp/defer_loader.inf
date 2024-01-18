@@ -12,6 +12,10 @@ FUNC_NAME=stellar_on_sapp_defer_entry
 #FUNC_FLAG=ALL
 #FUNC_NAME=stellar_on_sapp_defer_entry
 
+#[TCP]
+#FUNC_FLAG=ALL
+#FUNC_NAME=stellar_on_sapp_detach_check_entry
+
 [UDP]
 FUNC_FLAG=ALL
 FUNC_NAME=stellar_on_sapp_defer_entry
