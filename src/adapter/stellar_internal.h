@@ -9,4 +9,6 @@ struct stellar
 	UT_array *plugin_specs_array;
 	UT_array *session_mq_schema_array;
 	UT_array *session_exdata_schema_array;
+	int topic_num;
+	int sub_num;
 };

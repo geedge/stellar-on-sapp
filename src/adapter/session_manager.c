@@ -196,6 +196,7 @@ int session_mq_create_topic(struct stellar *st, const char *topic_name, msg_free
 	t_schema.subscribers=NULL;
 	t_schema.sub_cnt=0;
 	utarray_push_back(st->session_mq_schema_array, &t_schema);
+	st->topic_num+=1;
 	return t_schema.topic_id;	
 }
 
@@ -236,8 +237,17 @@ int session_mq_publish_message(struct session *sess, int topic_id, void *data)
 
 int session_mq_ignore_message(struct session *sess, int topic_id, int sub_id)
 {
-	// TODO: implement
-	return -1;
+	if(topic_id < 0 || sub_id < 0)return -1;
+	if(topic_id >= sess->st->topic_num)return -1;
+	struct session_mq_topic_schema *topic = (struct session_mq_topic_schema *)utarray_eltptr(sess->st->session_mq_schema_array, (unsigned int)topic_id);
+	if(sub_id > topic->sub_cnt)return -1;
+	if(sess->mq_sub_status)
+	{
+		sess->mq_sub_status[topic_id+(sub_id-1)]=0;
+		return 0;
+	}
+	else
+		return -1;
 }
 
 int session_mq_subscribe_topic(struct stellar *st, int topic_id, on_msg_cb_func *sub_cb, void *cb_arg)
@@ -251,6 +261,27 @@ int session_mq_subscribe_topic(struct stellar *st, int topic_id, on_msg_cb_func 
     new_subscriber->cb_arg = cb_arg;
 	DL_APPEND(topic->subscribers, new_subscriber);
 	topic->sub_cnt+=1;
+	st->sub_num+=1;
+	return topic->sub_cnt;
+}
+
+
+int stellar_get_session_mq_topic_cnt(struct stellar *st)
+{
+	if(st->session_exdata_schema_array)
+	{
+		return utarray_len(st->session_mq_schema_array);
+	}
+	else
+		return 0;
+}
+
+int stellar_get_session_mq_subscriber_cnt(struct stellar *st, int topic_id)
+{
+	if(st->session_exdata_schema_array==NULL)return -1;
+	unsigned int len = utarray_len(st->session_mq_schema_array);
+	if (len <= (unsigned int)topic_id)return -1;
+	struct session_mq_topic_schema *topic = (struct session_mq_topic_schema *)utarray_eltptr(st->session_mq_schema_array, (unsigned int)topic_id);
 	return topic->sub_cnt;
 }
 
@@ -359,6 +390,8 @@ struct session *session_new(struct stellar *st, enum session_type type, int thre
 	sess->type = type;
 	sess->state = SESSION_STATE_OPENING;
 	sess->mq = NULL;
+	sess->mq_sub_status=CALLOC(char, st->topic_num*st->sub_num);
+	memset(sess->mq_sub_status, 1, st->topic_num*st->sub_num);
 	sess->ex_data_rt = session_new_exdata_rt(st);
 	sess->ev_list=NULL;
 	sess->intrinsic_events=session_intrinsic_events_init(st, sess);
@@ -384,6 +417,10 @@ void session_free(struct session *sess)
 	if(sess->mq != NULL)
 	{
 		session_mq_free(sess->mq);
+	}
+	if(sess->mq_sub_status != NULL)
+	{
+		FREE(sess->mq_sub_status);
 	}
 	session_free_exdata_runtime(sess, sess->ex_data_rt);
 	if(sess->cur_pkt)
@@ -508,9 +545,14 @@ void session_defer_loop(struct session *sess)
                                                                     (unsigned int)(mq_elt->topic_id));
             if (topic)
             {
+				int cur_sub_idx = 0;
                 DL_FOREACH_SAFE(topic->subscribers, sub_elt, sub_tmp)
                 {
-                    sub_elt->sub_cb(sess, mq_elt->topic_id, mq_elt->message, sub_elt->cb_arg);
+					if(sess->mq_sub_status[(mq_elt->topic_id)+cur_sub_idx] == 1)
+					{
+     	            	sub_elt->sub_cb(sess, mq_elt->topic_id, mq_elt->message, sub_elt->cb_arg);
+					}
+					cur_sub_idx++;
                 }
                 if (topic->free_cb)
                 {

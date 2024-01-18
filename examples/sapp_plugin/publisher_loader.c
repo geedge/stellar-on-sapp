@@ -24,6 +24,10 @@ static void session_mq_topic_free(void *data, void *cb_arg)
 	return;
 }
 
+struct stellar *g_stellar=NULL;
+int g_topic_id=-1;
+int g_sub_id=-1;
+
 static int session_mq_loader_read(struct session *sess, int topic_id, const void *data, void *cb_arg)
 {
 	struct simple_stream_ctx *ctx =(struct simple_stream_ctx *)data;	
@@ -33,11 +37,10 @@ static int session_mq_loader_read(struct session *sess, int topic_id, const void
 	ctx->s2c_pkts, ctx->s2c_bytes);
 	printf("total-pkt=%u, ", ctx->c2s_pkts+ctx->s2c_pkts);
 	printf("total-count=%u\n", ctx->c2s_bytes+ctx->s2c_bytes);
+	session_mq_ignore_message(sess, topic_id, g_sub_id);
 	return 0;
 }
 
-struct stellar *g_stellar=NULL;
-int g_topic_id=-1;
 int PUBLISHER_LOADER_INIT()
 {
 	g_stellar = stellar_init("./stellar_plugin/simple_plugin.toml");
@@ -52,7 +55,7 @@ int PUBLISHER_LOADER_INIT()
 	{
 		g_topic_id=session_mq_create_topic(g_stellar, "SIMPLE_MQ_TOPIC", session_mq_topic_free, NULL);
 	}
-	session_mq_subscribe_topic(g_stellar , g_topic_id, session_mq_loader_read, NULL);
+	g_sub_id=session_mq_subscribe_topic(g_stellar , g_topic_id, session_mq_loader_read, NULL);
 	return 0;
 }
 
