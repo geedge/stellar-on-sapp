@@ -401,7 +401,9 @@ int http_decoder_table_get_header(struct http_decoder_table *table, struct hstri
 
             if (tmp_key.str_len == key->str_len
                 && (0 == strncasecmp(tmp_key.str, key->str, key->str_len))) {
-                http_decoder_string_get(&tmp_header->val, &hdr_array[header_cnt++].val);
+                http_decoder_string_get(&tmp_header->key, &hdr_array[header_cnt].key);
+                http_decoder_string_get(&tmp_header->val, &hdr_array[header_cnt].val);
+                header_cnt++;
             }
         }
     }
