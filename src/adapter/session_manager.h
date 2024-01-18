@@ -22,6 +22,7 @@ struct session
 	struct session_event  *intrinsic_events;
 	struct session_exdata_runtime *ex_data_rt;
 	struct session_mq *mq;
+	char *mq_sub_status;
 	struct session_event *ev_list;
 	uint64_t set_detach_others;
 };
