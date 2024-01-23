@@ -40,7 +40,7 @@ int g_res_exdata_idx = 0;
 int g_topic_id = 0;
 
 
-#if 0
+#if 1
 void output_http_req_line(struct http_request_line *req_line)
 {
     char tmp_str[MAX_KEY_STR_LEN] = {0};
@@ -74,28 +74,16 @@ void output_http_header(struct http_header *header)
 #endif
 
 void
-output_http_header(struct http_header *header, int res)
-{
-    char key[MAX_KEY_STR_LEN] = {0};
-
-    snprintf(key, header->key.str_len + 1, "%s", header->key.str);
-    if (0 == res) {
-        printf("<ouput_http_req_header> header:%s\n", key);
-    } else {
-        printf("<ouput_http_res_header> header:%s\n", key);
-    }
-    
-}
-
-void
 output_http_body(struct hstring *body, int decompress_flag)
 {
     int counter = 0;
 
     if (1 == decompress_flag) {
-        printf("\n\n----------------decompress body---------------\n");
+        printf("\n\n----------------decompress body len:%zu---------------\n",
+              body->str_len);
     } else {
-        printf("\n\n----------------raw body---------------\n");
+        printf("\n\n----------------raw body len:%zu---------------\n",
+               body->str_len);
     }
 
     for (size_t i = 0; i < body->str_len; i++) {
@@ -207,6 +195,7 @@ next:
     case HTTP_MESSAGE_REQ_HEADER:
         while (http_message_request_header_next(msg, &header) > 0) {
             http_header_to_json(json, &header);
+            // output_http_header(&header);
         }
         g_header_count = 1;
         break;
@@ -224,6 +213,7 @@ next:
     case HTTP_MESSAGE_RES_HEADER:
         while (http_message_response_header_next(msg, &header) > 0) {
             http_header_to_json(json, &header);
+            // output_http_header(&header);
         }
         g_header_count = 1;
         break;

@@ -26,7 +26,8 @@ struct http_decoder_half_data {
     int status_code;
 
     enum http_content_encoding content_encoding;
-    char *decompress_body;
+    struct http_content_decompress *decompress;
+    char *ref_decompress_body;
     size_t decompress_body_len;
 };
 
@@ -44,7 +45,7 @@ struct http_decoder_half {
     long long trans_counter;
 };
 
-//#define HTTP_DECODER_DEBUG
+// #define HTTP_DECODER_DEBUG
 #ifdef HTTP_DECODER_DEBUG
 static void printf_debug_info(const char *desc, const char *at, size_t length)
 {
@@ -68,9 +69,6 @@ http_decoder_half_data_decompress(struct http_decoder_half_data *data)
 {
     assert(data);
 
-    FREE(data->decompress_body);
-    data->decompress_body_len = 0;
-
     if (data->content_encoding == HTTP_CONTENT_ENCODING_NONE) {
         return;
     }
@@ -81,15 +79,19 @@ http_decoder_half_data_decompress(struct http_decoder_half_data *data)
         return;
     }
 
-    struct http_content_decompress *decompress =
-        http_content_decompress_create(data->content_encoding);
-    assert(decompress);
-    if (http_content_decompress_write(decompress, raw_body.str, raw_body.str_len,
-                                      &data->decompress_body,
+    if (NULL == data->decompress) {
+        data->decompress = http_content_decompress_create(data->content_encoding);
+    }
+        
+    assert(data->decompress);
+    if (http_content_decompress_write(data->decompress, raw_body.str,
+                                      raw_body.str_len,
+                                      &data->ref_decompress_body,
                                       &data->decompress_body_len) == -1) {
         // log error
+        http_content_decompress_destroy(data->decompress);
+        data->decompress = NULL;
     }
-    http_content_decompress_destroy(decompress);
 }
 
 /* Possible return values 0, -1, `HPE_PAUSED` */
@@ -125,62 +127,20 @@ static int on_message_complete(llhttp_t *http)
         container_of(http, struct http_decoder_half, parser);
     assert(half);
 
-    // if enable  cache_body, trigger body_data/body_end event
-    // if disable cache_body, trigger body_end event
-    if (half->is_cache_body
-        || (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY)
-            == STRING_STATE_CACHE) {
-            http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
-            http_decoder_half_data_decompress(half->ref_data);
-        }
-
-        if (half->parser.type == HTTP_REQUEST) {
-            if (half->event == HTTP_EVENT_REQ_BODY_BEGIN) {
-                half->event = HTTP_EVENT_REQ_BODY_DATA;
-                if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data,
-                                     half->http_ev_ctx);
-                }
-
-                half->event = HTTP_EVENT_REQ_BODY_END;
-                if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data,
-                                     half->http_ev_ctx);
-                }
-            }
-        } else {
-            if (half->event == HTTP_EVENT_RES_BODY_BEGIN) {
-                half->event = HTTP_EVENT_RES_BODY_DATA;
-                if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data,
-                                     half->http_ev_ctx);
-                }
-
-                half->event = HTTP_EVENT_RES_BODY_END;
-                if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data,
-                                     half->http_ev_ctx);
-                }
+    if (half->parser.type == HTTP_REQUEST) {
+        if (half->event == HTTP_EVENT_REQ_BODY_DATA) {
+            half->event = HTTP_EVENT_REQ_BODY_END;
+            if (half->http_ev_cb != NULL) {
+                half->http_ev_cb(half->event, &half->ref_data,
+                                 half->http_ev_ctx);
             }
         }
     } else {
-        // no cache body
-        if (half->parser.type == HTTP_REQUEST) {
-            if (half->event == HTTP_EVENT_REQ_BODY_DATA) {
-                half->event = HTTP_EVENT_REQ_BODY_END;
-                if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data,
-                                     half->http_ev_ctx);
-                }
-            }
-        } else {
-            if (half->event == HTTP_EVENT_RES_BODY_DATA) {
-                half->event = HTTP_EVENT_RES_BODY_END;
-                if (half->http_ev_cb != NULL) {
-                    half->http_ev_cb(half->event, &half->ref_data,
-                                     half->http_ev_ctx);
-                }
+        if (half->event == HTTP_EVENT_RES_BODY_DATA) {
+            half->event = HTTP_EVENT_RES_BODY_END;
+            if (half->http_ev_cb != NULL) {
+                half->http_ev_cb(half->event, &half->ref_data,
+                                 half->http_ev_ctx);
             }
         }
     }
@@ -510,37 +470,30 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
         }
     }
 
-    // if enable  cache_body, trigger body_data event on_message_complete
-    // if disable cache_body, trigger body_data event on_body
-    if (half->is_cache_body ||
-        (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE)) {
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY,
-                                 at, length);
-        http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_BODY);
-    } else {
-        if (half->ref_data != NULL) {
-            if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY)
-                == STRING_STATE_COMMIT) {
-                http_decoder_table_reset(half->ref_data->table, HTTP_ITEM_BODY);
-            }
-
-            http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY,
-                                     at, length);
-            http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
+    if (half->ref_data != NULL) {
+        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_BODY) ==
+            STRING_STATE_COMMIT) {
+            http_decoder_table_reset(half->ref_data->table, HTTP_ITEM_BODY);
         }
 
-        if (half->parser.type == HTTP_REQUEST) {
-            half->event = HTTP_EVENT_REQ_BODY_DATA;
-            if (half->http_ev_cb) {
-                half->http_ev_cb(half->event, &half->ref_data,
-                                 half->http_ev_ctx);
-            }
-        } else {
-            half->event = HTTP_EVENT_RES_BODY_DATA;
-            if (half->http_ev_cb) {
-                half->http_ev_cb(half->event, &half->ref_data,
-                                 half->http_ev_ctx);
-            }
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY, at,
+                                 length);
+        http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
+    }
+
+    if (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE) {
+        http_decoder_half_data_decompress(half->ref_data);
+    }
+
+    if (half->parser.type == HTTP_REQUEST) {
+        half->event = HTTP_EVENT_REQ_BODY_DATA;
+        if (half->http_ev_cb) {
+            half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+        }
+    } else {
+        half->event = HTTP_EVENT_RES_BODY_DATA;
+        if (half->http_ev_cb) {
+            half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
         }
     }
 
@@ -733,7 +686,7 @@ struct http_decoder_half_data *http_decoder_half_data_new()
     data->status_code = -1;
 
     data->content_encoding = HTTP_CONTENT_ENCODING_NONE;
-    data->decompress_body = NULL;
+    data->ref_decompress_body = NULL;
     data->decompress_body_len = 0;
 
     return data;
@@ -750,8 +703,9 @@ void http_decoder_half_data_free(struct http_decoder_half_data *data)
         data->table = NULL;
     }
 
-    if (data->decompress_body != NULL) {
-        FREE(data->decompress_body);
+    if (data->decompress != NULL) {
+        http_content_decompress_destroy(data->decompress);
+        data->decompress = NULL;
     }
 
     FREE(data);
@@ -834,7 +788,7 @@ int http_decoder_half_data_get_decompress_body(struct http_decoder_half_data *da
     }
 
 
-    body->str = data->decompress_body;
+    body->str = data->ref_decompress_body;
     body->str_len = data->decompress_body_len;
     return 0;
 }

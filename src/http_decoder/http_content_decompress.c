@@ -148,15 +148,14 @@ http_content_decompress_write_zlib(struct http_content_decompress *decompress,
     z_stream *z_stream_ptr = decompress->z_stream_ptr;
     z_stream_ptr->avail_in = (unsigned int)indata_len;
     z_stream_ptr->next_in = (unsigned char *)indata;
+    z_stream_ptr->avail_out = (unsigned int)decompress->buffer_size;
+    z_stream_ptr->next_out = (unsigned char *)decompress->buffer;
 
     *outdata = NULL;
     *outdata_len = 0;
 
     int ret = 0;
     do {
-        z_stream_ptr->avail_out = (unsigned int)decompress->buffer_size;
-        z_stream_ptr->next_out = (unsigned char *)decompress->buffer;
-
         ret = inflate(z_stream_ptr, Z_NO_FLUSH);
         if (ret == Z_STREAM_ERROR || ret == Z_NEED_DICT
             || ret == Z_DATA_ERROR || ret == Z_MEM_ERROR) {
@@ -166,23 +165,24 @@ http_content_decompress_write_zlib(struct http_content_decompress *decompress,
 
         size_t have = decompress->buffer_size - z_stream_ptr->avail_out;
         if (have > 0) {
-            if (NULL == *outdata) {
-                // http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes", 
-                //                  http_content_encoding_int2str(decompress->encoding),
-                //                  have);
-                *outdata = safe_dup(decompress->buffer, have);
-                *outdata_len = have;
-            } else {
-                // http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes", 
-                //                  http_content_encoding_int2str(decompress->encoding), 
-                //                  *outdata_len + have + 1);
-                *outdata = REALLOC(char, *outdata, *outdata_len + have + 1);
-                memcpy(*outdata + *outdata_len, decompress->buffer, have);
+            if (0 == z_stream_ptr->avail_out) {
+                decompress->buffer_size += have;
+                decompress->buffer = REALLOC(char, decompress->buffer,
+                                             decompress->buffer_size);
+                *outdata = decompress->buffer;
                 *outdata_len = *outdata_len + have;
-                memset(*outdata + *outdata_len, 0, 1);
+                http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes", 
+                                 http_content_encoding_int2str(decompress->encoding), 
+                                 decompress->buffer_size);
+                z_stream_ptr->avail_out = have;
+                z_stream_ptr->next_out = (unsigned char *)decompress->buffer + 
+                                         (decompress->buffer_size - have);
+            } else {
+                *outdata = decompress->buffer;
+                *outdata_len = have;
             }
         }
-    } while (0 == z_stream_ptr->avail_out);
+    } while (z_stream_ptr->avail_in != 0);
 
     return 0;
 }
@@ -192,37 +192,32 @@ http_content_decompress_write_br(struct http_content_decompress *decompress,
                                  const char *indata, size_t indata_len,
                                  char **outdata, size_t *outdata_len)
 {
-    size_t available_out;
     size_t available_in = indata_len;
     const unsigned char *next_in = (const unsigned char *)indata;
-    unsigned char *next_out;
+    size_t available_out = decompress->buffer_size;
+    unsigned char *next_out = (unsigned char *)decompress->buffer;
 
     *outdata = NULL;
     *outdata_len = 0;
 
     int ret;
     for (;;) {
-        available_out = decompress->buffer_size;
-        next_out = (unsigned char *)decompress->buffer;
-
         ret = BrotliDecoderDecompressStream(decompress->br_state, &available_in, 
                                             &next_in, &available_out, &next_out, 0);
         size_t have = decompress->buffer_size - available_out;
         if (have > 0) {
-            if (NULL == *outdata) {
-                // http_decoder_log(DEBUG, "%s alloc outbuffer %zu bytes",
-                //                 http_content_encoding_int2str(decompress->encoding),
-                //                 have);
-                *outdata = safe_dup(decompress->buffer, have);
-                *outdata_len = have;
-            } else {
-                // http_decoder_log(DEBUG, "%s realloc outbuffer %zu bytes",
-                //                  http_content_encoding_int2str(decompress->encoding),
-                //                  *outdata_len + have + 1);
-                *outdata = REALLOC(char, *outdata, *outdata_len + have + 1);
-                memcpy(*outdata + *outdata_len, decompress->buffer, have);
+            if (0 == available_out) {
+                decompress->buffer_size += have;
+                decompress->buffer = REALLOC(char, decompress->buffer,
+                                             decompress->buffer_size);
+                *outdata = decompress->buffer;
                 *outdata_len = *outdata_len + have;
-                memset(*outdata + *outdata_len, 0, 1);
+                available_out = have;
+                next_out = (unsigned char *)decompress->buffer +
+                           (decompress->buffer_size - have);
+            } else {
+                *outdata = decompress->buffer;
+                *outdata_len = have;
             }
         }
 
