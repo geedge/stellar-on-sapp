@@ -19,7 +19,12 @@
 #include "stellar/utils.h"
 
 #define MAX_HEADER_SIZE 16
-
+#define MAX_URI_CACHE_SIZE 1024
+#define MAX_STATUS_CACHE_SIZE 32
+#define MAX_METHOD_CACHE_SIZE 8
+#define MAX_VERSION_CACHE_SIZE 4
+#define MAX_HEADER_KEY_CACHE_SIZE 128
+#define MAX_HEADER_VALUE_CACHE_SIZE 1024
 
 struct http_decoder_header {
     struct http_decoder_string key;
@@ -39,14 +44,38 @@ struct http_decoder_table {
     struct http_decoder_header *headers;
 };
 
+static void http_decoder_table_init(struct http_decoder_table *table)
+{
+    if (NULL == table) {
+        return;
+    }
+
+    struct http_decoder_header *header = NULL;
+    assert(table);
+
+    http_decoder_string_init(&table->uri, MAX_URI_CACHE_SIZE);
+    http_decoder_string_init(&table->status, MAX_STATUS_CACHE_SIZE);
+    http_decoder_string_init(&table->method, MAX_METHOD_CACHE_SIZE);
+    http_decoder_string_init(&table->version, MAX_METHOD_CACHE_SIZE);
+
+    for (size_t i = 0; i < table->header_size; i++) {
+        header = &table->headers[i];
+        http_decoder_string_init(&header->key, MAX_HEADER_KEY_CACHE_SIZE);
+        http_decoder_string_init(&header->val, MAX_HEADER_VALUE_CACHE_SIZE);
+    }
+        
+    http_decoder_string_init(&table->body, 0);
+}
+
 struct http_decoder_table *http_decoder_table_new()
 {
     struct http_decoder_table *table = CALLOC(struct http_decoder_table, 1);
     assert(table);
 
-    table->header_index = 0;
     table->header_size = MAX_HEADER_SIZE;
     table->headers = CALLOC(struct http_decoder_header, table->header_size);
+
+    http_decoder_table_init(table);
 
     return table;
 }
@@ -312,6 +341,28 @@ void http_decoder_table_reset(struct http_decoder_table *table, enum http_item t
     }
 }
 
+void http_decoder_table_reinit(struct http_decoder_table *table)
+{
+    if (NULL == table) {
+        return;
+    }
+
+    struct http_decoder_header *header = NULL;
+    assert(table);
+
+    http_decoder_string_reinit(&table->uri);
+    http_decoder_string_reinit(&table->status);
+    http_decoder_string_reinit(&table->method);
+    http_decoder_string_reinit(&table->version);
+    for (size_t i = 0; i < table->header_iter; i++) {
+        header = &table->headers[i];
+        http_decoder_string_reinit(&header->key);
+        http_decoder_string_reinit(&header->val);
+    }
+        
+    http_decoder_string_reinit(&table->body);
+}
+
 void http_decoder_table_dump(struct http_decoder_table *table)
 {
     if (NULL == table) {
@@ -380,6 +431,21 @@ int http_decoder_table_get_body(struct http_decoder_table *table, struct hstring
     return http_decoder_string_get(&table->body, out);
 }
 
+int http_decoder_table_has_parsed_header(struct http_decoder_table *table)
+{
+    if (NULL == table) {
+        return 0;
+    }
+
+    struct http_decoder_header *tmp_header = &table->headers[table->header_iter];
+    if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT &&
+        http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
+        return 1;
+    }
+
+    return 0;
+}
+
 int http_decoder_table_get_header(struct http_decoder_table *table, struct hstring *key,
                                   struct http_header *hdr_array, size_t array_size)
 {
@@ -390,12 +456,12 @@ int http_decoder_table_get_header(struct http_decoder_table *table, struct hstri
     int header_cnt = 0;
     for (int i = 0; i < table->header_size && header_cnt < array_size; i++) {
         struct http_decoder_header *tmp_header = &table->headers[i];
-        if (NULL == tmp_header) {
+        if (tmp_header->key.commit.str_len != key->str_len) {
             continue;
         }
 
-        if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT
-            && http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
+        if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT &&
+            http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
             struct hstring tmp_key;
             http_decoder_string_get(&tmp_header->key, &tmp_key);
 
@@ -422,13 +488,15 @@ int http_decoder_table_iter_header(struct http_decoder_table *table,
         return 0;
     }
 
-    struct http_decoder_header *tmp_header = &table->headers[table->header_iter++];
+    struct http_decoder_header *tmp_header = &table->headers[table->header_iter];
     if (tmp_header != NULL) {
         if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT &&
             http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
 
             http_decoder_string_get(&tmp_header->key, &hdr->key);
             http_decoder_string_get(&tmp_header->val, &hdr->val);
+            table->header_iter++;
+
             return 1;
         }
     }

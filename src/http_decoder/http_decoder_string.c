@@ -59,32 +59,83 @@ void http_decoder_string_refer(struct http_decoder_string *rstr,
     rstr->state = STRING_STATE_REFER;
 }
 
+static void string_refer2cache(struct http_decoder_string *rstr)
+{
+    if (0 == rstr->refer.str_len) {
+        return;
+    }
+
+    if (rstr->cache.str_len >= rstr->max_cache_size) {
+        return;
+    }
+
+    size_t length = rstr->cache.str_len + rstr->refer.str_len;
+    if (length > rstr->max_cache_size) {
+        length = rstr->max_cache_size;
+    }
+
+    if (NULL == rstr->cache.str) {
+        rstr->cache.str = CALLOC(char, length + 1);
+        memcpy(rstr->cache.str, rstr->refer.str, length);
+    } else {
+        rstr->cache.str = REALLOC(char, rstr->cache.str, length + 1);
+        memcpy(rstr->cache.str + rstr->cache.str_len, rstr->refer.str,
+               (length - rstr->cache.str_len));
+    }
+
+    rstr->cache.str_len = length;
+
+    rstr->refer.str = NULL;
+    rstr->refer.str_len = 0;
+}
+
+static void string_commit2cache(struct http_decoder_string *rstr)
+{
+    if (rstr->cache.str_len == rstr->commit.str_len &&
+        rstr->cache.str == rstr->commit.str) {
+
+        rstr->commit.str = NULL;
+        rstr->commit.str_len = 0;
+        return;
+    }
+
+    //Only http header key need to backward to cache
+    size_t length = 0;
+    if (rstr->commit.str_len > rstr->max_cache_size) {
+        length = rstr->max_cache_size;
+    } else {
+        length = rstr->commit.str_len;
+    }
+
+    if (length > 0) {
+        if (NULL == rstr->cache.str) {
+            rstr->cache.str = CALLOC(char, length + 1);
+        } else {
+            abort();
+        }
+        memcpy(rstr->cache.str, rstr->commit.str, length);
+        rstr->cache.str_len = length;
+
+        rstr->commit.str = NULL;
+        rstr->commit.str_len = 0;
+    }
+}
+
 void http_decoder_string_cache(struct http_decoder_string *rstr)
 {
     if (NULL == rstr) {
         return;
     }
 
-    size_t length = 0;
-
     switch (rstr->state) {
     case STRING_STATE_REFER:
-        if (rstr->refer.str_len > 0) {
-            if (NULL == rstr->cache.str) {
-                length = rstr->refer.str_len + 1;
-                rstr->cache.str = CALLOC(char, length);
-            } else {
-                length = rstr->cache.str_len + rstr->refer.str_len + 2;
-                rstr->cache.str = REALLOC(char, rstr->cache.str, length);
-            }
-
-            memcpy(rstr->cache.str + rstr->cache.str_len, rstr->refer.str,
-                   rstr->refer.str_len);
-            rstr->cache.str_len += rstr->refer.str_len;
-
-            rstr->refer.str = NULL;
-            rstr->refer.str_len = 0;
-        }
+        string_refer2cache(rstr);
+        break;
+    case STRING_STATE_CACHE:
+        break;
+    case STRING_STATE_COMMIT:
+        //commit backward to cache
+        string_commit2cache(rstr);
         break;
     default:
         abort();
@@ -145,6 +196,39 @@ void http_decoder_string_reset(struct http_decoder_string *rstr)
         abort();
         break;
     }
+
+    rstr->state = STRING_STATE_INIT;
+}
+
+
+void http_decoder_string_init(struct http_decoder_string *rstr,
+                              size_t max_cache_size)
+{
+    rstr->max_cache_size = max_cache_size;
+}
+
+void http_decoder_string_reinit(struct http_decoder_string *rstr)
+{
+    if (rstr->state == STRING_STATE_CACHE) {
+        return;
+    }
+
+    if (rstr->state == STRING_STATE_COMMIT &&
+        rstr->cache.str == rstr->commit.str &&
+        rstr->cache.str_len == rstr->commit.str_len) {
+        return;
+    }
+
+    if (rstr->cache.str != NULL) {
+        FREE(rstr->cache.str);
+        rstr->cache.str_len = 0;
+    }
+
+    rstr->refer.str = NULL;
+    rstr->refer.str_len = 0;
+
+    rstr->commit.str = NULL;
+    rstr->commit.str_len = 0;
 
     rstr->state = STRING_STATE_INIT;
 }

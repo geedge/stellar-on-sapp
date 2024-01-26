@@ -221,8 +221,8 @@ http_content_decompress_write_br(struct http_content_decompress *decompress,
             }
         }
 
-        if (ret == BROTLI_DECODER_RESULT_SUCCESS
-            || ret == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT) {
+        if (ret == BROTLI_DECODER_RESULT_SUCCESS ||
+            ret == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT) {
             return 0;
         }
 

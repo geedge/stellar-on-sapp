@@ -65,6 +65,7 @@ struct http_decoder_string {
     struct hstring commit;
 
     enum string_state state;
+    size_t max_cache_size;
 };
 
 void http_decoder_string_refer(struct http_decoder_string *rstr,
@@ -75,6 +76,11 @@ void http_decoder_string_cache(struct http_decoder_string *rstr);
 void http_decoder_string_commit(struct http_decoder_string *rstr);
 
 void http_decoder_string_reset(struct http_decoder_string *rstr);
+
+void http_decoder_string_init(struct http_decoder_string *rstr,
+                              size_t max_cache_size);
+
+void http_decoder_string_reinit(struct http_decoder_string *rstr);
 
 enum string_state http_decoder_string_state(struct http_decoder_string *rstr);
 

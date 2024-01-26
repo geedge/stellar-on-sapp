@@ -21,7 +21,6 @@ extern "C" {
 #include "http_decoder.h"
 #include "http_decoder_string.h"
 
-
 enum http_item {
     HTTP_ITEM_URI = 0x01,
     HTTP_ITEM_STATUS = 0x02,
@@ -33,7 +32,6 @@ enum http_item {
 };
 
 struct http_decoder_table;
-
 struct http_decoder_table *http_decoder_table_new();
 
 void http_decoder_table_free(struct http_decoder_table *table);
@@ -50,6 +48,8 @@ void http_decoder_table_commit(struct http_decoder_table *table, enum http_item 
 
 void http_decoder_table_reset(struct http_decoder_table *table, enum http_item type);
 
+void http_decoder_table_reinit(struct http_decoder_table *table);
+
 void http_decoder_table_dump(struct http_decoder_table *table);
 
 int http_decoder_table_get_uri(struct http_decoder_table *table, struct hstring *out);
@@ -62,10 +62,15 @@ int http_decoder_table_get_version(struct http_decoder_table *table, struct hstr
 
 int http_decoder_table_get_body(struct http_decoder_table *table, struct hstring *out);
 
-int http_decoder_table_get_header(struct http_decoder_table *table, struct hstring *key,
-                                  struct http_header *hdr_array, size_t array_size);
+int http_decoder_table_has_parsed_header(struct http_decoder_table *table);
 
-int http_decoder_table_iter_header(struct http_decoder_table *table, struct http_header *hdr);
+int http_decoder_table_get_header(struct http_decoder_table *table,
+                                  struct hstring *key,
+                                  struct http_header *hdr_array,
+                                  size_t array_size);
+
+int http_decoder_table_iter_header(struct http_decoder_table *table,
+                                   struct http_header *hdr);
 
 #ifdef __cplusplus
 }

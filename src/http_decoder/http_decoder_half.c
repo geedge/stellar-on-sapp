@@ -10,9 +10,13 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "stellar/utils.h"
+#include "stellar/session_mq.h"
 #include "llhttp.h"
+#include "http_decoder.h"
+#include "http_decoder_inc.h"
 #include "http_decoder_utils.h"
 #include "http_decoder_half.h"
 #include "http_decoder_table.h"
@@ -43,6 +47,7 @@ struct http_decoder_half {
     http_event_cb *http_ev_cb;
     struct http_event_context *http_ev_ctx;
     long long trans_counter;
+    long long err_counter;
 };
 
 // #define HTTP_DECODER_DEBUG
@@ -194,6 +199,7 @@ static int on_method_complete(llhttp_t *http)
         STRING_STATE_REFER) {
         http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_METHOD);
     }
+
     http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_METHOD);
 
     return 0;
@@ -226,6 +232,7 @@ static int on_uri_complete(llhttp_t *http)
         STRING_STATE_REFER) {
         http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_URI);
     }
+
     http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_URI);
 
     return 0;
@@ -258,6 +265,7 @@ static int on_version_complete(llhttp_t *http)
         STRING_STATE_REFER) {
         http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_VERSION);
     }
+
     http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_VERSION);
 
     half->ref_data->major_version = llhttp_get_http_major(&half->parser);
@@ -299,14 +307,16 @@ static int on_status_complete(llhttp_t *http)
     if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_STATUS) ==
         STRING_STATE_REFER) {
         http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_STATUS);
-    } 
-    http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_STATUS);
+    }
 
+    http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_STATUS);
     half->ref_data->status_code = llhttp_get_status_code(&half->parser);
 
-    half->event = HTTP_EVENT_RES_LINE;
-    if (half->http_ev_cb != NULL) {
-        half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+    if (half->parser.type == HTTP_RESPONSE) {
+        half->event = HTTP_EVENT_RES_LINE;
+        if (half->http_ev_cb != NULL) {
+            half->http_ev_cb(half->event, &half->ref_data, half->http_ev_ctx);
+        }
     }
 
     return 0;
@@ -335,10 +345,6 @@ static int on_header_field_complete(llhttp_t *http)
         container_of(http, struct http_decoder_half, parser);
     assert(half);
 
-    if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY) ==
-        STRING_STATE_REFER) {
-        http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRKEY);
-    }
     http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_HDRKEY);
 
     return 0;
@@ -367,10 +373,11 @@ static int on_header_value_complete(llhttp_t *http)
         container_of(http, struct http_decoder_half, parser);
     assert(half);
 
-    if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL) ==
-        STRING_STATE_REFER) {
-        http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRVAL);
+    if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY) == 
+        STRING_STATE_CACHE) {
+        http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_HDRKEY);
     }
+
     http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_HDRVAL);
 
     if (half->ref_data->content_encoding == HTTP_CONTENT_ENCODING_NONE) {
@@ -379,10 +386,9 @@ static int on_header_value_complete(llhttp_t *http)
 
         if (http_decoder_table_get_header(half->ref_data->table, &key,
                                           &http_hdr, 1) == 1) {
-            char *str = safe_dup(http_hdr.val.str, http_hdr.val.str_len);
-            half->ref_data->content_encoding =
-                http_content_encoding_str2int(str);
-            FREE(str);
+            char encoding_str[16] = {0};
+            memcpy(encoding_str, http_hdr.val.str, http_hdr.val.str_len);
+            half->ref_data->content_encoding = http_content_encoding_str2int(encoding_str);
         }
     }
 
@@ -476,8 +482,8 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
             http_decoder_table_reset(half->ref_data->table, HTTP_ITEM_BODY);
         }
 
-        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY, at,
-                                 length);
+        http_decoder_table_refer(half->ref_data->table, HTTP_ITEM_BODY,
+                                 at, length);
         http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
     }
 
@@ -510,7 +516,7 @@ static void http_decoder_half_init(struct http_decoder_half *half,
 
     llhttp_settings_init(&half->settings);
     llhttp_init(&half->parser, type, &half->settings);
-
+    
     half->settings.on_message_begin = on_message_begin;
     half->settings.on_message_complete = on_message_complete;
     half->settings.on_reset = on_reset;
@@ -578,9 +584,33 @@ void http_decoder_half_reinit(struct http_decoder_half *half, int topic_id,
 {
     assert(half != NULL);
 
+    if (half->ref_data != NULL) {
+        http_decoder_table_reinit(half->ref_data->table);
+    }
+
     half->http_ev_ctx->topic_id = topic_id;
     half->http_ev_ctx->ref_session = sess;
     half->http_ev_ctx->ref_queue = queue;
+}
+
+static void publish_message_for_parsed_header(struct http_decoder_half *half)
+{
+    if (http_decoder_table_has_parsed_header(half->ref_data->table) <= 0) {
+        return;
+    }
+
+    // publish complete kv-header message
+    struct http_message *msg = NULL;
+    if (half->parser.type == HTTP_REQUEST) {
+        msg = http_message_new(HTTP_MESSAGE_REQ_HEADER, half->ref_data);
+        session_mq_publish_message(half->http_ev_ctx->ref_session,
+                                   half->http_ev_ctx->topic_id, msg);
+    } else {
+        // http response
+        msg = http_message_new(HTTP_MESSAGE_RES_HEADER, half->ref_data);
+        session_mq_publish_message(half->http_ev_ctx->ref_session,
+                                   half->http_ev_ctx->topic_id, msg);
+    }
 }
 
 int http_decoder_half_parse(struct http_decoder_half *half,
@@ -643,11 +673,18 @@ int http_decoder_half_parse(struct http_decoder_half *half,
 
         if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY)
             == STRING_STATE_REFER) {
+            publish_message_for_parsed_header(half);
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRKEY);
         }
 
         if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL)
             == STRING_STATE_REFER) {
+            publish_message_for_parsed_header(half);
+
+            /* Header key should have been committed
+               If it's not cached, cache it for next packet to use
+            */
+            http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRKEY);
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRVAL);
         }
 

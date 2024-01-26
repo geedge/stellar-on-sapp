@@ -20,10 +20,26 @@
         "minor_version": 0,
         "status_code": 200,
         "Server": "SimpleHTTP/0.6 Python/2.7.5",
-        "Date": "Fri, 29 Dec 2023 09:32:21 GMT",
-        "Content-type": "text/html",
-        "Content-Length": "144",
-        "Last-Modified": "Fri, 29 Dec 2023 08:50:53 GMT",
         "name": "HTTP_DECODER_RESULT_2"
+    },
+    {
+        "Tuple4": "192.168.42.40.36338>192.168.40.137.80",
+        "Date": "Fri, 29 Dec 2023 09:32:21 GMT",
+        "name": "HTTP_DECODER_RESULT_3"
+    },
+    {
+        "Tuple4": "192.168.42.40.36338>192.168.40.137.80",
+        "Content-type": "text/html",
+        "name": "HTTP_DECODER_RESULT_4"
+    },
+    {
+        "Tuple4": "192.168.42.40.36338>192.168.40.137.80",
+        "Content-Length": "144",
+        "name": "HTTP_DECODER_RESULT_5"
+    },
+    {
+        "Tuple4": "192.168.42.40.36338>192.168.40.137.80",
+        "Last-Modified": "Fri, 29 Dec 2023 08:50:53 GMT",
+        "name": "HTTP_DECODER_RESULT_6"
     }
 ]

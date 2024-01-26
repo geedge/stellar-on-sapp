@@ -44,32 +44,36 @@ int g_topic_id = 0;
 void output_http_req_line(struct http_request_line *req_line)
 {
     char tmp_str[MAX_KEY_STR_LEN] = {0};
-    snprintf(tmp_str, req_line->method.str_len + 1, "%s", req_line->method.str);
+    memcpy(tmp_str, req_line->method.str, req_line->method.str_len);
     printf("req_method:%s\n", tmp_str);
 
     memset(tmp_str, 0, sizeof(tmp_str));
-    snprintf(tmp_str, req_line->uri.str_len + 1, "%s", req_line->uri.str);
+    memcpy(tmp_str, req_line->uri.str, req_line->uri.str_len);
     printf("req_uri:%s\n", tmp_str);
 
     memset(tmp_str, 0, sizeof(tmp_str));
-    snprintf(tmp_str, req_line->version.str_len + 1, "%s", req_line->version.str);
+    memcpy(tmp_str, req_line->version.str, req_line->version.str_len);
     printf("req_version:%s\n", tmp_str);
 }
 
 void output_http_res_line(struct http_response_line *res_line)
 {
     char tmp_str[MAX_KEY_STR_LEN] = {0};
-    snprintf(tmp_str, res_line->version.str_len + 1, "%s", res_line->version.str);
+    memcpy(tmp_str, res_line->version.str, res_line->version.str_len);
     printf("res_version:%s\n", tmp_str);
 
     memset(tmp_str, 0, sizeof(tmp_str));
-    snprintf(tmp_str, res_line->status.str_len + 1, "%s", res_line->status.str);
+    memcpy(tmp_str, res_line->status.str, res_line->status.str_len);
     printf("res_status:%s\n", tmp_str);
 }
 
 void output_http_header(struct http_header *header)
 {
-    printf("<%s:%s>\n", header->key.str, header->val.str);
+    char tmp_key[MAX_KEY_STR_LEN] = {0};
+    char tmp_val[MAX_KEY_STR_LEN] = {0};
+    memcpy(tmp_key, header->key.str, header->key.str_len);
+    memcpy(tmp_val, header->val.str, header->val.str_len);
+    printf("<%s:%s>\n", tmp_key, tmp_val);
 }
 #endif
 
@@ -165,7 +169,7 @@ http_decoder_test_entry(struct session *sess, int topic_id, const void *data,
     struct hstring body = {0};
     struct http_message *msg = (struct http_message *)data; 
     enum http_message_type msg_type = http_message_type(msg);
-    
+
     if (msg_type == HTTP_MESSAGE_REQ_LINE ||
         msg_type == HTTP_MESSAGE_REQ_HEADER) {
         exdata_idx = g_req_exdata_idx;
@@ -195,7 +199,6 @@ next:
     case HTTP_MESSAGE_REQ_HEADER:
         while (http_message_request_header_next(msg, &header) > 0) {
             http_header_to_json(json, &header);
-            // output_http_header(&header);
         }
         g_header_count = 1;
         break;
@@ -213,7 +216,6 @@ next:
     case HTTP_MESSAGE_RES_HEADER:
         while (http_message_response_header_next(msg, &header) > 0) {
             http_header_to_json(json, &header);
-            // output_http_header(&header);
         }
         g_header_count = 1;
         break;

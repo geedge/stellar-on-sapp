@@ -106,7 +106,10 @@ add_test(NAME HTTP_GET_REQ_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SO
 add_test(NAME HTTP_TRANS_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_trans_pipeline.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_trans_pipeline.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
+# add_test(NAME COREDUMP_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/coredump.json
+#          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name coredump.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
+# set_tests_properties(COREDUMP_TEST PROPERTIES FIXTURES_REQUIRED TestFixture)
 set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_GET_MULTI_TRANS_TEST
                      HTTP_GET_LONG_COOKIE_TEST
