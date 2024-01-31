@@ -270,10 +270,10 @@ const char *session_get0_current_payload(struct session *sess, size_t *payload_l
 }
 
 #include <assert.h>
-const struct packet *session_get0_current_packet(struct session *sess)
+inline const struct packet *session_get0_current_packet(struct session *sess)
 {
-	if(sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL)return NULL;
-	sess->cur_pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
+	//if(sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL)return NULL;
+	//sess->cur_pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
 	return sess->cur_pkt;
 }
 
