@@ -19,6 +19,7 @@ extern "C" {
 #include <stddef.h>
 
 #include "http_decoder.h"
+#include "http_decoder_inc.h"
 #include "http_decoder_string.h"
 
 enum http_item {
@@ -32,7 +33,7 @@ enum http_item {
 };
 
 struct http_decoder_table;
-struct http_decoder_table *http_decoder_table_new();
+struct http_decoder_table *http_decoder_table_new(nmx_pool_t *mempool);
 
 void http_decoder_table_free(struct http_decoder_table *table);
 

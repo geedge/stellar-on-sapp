@@ -47,6 +47,7 @@ enum http_event {
 
 struct http_event_context {
     int topic_id;
+    nmx_pool_t *ref_mempool;
     struct session *ref_session;
     struct http_decoder_result_queue *ref_queue;
 };
@@ -58,23 +59,25 @@ typedef void http_event_cb(enum http_event event, struct http_decoder_half_data 
                            struct http_event_context *ev_ctx);
 
 struct http_decoder_half *
-http_decoder_half_new(http_event_cb *event_cb, int is_cache_body, int type);
+http_decoder_half_new(nmx_pool_t *mempool, http_event_cb *event_cb, int type);
 
-void http_decoder_half_free(struct http_decoder_half *half);
+void http_decoder_half_free(nmx_pool_t *mempool, struct http_decoder_half *half);
 
 void http_decoder_half_reinit(struct http_decoder_half *half, int topic_id,
                               struct http_decoder_result_queue *queue,
-                              struct session *sess);
+                              nmx_pool_t *mempool, struct session *sess);
 
-int http_decoder_half_parse(struct http_decoder_half *half,
-                            const char *data, size_t len);
+int http_decoder_half_parse(struct http_decoder_half *half, const char *data,
+                            size_t data_len);
 
 long long http_decoder_half_trans_count(struct http_decoder_half *half);
 
 //http decoder half data API
-struct http_decoder_half_data *http_decoder_half_data_new();
+struct http_decoder_half_data *
+http_decoder_half_data_new(nmx_pool_t *mempool);
 
-void http_decoder_half_data_free(struct http_decoder_half_data *data);
+void http_decoder_half_data_free(nmx_pool_t *mempool,
+                                 struct http_decoder_half_data *data);
 
 int http_decoder_half_data_get_request_line(struct http_decoder_half_data *data,
                                             struct http_request_line *line);

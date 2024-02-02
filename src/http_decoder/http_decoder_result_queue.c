@@ -12,26 +12,29 @@
 
 #include "stellar/utils.h"
 #include "http_decoder_half.h"
+#include "http_decoder_inc.h"
 #include "http_decoder_result_queue.h"
 
 struct http_decoder_result_queue *
-http_decoder_result_queue_new(size_t queue_size)
+http_decoder_result_queue_new(nmx_pool_t *mempool, size_t queue_size)
 {
     struct http_decoder_result_queue *queue =
-        CALLOC(struct http_decoder_result_queue, 1);
+        MEMPOOL_CALLOC(mempool, struct http_decoder_result_queue, 1);
     assert(queue);
 
     queue->req_index = 0;
     queue->res_index = 0;
     queue->queue_size = queue_size;
 
-    queue->array = CALLOC(struct http_decoder_result, queue->queue_size);
+    queue->array = MEMPOOL_CALLOC(mempool, struct http_decoder_result,
+                                  queue->queue_size);
     assert(queue->array);
 
     return queue;
 }
 
-void http_decoder_result_queue_free(struct http_decoder_result_queue *queue)
+void http_decoder_result_queue_free(nmx_pool_t *mempool,
+                                    struct http_decoder_result_queue *queue)
 {
 	if (NULL == queue) {
 		return;
@@ -40,20 +43,20 @@ void http_decoder_result_queue_free(struct http_decoder_result_queue *queue)
     if (queue->array != NULL) {
         for (size_t i = 0; i < queue->queue_size; i++) {
             if (queue->array[i].req_data != NULL) {
-            	http_decoder_half_data_free(queue->array[i].req_data);
+            	http_decoder_half_data_free(mempool, queue->array[i].req_data);
 				queue->array[i].req_data = NULL;
             }
 
             if (queue->array[i].res_data != NULL) {
-            	http_decoder_half_data_free(queue->array[i].res_data);
+            	http_decoder_half_data_free(mempool, queue->array[i].res_data);
 				queue->array[i].res_data = NULL;
             }
         }
         
-		FREE(queue->array);
+		MEMPOOL_FREE(mempool, queue->array);
     }
 
-    FREE(queue);
+    MEMPOOL_FREE(mempool, queue);
 }
 
 void http_decoder_result_queue_inc_req_index(struct http_decoder_result_queue *queue)

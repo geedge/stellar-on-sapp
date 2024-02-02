@@ -19,6 +19,7 @@ extern "C"
 
 #include <stddef.h>
 
+#include "mempool/nmx_palloc.h"
 #include "http_decoder_half.h"
 
 struct http_decoder_result {
@@ -34,9 +35,10 @@ struct http_decoder_result_queue {
 };
 
 struct http_decoder_result_queue *
-http_decoder_result_queue_new(size_t queue_size);
+http_decoder_result_queue_new(nmx_pool_t *mempool, size_t queue_size);
 
-void http_decoder_result_queue_free(struct http_decoder_result_queue *queue);
+void http_decoder_result_queue_free(nmx_pool_t *mempool,
+                                    struct http_decoder_result_queue *queue);
 
 void http_decoder_result_queue_inc_req_index(struct http_decoder_result_queue *queue);
 

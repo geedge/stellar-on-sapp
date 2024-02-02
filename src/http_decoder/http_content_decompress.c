@@ -18,7 +18,7 @@
 #include "http_decoder_utils.h"
 #include "http_content_decompress.h"
 
-#define BUFFER_SIZE (1024 * 1024 * 4)
+#define BUFFER_SIZE (16 * 1024)
 
 struct http_content_decompress {
     enum http_content_encoding encoding;

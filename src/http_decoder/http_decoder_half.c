@@ -40,8 +40,6 @@ struct http_decoder_half {
     llhttp_settings_t settings;
     enum llhttp_errno error;
 
-    int is_cache_body;
-
     struct http_decoder_half_data *ref_data;
     enum http_event event;
     http_event_cb *http_ev_cb;
@@ -514,9 +512,9 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
     return 0;
 }
 
-static void http_decoder_half_init(struct http_decoder_half *half,
-                                   http_event_cb *http_ev_cb,
-                                   int is_cache_body, int type)
+static void
+http_decoder_half_init(struct http_decoder_half *half,
+                       http_event_cb *http_ev_cb, int type)
 {
     if (NULL == half) {
         return;
@@ -556,39 +554,39 @@ static void http_decoder_half_init(struct http_decoder_half *half,
     half->error = HPE_OK;
 
     half->http_ev_cb = http_ev_cb;
-    half->is_cache_body = is_cache_body;
 
     half->ref_data = NULL;
 }
 
 struct http_decoder_half *
-http_decoder_half_new(http_event_cb *ev_cb, int is_cache_body, int type)
+http_decoder_half_new(nmx_pool_t *mempool, http_event_cb *ev_cb, int type)
 {
-    struct http_decoder_half *half = CALLOC(struct http_decoder_half, 1);
+    struct http_decoder_half *half = MEMPOOL_CALLOC(mempool, struct http_decoder_half, 1);
     assert(half);
 
-    half->http_ev_ctx = CALLOC(struct http_event_context, 1);
-    http_decoder_half_init(half, ev_cb, is_cache_body, type);
+    half->http_ev_ctx = MEMPOOL_CALLOC(mempool, struct http_event_context, 1);
+    http_decoder_half_init(half, ev_cb, type);
 
     return half;
 }
 
-void http_decoder_half_free(struct http_decoder_half *half)
+void http_decoder_half_free(nmx_pool_t *mempool, struct http_decoder_half *half)
 {
     if (NULL == half) {
         return;
     }
 
     if (half->http_ev_ctx != NULL) {
-        FREE(half->http_ev_ctx);
+        MEMPOOL_FREE(mempool, half->http_ev_ctx);
+        half->http_ev_ctx = NULL;
     }
 
-    FREE(half);
+    MEMPOOL_FREE(mempool, half);
 }
 
 void http_decoder_half_reinit(struct http_decoder_half *half, int topic_id,
                               struct http_decoder_result_queue *queue,
-                              struct session *sess)
+                              nmx_pool_t *mempool, struct session *sess)
 {
     assert(half != NULL);
 
@@ -597,6 +595,7 @@ void http_decoder_half_reinit(struct http_decoder_half *half, int topic_id,
     }
 
     half->http_ev_ctx->topic_id = topic_id;
+    half->http_ev_ctx->ref_mempool = mempool;
     half->http_ev_ctx->ref_session = sess;
     half->http_ev_ctx->ref_queue = queue;
 }
@@ -630,8 +629,8 @@ static void publish_message_for_parsed_header(struct http_decoder_half *half)
     }
 }
 
-int http_decoder_half_parse(struct http_decoder_half *half,
-                            const char *data, size_t data_len)
+int http_decoder_half_parse(struct http_decoder_half *half, const char *data,
+                            size_t data_len)
 {
     if (NULL == half || NULL == data || 0 == data_len) {
         return -1;
@@ -752,13 +751,14 @@ long long http_decoder_half_trans_count(struct http_decoder_half *half)
     return trans_cnt;
 }
 
-struct http_decoder_half_data *http_decoder_half_data_new()
+struct http_decoder_half_data *
+http_decoder_half_data_new(nmx_pool_t *mempool)
 {
     struct http_decoder_half_data *data =
-        CALLOC(struct http_decoder_half_data, 1);
+        MEMPOOL_CALLOC(mempool, struct http_decoder_half_data, 1);
     assert(data);
 
-    data->table = http_decoder_table_new();
+    data->table = http_decoder_table_new(mempool);
     assert(data->table);
 
     data->major_version = -1;
@@ -772,7 +772,8 @@ struct http_decoder_half_data *http_decoder_half_data_new()
     return data;
 }
 
-void http_decoder_half_data_free(struct http_decoder_half_data *data)
+void http_decoder_half_data_free(nmx_pool_t *mempool,
+                                 struct http_decoder_half_data *data)
 {
     if (NULL == data) {
         return;
@@ -788,7 +789,7 @@ void http_decoder_half_data_free(struct http_decoder_half_data *data)
         data->decompress = NULL;
     }
 
-    FREE(data);
+    MEMPOOL_FREE(mempool, data);
 }
 
 int http_decoder_half_data_get_request_line(struct http_decoder_half_data *data,

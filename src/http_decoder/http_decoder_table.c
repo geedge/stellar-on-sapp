@@ -38,7 +38,8 @@ struct http_decoder_table {
     struct http_decoder_string version;
     struct http_decoder_string body;
 
-    int header_complete; //flag for all headers parsed completely
+    nmx_pool_t *ref_mempool;
+    int header_complete; // flag for all headers parsed completely
     size_t header_cnt;
     size_t header_index;
     size_t header_iter;
@@ -68,13 +69,16 @@ static void http_decoder_table_init(struct http_decoder_table *table)
     http_decoder_string_init(&table->body, 0);
 }
 
-struct http_decoder_table *http_decoder_table_new()
+struct http_decoder_table *http_decoder_table_new(nmx_pool_t *mempool)
 {
-    struct http_decoder_table *table = CALLOC(struct http_decoder_table, 1);
+    struct http_decoder_table *table =
+        MEMPOOL_CALLOC(mempool, struct http_decoder_table, 1);
     assert(table);
 
+    table->ref_mempool = mempool;
     table->header_cnt = INIT_HEADER_CNT;
-    table->headers = CALLOC(struct http_decoder_header, table->header_cnt);
+    table->headers = MEMPOOL_CALLOC(mempool, struct http_decoder_header,
+                                    table->header_cnt);
 
     http_decoder_table_init(table);
 
@@ -118,10 +122,11 @@ void http_decoder_table_free(struct http_decoder_table *table)
             }
         }
 
-        FREE(table->headers);
+        MEMPOOL_FREE(table->ref_mempool, table->headers);
+        table->headers = NULL;
     }
 
-    FREE(table);
+    MEMPOOL_FREE(table->ref_mempool, table);
 }
 
 enum string_state
@@ -258,6 +263,7 @@ void http_decoder_table_commit(struct http_decoder_table *table, enum http_item 
         return;
     }
 
+    size_t i = 0;
     struct http_decoder_header *header = NULL;
     assert(table);
 
@@ -284,10 +290,19 @@ void http_decoder_table_commit(struct http_decoder_table *table, enum http_item 
         http_decoder_string_commit(&header->val);
         // inc index
         if ((table->header_index + 1) >= table->header_cnt) {
-            table->headers = REALLOC(struct http_decoder_header, table->headers,
-                                     table->header_cnt * 2);
+            struct http_decoder_header *old_headers = table->headers;
+            table->headers =
+                MEMPOOL_CALLOC(table->ref_mempool, struct http_decoder_header,
+                               table->header_cnt * 2);
             table->header_cnt *= 2;
-            for (size_t i = table->header_index + 1; i < table->header_cnt; i++) {
+
+            for (i = 0; i <= table->header_index; i++) {
+                table->headers[i] = old_headers[i];
+            }
+
+            MEMPOOL_FREE(table->ref_mempool, old_headers);
+
+            for (i = table->header_index + 1; i < table->header_cnt; i++) {
                 header = &table->headers[i];
                 memset(header, 0, sizeof(struct http_decoder_header));
                 http_decoder_string_init(&header->key, MAX_HEADER_KEY_CACHE_SIZE);

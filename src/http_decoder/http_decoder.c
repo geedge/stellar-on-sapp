@@ -21,11 +21,12 @@
 #include "http_decoder_table.h"
 #include "http_decoder_result_queue.h"
 #include "llhttp.h"
+#include "http_decoder_inc.h"
 #include "fieldstat/fieldstat_easy.h"
 
 #define HTTP_IDENTIFY_LEN 16
 #define HD_RESULT_QUEUE_SIZE 16
-#define HD_IS_CACHE_BODY 1
+#define MEMPOOL_SIZE (32 * 1024)
 
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
 const char *fs_file_name = "http_decoder.fs";
@@ -47,6 +48,7 @@ struct http_decoder {
 struct http_decoder_exdata {
     struct http_decoder_result_queue *queue;
     struct http_decoder *decoder;
+    nmx_pool_t *mempool;
 };
 
 struct http_decoder_context {
@@ -91,6 +93,7 @@ static void http_event_handler(enum http_event event,
     assert(ev_ctx);
 
     size_t queue_idx = 0;
+    nmx_pool_t *mempool = ev_ctx->ref_mempool;
     struct http_decoder_result_queue *queue = ev_ctx->ref_queue;
     struct http_message *msg = NULL;
     struct http_decoder_half_data *half_data = NULL;
@@ -106,15 +109,15 @@ static void http_event_handler(enum http_event event,
         half_data = http_decoder_result_queue_peek_req(queue);
         if (half_data != NULL) {
             half_data = http_decoder_result_queue_pop_req(queue);
-            http_decoder_half_data_free(half_data);
+            http_decoder_half_data_free(mempool, half_data);
             half_data = NULL;
         }
 
-        half_data = http_decoder_half_data_new();
+        half_data = http_decoder_half_data_new(mempool);
         ret = http_decoder_result_queue_push_req(queue, half_data);
         if (ret < 0) {
             fprintf(stderr, "http_decoder_result_queue_push req failed.");
-            http_decoder_half_data_free(half_data);
+            http_decoder_half_data_free(mempool, half_data);
             half_data = NULL;
         }
         *data = half_data;
@@ -147,7 +150,7 @@ static void http_event_handler(enum http_event event,
         http_decoder_result_queue_inc_req_index(queue);
 		half_data = http_decoder_result_queue_pop_req(queue);
         if (half_data != NULL) {
-            http_decoder_half_data_free(half_data);
+            http_decoder_half_data_free(mempool, half_data);
             half_data = NULL;
         }
         break;
@@ -160,15 +163,15 @@ static void http_event_handler(enum http_event event,
         half_data = http_decoder_result_queue_peek_res(queue);
         if (half_data != NULL) {
             half_data = http_decoder_result_queue_pop_res(queue);
-            http_decoder_half_data_free(half_data);
+            http_decoder_half_data_free(mempool, half_data);
             half_data = NULL;
         }
 
-        half_data = http_decoder_half_data_new();
+        half_data = http_decoder_half_data_new(mempool);
         ret = http_decoder_result_queue_push_res(queue, half_data);
         if (ret < 0) {
             fprintf(stderr, "http_decoder_result_queue_push res failed.");
-            http_decoder_half_data_free(half_data);
+            http_decoder_half_data_free(mempool, half_data);
             half_data = NULL;
         }
         *data = half_data;
@@ -203,7 +206,7 @@ static void http_event_handler(enum http_event event,
         http_decoder_result_queue_inc_res_index(queue);
 		half_data = http_decoder_result_queue_pop_res(queue);
         if (half_data != NULL) {
-            http_decoder_half_data_free(half_data);
+            http_decoder_half_data_free(mempool, half_data);
             half_data = NULL;
         }
         break;
@@ -214,42 +217,44 @@ static void http_event_handler(enum http_event event,
 }
 
 static struct http_decoder *
-http_decoder_new(http_event_cb *ev_cb, int is_cache_body)
+http_decoder_new(nmx_pool_t *mempool, http_event_cb *ev_cb)
 {
-	struct http_decoder *decoder = CALLOC(struct http_decoder, 1);
+	struct http_decoder *decoder = MEMPOOL_CALLOC(mempool, struct http_decoder, 1);
 	assert(decoder);
 
-	decoder->c2s_half = http_decoder_half_new(ev_cb, is_cache_body, HTTP_REQUEST);
-	decoder->s2c_half = http_decoder_half_new(ev_cb, is_cache_body, HTTP_RESPONSE);
+	decoder->c2s_half = http_decoder_half_new(mempool, ev_cb, HTTP_REQUEST);
+	decoder->s2c_half = http_decoder_half_new(mempool, ev_cb, HTTP_RESPONSE);
 
 	return decoder;
 }
 
-static void http_decoder_free(struct http_decoder *decoder)
+static void
+http_decoder_free(nmx_pool_t *mempool, struct http_decoder *decoder)
 {
     if (NULL == decoder) {
         return;
     }
 
     if (decoder->c2s_half != NULL) {
-        http_decoder_half_free(decoder->c2s_half);
+        http_decoder_half_free(mempool, decoder->c2s_half);
         decoder->c2s_half = NULL;
     }
 
     if (decoder->s2c_half != NULL) {
-        http_decoder_half_free(decoder->s2c_half);
+        http_decoder_half_free(mempool, decoder->s2c_half);
         decoder->s2c_half = NULL;
     }
 
-    FREE(decoder);
+    MEMPOOL_FREE(mempool, decoder);
 }
 
 static struct http_decoder_exdata *http_decoder_exdata_new(size_t queue_size)
 {
     struct http_decoder_exdata *ex_data = CALLOC(struct http_decoder_exdata, 1);
 
-    ex_data->decoder = http_decoder_new(http_event_handler, 0);
-    ex_data->queue = http_decoder_result_queue_new(HD_RESULT_QUEUE_SIZE);
+    ex_data->mempool = nmx_create_pool(MEMPOOL_SIZE);
+    ex_data->decoder = http_decoder_new(ex_data->mempool, http_event_handler);
+    ex_data->queue = http_decoder_result_queue_new(ex_data->mempool, HD_RESULT_QUEUE_SIZE);
 
     return ex_data;
 }
@@ -261,14 +266,16 @@ static void http_decoder_exdata_free(struct http_decoder_exdata *ex_data)
     }
 
     if (ex_data->decoder != NULL) {
-        http_decoder_free(ex_data->decoder);
+        http_decoder_free(ex_data->mempool, ex_data->decoder);
         ex_data->decoder = NULL;
     }
 
     if (ex_data->queue != NULL) {
-        http_decoder_result_queue_free(ex_data->queue);
+        http_decoder_result_queue_free(ex_data->mempool, ex_data->queue);
         ex_data->queue = NULL;
     }
+
+    nmx_destroy_pool(ex_data->mempool);
 
     FREE(ex_data);
 }
@@ -365,7 +372,7 @@ int http_decoder_entry(struct session *sess, int events,
     //        ex_data->queue->res_index,
     //        ex_data->queue->array[ex_data->queue->res_index].res_data);
     http_decoder_half_reinit(cur_half, decoder_ctx->topic_id, ex_data->queue,
-                             sess);
+                             ex_data->mempool, sess);
     ret = http_decoder_half_parse(cur_half, payload, payload_len);
     if (ret < 0) {
         // fieldstat_easy_counter_incrby(decoder_ctx->fse, thread_id,
