@@ -1,20 +1,36 @@
 #pragma once
 
-#include <sys/time.h>
-
+struct session;
 struct stellar;
 
-int stellar_get_worker_thread_num(struct stellar *st);
-int stellar_get_current_thread_id(struct stellar *st);
+//return plugin_env
+typedef void *plugin_on_load_func(struct stellar *st);
+typedef void plugin_on_unload_func(void *plugin_env);
 
-int stellar_get_session_mq_topic_cnt(struct stellar *st);
-int stellar_get_session_mq_subscriber_cnt(struct stellar *st, int topic_id);
+//return per_session_ctx
+typedef void *session_ctx_new_func(struct session *sess, void *plugin_env);
+typedef void session_ctx_free_func(struct session *sess, void *session_ctx, void *plugin_env);
+
+#define TOPIC_TCP "TCP"
+#define TOPIC_TCP_STREAM "TCP_STREAM"
+#define TOPIC_UDP "UDP"
+#define TOPIC_EGRESS "EGRESS"
+#define TOPIC_CONTROL_PACKET "CONTROL_PACKET"
+							
+//return session plugin_id
+int stellar_session_plugin_register(struct stellar *st, 
+									session_ctx_new_func session_ctx_new, 
+									session_ctx_free_func session_ctx_free, 
+									void *plugin_env);
+
+void stellar_session_plugin_dettach_current_session(struct session *sess);
 
 
-typedef void *plugin_init_callback(struct stellar *st);
-typedef void plugin_exit_callback(void *plugin_ctx);
 
-typedef int stellar_periodic_cb_func(struct stellar *st, void *cb_arg);
+struct packet;
+typedef void *plugin_on_packet_func(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env);
 
-int stellar_worker_thread_periodic_add(struct stellar *st, stellar_periodic_cb_func *periodic_cb, void *cb_arg, const struct timeval *interval);
+//return packet plugin_id
+int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol, plugin_on_packet_func on_packet, void *plugin_env);
+
 

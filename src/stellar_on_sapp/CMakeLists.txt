@@ -2,8 +2,8 @@ add_definitions(-fPIC)
 
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
-add_library(stellar_on_sapp SHARED stellar_on_sapp.c) 
-target_link_libraries(stellar_on_sapp adapter)
+add_library(stellar_on_sapp SHARED stellar_on_sapp_loader.c stellar_on_sapp_api.c) 
+target_link_libraries(stellar_on_sapp plugin_manager)
 set_target_properties(stellar_on_sapp PROPERTIES LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/version.map")
 set_target_properties(stellar_on_sapp PROPERTIES PREFIX "")
 

@@ -1,10 +1,10 @@
+#include "stellar/stellar.h"
 #include "stellar/utils.h"
 #include "stellar/session_exdata.h"
 
-#include "adapter/adapter.h"
+#include "stellar_on_sapp.h"
 
 #include <MESA/stream.h>
-#include <stream_inc/stream_base.h>
 
 #include <assert.h>
 
@@ -21,6 +21,12 @@ struct simple_stream_ctx
 #define STELLAR_BRIDEGE_NAME "STELLAR_SESSION"
 #define STELLAR_EXDATA_NAME "SAPP_STREAMINFO"
 
+enum entry_type
+{
+	ENTRY_TYPE_UDP,
+	ENTRY_TYPE_TCPALL,
+	ENTRY_TYPE_TCP,
+};
 
 struct stellar *g_stellar=NULL;
 int g_session_bridge_id=-1;
@@ -48,26 +54,25 @@ static int is_l7_type_tunnels(struct streaminfo *a_stream)
 
 static void stellar_on_sapp_bridge_free(const struct streaminfo *stream, int bridge_id, void *data)
 {
-	adapter_session_state_update((struct streaminfo *)stream, (struct session *)data, NULL, SESSION_STATE_CLOSING);	
-	adapter_session_free((struct session *)data);
+	session_free_on_sapp((struct session *)data);
 	return;
 }
 
 int STELLAR_START_LOADER_INIT()
 {
-	g_stellar = stellar_init(STELLAR_PLUGIN_PATH);
+	g_stellar = stellar_init_on_sapp(STELLAR_PLUGIN_PATH);
 	if(g_stellar==NULL)return -1;
 	g_session_bridge_id=stream_bridge_build(STELLAR_BRIDEGE_NAME, "w");
 	if(g_session_bridge_id < 0)return -1;
 	stream_bridge_register_data_free_cb(g_session_bridge_id, stellar_on_sapp_bridge_free);
-	g_streaminfo_exdata_id=stellar_session_get_ex_new_index(g_stellar, STELLAR_EXDATA_NAME, NULL, NULL); 
+	g_streaminfo_exdata_id=stellar_session_exdata_new_index(g_stellar, STELLAR_EXDATA_NAME, NULL, NULL); 
 	if(g_streaminfo_exdata_id < 0)return -1;
 	return 0;
 }
 
 void STELLAR_START_LOADER_EXIT(void)
 {
-	stellar_exit(g_stellar);
+	stellar_exit_on_sapp(g_stellar);
 	return;
 }
 
@@ -85,7 +90,7 @@ char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thre
 	struct session *sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
 	if(sess)
 	{
-		adapter_session_poll(sess);
+		session_poll_on_sapp(sess);
 		return APP_STATE_GIVEME;
 	}
 	else
@@ -99,7 +104,9 @@ void  STELLAR_DEFER_LOADER_EXIT(void)
 	return;
 }
 
-static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet)
+
+
+static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet, enum entry_type type)
 {
 	struct simple_stream_ctx *ctx=(struct simple_stream_ctx *)*pme;
 	struct tcpdetail *pdetail=(struct tcpdetail *)pstream->pdetail;
@@ -127,31 +134,58 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 			ctx->s2c_pkts++;
 		}  		
 	}
+
+	//entry_type convert to packet_type
+	enum packet_type pkt_type=UNKNOWN;
+	switch (type)
+	{
+	case ENTRY_TYPE_UDP:
+		pkt_type=UDP;
+		break;
+	case ENTRY_TYPE_TCP:
+		pkt_type=TCP_STREAM;
+		break;	
+	case ENTRY_TYPE_TCPALL:
+		pkt_type=TCP;
+		break;	
+	default:
+		break;
+	}
+
 	switch (state)
 	{
 	case OP_STATE_PENDING:
-		ctx->sess=adapter_session_new(g_stellar, pstream);
-		session_set_ex_data(ctx->sess, g_streaminfo_exdata_id, pstream);
-		stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
-		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
-		break;
+        if (type == ENTRY_TYPE_TCPALL || type == ENTRY_TYPE_UDP)
+        {
+            ctx->sess = session_new_on_sapp(g_stellar, pstream);
+            session_exdata_set(ctx->sess, g_streaminfo_exdata_id, pstream);
+            stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
+        }
+        else
+        {
+            ctx->sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
+        }
+        entry_ret = session_state_update_on_sapp(pstream, ctx->sess, a_packet, pkt_type);
+        break;
 	case OP_STATE_DATA:
 		raw_pkt = get_current_rawpkt_from_streaminfo(pstream);
 		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
 		if(is_ctrl_pkt==1)
 		{
-			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CONTROL);
+			entry_ret=session_state_update_on_sapp(pstream, ctx->sess, a_packet, CONTROL);
 			entry_ret = entry_ret|APP_STATE_DROPPKT;
 		}
 		else
 		{
-			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+			entry_ret=session_state_update_on_sapp(pstream, ctx->sess, a_packet, pkt_type);
 		}
 		break;
 	case OP_STATE_CLOSE:
-		if(a_packet)
+		// for TCPALL && UDP closed by idle timeout, definitely no packet
+		// for TCP stream, only trigger update when packet payload > 0
+		if(a_packet && pstream->ptcpdetail->datalen > 0)
 		{
-			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+			entry_ret=session_state_update_on_sapp(pstream, ctx->sess, a_packet, pkt_type);
 		}
 		FREE(*pme);
 		break;
@@ -163,28 +197,19 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 
 unsigned char stellar_on_sapp_udp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
-	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
+	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet, ENTRY_TYPE_UDP);
 }
 
 unsigned char stellar_on_sapp_tcpall_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
-	return loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet);
-}
-
-unsigned char stellar_on_sapp_detach_check_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
-{
-	struct session *sess=(struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);  
-	if(adapter_session_get_detach_others(sess) == 1)
-	{
-		return APP_STATE_DROPME|APP_STATE_KILL_OTHER;
-	}
-	else
-	{
-		return APP_STATE_GIVEME;
-	}
+	return loader_transfer_stream_entry(pstream, pstream->pktstate, pme,  thread_seq,  a_packet, ENTRY_TYPE_TCPALL);
 }
 
 unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
-	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
+	
+	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet, ENTRY_TYPE_TCP);
 }
+
+// TODO: add packet entry and call plugin_manager_on_packet
+// TODO: add polling entry and call plugin_manager_on_polling

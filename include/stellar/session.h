@@ -1,9 +1,9 @@
 #pragma once
 
+#include "stellar.h"
+
 #include <stdint.h>
 #include <stddef.h>
-
-#include "stellar.h"
 
 enum session_type
 {
@@ -22,8 +22,7 @@ enum session_state
 	__SESSION_STATE_MAX,
 };
 
-
-struct session;
+enum session_type session_get_type(struct session *sess);
 
 #define SESSION_SEEN_C2S_FLOW (1 << 0)
 #define SESSION_SEEN_S2C_FLOW (1 << 1)
@@ -43,8 +42,8 @@ int session_is_symmetric(struct session *sess, unsigned char *flag);
 #define	SESSION_IS_TUNNLE_SOCKS (1 << 8)
 #define	SESSION_IS_TUNNLE_HTTP_PROXY (1 << 9)
 
-int session_is_outer_tunnel(struct session *sess, uint64_t *flag);
-int session_is_inner_most(struct session *sess, uint64_t *flag);
+int session_is_outmost(struct session *sess, uint64_t *flag);
+int session_is_innermost(struct session *sess, uint64_t *flag);
 
 #define SESSION_DIRECTION_IN 0
 #define SESSION_DIRECTION_OUT 1
@@ -108,7 +107,6 @@ const char *session_get0_route_ctx(struct session *sess, int session_direction, 
 int session_set_session_id(struct session *sess, uint64_t session_id);
 int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, size_t sid_num);
 
-struct packet;
 const struct packet *session_get0_current_packet(struct session *sess);
 
 #define PACKET_DIRECTION_C2S 0
@@ -116,32 +114,4 @@ const struct packet *session_get0_current_packet(struct session *sess);
 int packet_get_direction(const struct packet *pkt);
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len);
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
-
-
-
-
-#define SESS_EV_OPENING 1<<1
-#define SESS_EV_PACKET 1<<2
-#define SESS_EV_CLOSING 1<<3
-#define SESS_EV_CONTROL 1<<6
-
-#define SESS_EV_TCP 1<<4
-#define SESS_EV_UDP 1<<5
-
-
-typedef int session_event_cb_func(struct session *sess, int events, const struct packet *pkt, void *cb_arg);
-
-struct session_event;
-//return plugin_id
-int stellar_plugin_register(struct stellar *st, int events, session_event_cb_func *cb, void *cb_arg);// register intrinsic event
-struct session_event *session_get_intrinsic_event(struct session *sess, int plugin_id);
-
-void session_plugin_detach_others(struct session *sess, int plugin_id);
-
-#include <sys/time.h>
-
-struct session_event *session_event_new(struct stellar *st, struct session *sess, int events, session_event_cb_func *cb, void *cb_arg);
-int session_event_add(struct session_event *ev, const struct timeval *timeout);
-int session_event_del(struct session_event *ev);
-int session_event_assign(struct session_event *ev, struct stellar *st, struct session *sess, int events, session_event_cb_func *cb, void *cb_arg);
-void session_event_free(struct session_event *ev);
+unsigned char packet_get_ip_protocol(struct packet *pkt);

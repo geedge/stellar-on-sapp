@@ -43,6 +43,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=ctunullpointer"
             "--suppress=redundantAssignment"
             "--suppress=duplicateValueTernary"
+            "--suppress=funcArgOrderDifferent"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()
@@ -74,12 +75,13 @@ include_directories(${CMAKE_SOURCE_DIR}/deps)
 include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_subdirectory(vendor)
-#add_subdirectory(deps/utable)
 add_subdirectory(deps/toml)
-add_subdirectory(src/adapter)
+add_subdirectory(src/plugin_manager)
 add_subdirectory(src/stellar_on_sapp)
-add_subdirectory(src/http_decoder)
-add_subdirectory(examples/sapp_plugin)
+
+#add_subdirectory(src/http_decoder)
+
+#add_subdirectory(examples/sapp_plugin)
 add_subdirectory(examples/stellar_plugin)
 
 enable_testing()

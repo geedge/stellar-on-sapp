@@ -1,169 +1,83 @@
 #include "stellar/session.h"
-#include "stellar/stellar.h"
-#include "stellar/utils.h"
-#include "stellar/session_exdata.h"
+#include "stellar_on_sapp.h"
 
 #include "stellar_internal.h"
-#include "adapter.h"
-#include "session_manager.h"
 
-#include "uthash/utarray.h"
+#include "stellar/stellar.h"
+#include "stellar/utils.h"
+
+#include "plugin_manager/plugin_manager.h"
 
 #include <MESA/stream.h>
 
-
-inline void adapter_session_poll(struct session *sess)
+struct stellar
 {
-	session_defer_loop(sess);
-}
-
-#include <dlfcn.h>
-#include "toml/toml.h"
-
-struct plugin_specific
-{
-	plugin_init_callback *init_cb;
-	plugin_exit_callback *exit_cb;
+	struct plugin_manager_schema *plug_mgr;
 };
 
-struct plugin_specific_inernal
+struct session
 {
-	struct plugin_specific specs;
-	void *plugin_ctx;
+	enum session_type type;
+	enum session_state state;
+	struct packet *cur_pkt;
+	struct stellar *st;
+	struct plugin_manager_runtime *plug_mgr_rt;
 };
 
-UT_icd plugin_specs_icd = {sizeof(struct plugin_specific_inernal), NULL, NULL, NULL};
-
-static void exdata_plugin_rt_free(struct session *sess, int idx, void *ex_ptr, void *arg)
+inline struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct stellar *st)
 {
-	if(ex_ptr)
-	{
-		FREE(ex_ptr);
-	}
-	return;
+	return st->plug_mgr;
 }
 
-static struct plugin_specific *load_plugin_specs(const char *toml_conf_path, int *spec_num)
+inline int stellar_plugin_manager_schema_set(struct stellar *st, struct plugin_manager_schema *pm)
 {
-	*spec_num = 0;
-    FILE* fp = fopen(toml_conf_path, "r");
-    char errbuf[256];
-    toml_table_t* conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
-    fclose(fp);	
-    if (!conf) {
-        fprintf(stderr, "Error parsing toml: %s\n", errbuf);
-        return NULL;
-    }	
-    toml_array_t* plugin_array = toml_array_in(conf, "plugin");
-	if(plugin_array==NULL)return NULL;
-    *spec_num = toml_array_nelem(plugin_array);
-     struct plugin_specific* plugins = CALLOC(struct plugin_specific, *spec_num);
-
-    for (int i = 0; i < *spec_num; i++) {
-        toml_table_t* plugin = toml_table_at(plugin_array, i);
-
-        const char *path_raw = toml_raw_in(plugin, "path");
-        const char *init_func_name_raw = toml_raw_in(plugin, "init");
-        const char *exit_func_name_raw = toml_raw_in(plugin, "exit");
-        char *path = NULL;
-        char *init_func_name = NULL;
-        char *exit_func_name = NULL;
-        if (toml_rtos(path_raw, &path) || toml_rtos(init_func_name_raw, &init_func_name) ||
-            toml_rtos(exit_func_name_raw, &exit_func_name))
-        {
-            goto LOAD_PLUGIN_SPEC_ERROR;
-        }
-        void* handle = dlopen(path, RTLD_NOW|RTLD_LAZY|RTLD_GLOBAL);
-        if (!handle) {
-            fprintf(stderr, "Error loading plugin %s: %s\n", path, dlerror());
-            goto LOAD_PLUGIN_SPEC_ERROR;
-        }
-
-        plugins[i].init_cb = (plugin_init_callback *) dlsym(handle, init_func_name);
-        if (!plugins[i].init_cb) {
-            fprintf(stderr, "Could not load init function %s: %s\n", init_func_name, dlerror());
-        }
-
-        plugins[i].exit_cb = (plugin_exit_callback *) dlsym(handle, exit_func_name);
-        if (!plugins[i].exit_cb) {
-            fprintf(stderr, "Could not load exit function %s: %s\n", exit_func_name, dlerror());
-        }
-        FREE(path);
-        FREE(init_func_name);
-        FREE(exit_func_name);
-    }
-    toml_free(conf);
-    return plugins;	
-LOAD_PLUGIN_SPEC_ERROR:
-	toml_free(conf);
-	FREE(plugins);
-	return NULL;	
+	if(st->plug_mgr)return -1;
+	st->plug_mgr=pm;
+	return 0;
 }
 
-struct stellar *stellar_init(const char *toml_conf_path)
+inline struct plugin_manager_runtime * session_plugin_manager_runtime_get(struct session *sess)
 {
-	int spec_num;
-	struct plugin_specific *specs = load_plugin_specs(toml_conf_path, &spec_num);
-	if(spec_num < 0)
+	return sess->plug_mgr_rt;
+}
+/*********************************************
+ * STELLAR INIT & EXIT ON SAPP *
+ *********************************************/
+
+struct stellar *stellar_init_on_sapp(const char *toml_conf_path)
+{
+	struct stellar *st = CALLOC(struct stellar, 1);
+	struct plugin_manager_schema *pm=plugin_manager_init(st, toml_conf_path);
+	if(pm==NULL)
 	{
+		FREE(st);
 		return NULL;
 	}
-	struct stellar *st = CALLOC(struct stellar, 1);
-	struct plugin_specific_inernal spec_internal={};
-	if(spec_num > 0)
-	{
-		utarray_new(st->plugin_specs_array,&plugin_specs_icd);
-		utarray_reserve(st->plugin_specs_array, spec_num);
-	}
-	for(int i = 0; i < spec_num; i++)
-	{
-		if (specs[i].init_cb != NULL)
-		{
-			spec_internal.plugin_ctx=specs[i].init_cb(st);
-			spec_internal.specs=specs[i];
-			utarray_push_back(st->plugin_specs_array, &spec_internal);
-		}
-	}
-	FREE(specs);
+	st->plug_mgr=pm;
 	return st;
 }
 
-void stellar_exit(struct stellar *st)
+void stellar_exit_on_sapp(struct stellar *st)
 {
 	if(!st)return;
-	struct plugin_specific_inernal *p=NULL;
-	while ((p = (struct plugin_specific_inernal *)utarray_next(st->plugin_specs_array, p)))
-	{
-		if(p->specs.exit_cb)p->specs.exit_cb(p->plugin_ctx);
-	}
-	if(st->session_mq_schema_array)utarray_free(st->session_mq_schema_array);
-	if(st->session_exdata_schema_array)utarray_free(st->session_exdata_schema_array);
-	if(st->intrinsic_session_event_schema_array)utarray_free(st->intrinsic_session_event_schema_array);
-	if(st->plugin_specs_array)utarray_free(st->plugin_specs_array);
+	if(st->plug_mgr)plugin_manager_exit(st->plug_mgr);
 	FREE(st);
 	return;	
 };
 
-struct streaminfo;
-//streaminfo open
-
 
 struct packet
 {
+	enum packet_type type;
 	void *raw_pkt;
 	struct streaminfo *a_stream;
 };
 
-static void adapter_packet_free(struct session *sess, struct packet *pkt, void *arg)
-{
-	if(pkt)
-	{
-		FREE(pkt);
-	}
-	return;
-}
+/*********************************************
+ * SESSION NEW & FREE ON SAPP *
+ *********************************************/
 
-struct session *adapter_session_new(struct stellar *st, struct streaminfo *stream)
+struct session *session_new_on_sapp(struct stellar *st, struct streaminfo *stream)
 {
 	enum session_type type;
 	if(stream->type==STREAM_TYPE_TCP)
@@ -178,49 +92,152 @@ struct session *adapter_session_new(struct stellar *st, struct streaminfo *strea
 	{
 		return NULL;
 	}
-	struct session *sess = session_new(st, type, stream->threadnum);
-	if(sess)
+	struct session *sess = CALLOC(struct session, 1);
+	sess->st = st;
+	sess->type = type;
+	sess->state = SESSION_STATE_OPENING;
+    sess->cur_pkt = CALLOC(struct packet, 1);
+	sess->plug_mgr_rt=plugin_manager_session_runtime_new(st->plug_mgr, sess);
+    sess->cur_pkt->a_stream = stream;
+    return sess;
+}
+
+void session_free_on_sapp(struct session *sess)
+{
+	sess->state = SESSION_STATE_CLOSING;
+	if(sess->plug_mgr_rt)
 	{
-    	struct packet *pkt = CALLOC(struct packet, 1);
-    	session_set_current_packet(sess, pkt,adapter_packet_free, NULL);
-    	pkt->a_stream = stream;
+		plugin_manager_session_runtime_free(sess->plug_mgr_rt);
 	}
-	return sess;
-}
-
-void adapter_session_free(struct session *sess)
-{
-	return session_free(sess);
-}
-
-int adapter_session_get_detach_others(struct session *sess)
-{
-	if(sess)
+	if(sess->cur_pkt)
 	{
-		return sess->set_detach_others;
+		FREE(sess->cur_pkt);
 	}
-	return 0;
+	FREE(sess);
+	return;
 }
 
-unsigned char adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state)
+/*********************************************
+ * SESSION STATE UPDATE ON SAPP *
+ *********************************************/
+
+unsigned char session_state_update_on_sapp(struct streaminfo *stream, struct session *sess, void *a_packet, enum packet_type type)
 {
-	struct packet *pkt = NULL;
-	if(sess)
+	if(sess && a_packet)
 	{
-		pkt=(struct packet *)session_get0_current_packet(sess);
+		sess->state=SESSION_STATE_ACTIVE;
+		struct packet *pkt = sess->cur_pkt;
 		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
-		session_dispatch( sess, state, pkt);
-		if(adapter_session_get_detach_others(sess) == 1)
-		{
-			return APP_STATE_GIVEME|APP_STATE_KILL_OTHER;
-		}
+		pkt->type=type;
+		plugin_manager_on_session_ingress(sess, pkt);
 		return APP_STATE_GIVEME;
 	}
 	else
 		return APP_STATE_DROPME;
 }
 
+void session_poll_on_sapp(struct session *sess)
+{
+	if(sess && sess->state != SESSION_STATE_CONTROL)
+	{
+		struct packet *pkt = sess->cur_pkt;
+		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
+		plugin_manager_on_session_egress(sess, pkt);
+	}
+}
 
+/*********************************************
+ * STELLAR INFO INTERFACE WRAPPER ON SAPP*
+ *********************************************/
+
+int stellar_get_worker_thread_num(struct stellar *st)
+{
+	return get_thread_count();
+}
+
+int stellar_get_current_thread_id(struct stellar *st)
+{
+	return get_current_worker_thread_id();
+}
+
+/*********************************************
+ * PACKET INFO INTERFACE WRAPPER ON SAPP*
+ *********************************************/
+
+
+inline enum packet_type packet_get_type(const struct packet *pkt)
+{
+	return pkt->type;
+}
+
+int packet_get_direction(const struct packet *pkt)
+{
+	const struct streaminfo *pstream=pkt->a_stream;
+	if(pstream->curdir==DIR_C2S)
+	{
+		return PACKET_DIRECTION_C2S;
+	}
+	else if(pstream->curdir==DIR_S2C)
+	{
+		return PACKET_DIRECTION_S2C;
+	}
+	return -1;
+}   	
+
+const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
+{
+	const void *raw_data=NULL;
+	int raw_datalen=0;
+	int ret1 = get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_DATA, &raw_data);
+	int ret2 = get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_TOT_LEN, &raw_datalen);
+	if(ret1 >= 0 || ret2 >= 0)
+	{
+		*data_len = raw_datalen;
+		return (const char *)raw_data;
+	}
+	else
+	{
+		*data_len = 0;
+		return NULL;
+	}
+}
+
+int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
+{
+	if(pkt == NULL || ts == NULL)return -1;
+	if(pkt->raw_pkt == NULL || pkt->a_stream == NULL)return -1;
+
+	get_opt_from_rawpkt(pkt->raw_pkt , RAW_PKT_GET_TIMESTAMP, ts);
+	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
+	return 0;
+}
+
+unsigned char packet_get_ip_protocol(struct packet *pkt)
+{
+	if(pkt == NULL || pkt->a_stream == NULL)return 0;
+	unsigned char ip_protocol=0;
+	switch(pkt->a_stream->type)
+	{
+		case STREAM_TYPE_TCP:
+			ip_protocol=IPPROTO_TCP;
+			break;
+		case STREAM_TYPE_UDP:
+			ip_protocol=IPPROTO_UDP;
+			break;
+		default:
+			break;
+	}
+	return ip_protocol; // FIXME: to be improved to support ICMP, etc.
+}
+
+/*********************************************
+ * SESSION INFO INTERFACE WRAPPER ON SAPP*
+ *********************************************/
+
+inline struct packet *session_get_current_packet(struct session *sess)
+{
+	return sess->cur_pkt;
+}
 
 const char* session_get0_readable_addr(struct session *sess)
 {
@@ -269,44 +286,9 @@ const char *session_get0_current_payload(struct session *sess, size_t *payload_l
 	return (const char*)sess->cur_pkt->a_stream->ptcpdetail->pdata;
 }
 
-#include <assert.h>
 inline const struct packet *session_get0_current_packet(struct session *sess)
 {
-	//if(sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL)return NULL;
-	//sess->cur_pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
 	return sess->cur_pkt;
-}
-
-int packet_get_direction(const struct packet *pkt)
-{
-	const struct streaminfo *pstream=pkt->a_stream;
-	if(pstream->curdir==DIR_C2S)
-	{
-		return PACKET_DIRECTION_C2S;
-	}
-	else if(pstream->curdir==DIR_S2C)
-	{
-		return PACKET_DIRECTION_S2C;
-	}
-	return -1;
-}   	
-
-const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
-{
-	const void *raw_data=NULL;
-	int raw_datalen=0;
-	int ret1 = get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_DATA, &raw_data);
-	int ret2 = get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_TOT_LEN, &raw_datalen);
-	if(ret1 >= 0 || ret2 >= 0)
-	{
-		*data_len = raw_datalen;
-		return (const char *)raw_data;
-	}
-	else
-	{
-		*data_len = 0;
-		return NULL;
-	}
 }
 
 int  session_get_direction(struct session *sess)
@@ -352,7 +334,7 @@ int session_is_symmetric(struct session *sess, unsigned char *flag)
 	return is_symmetric;
 }	
 
-int session_is_outer_tunnel(struct session *sess, uint64_t *flag)
+int session_is_outmost(struct session *sess, uint64_t *flag)
 {
 	if(sess==NULL||sess->cur_pkt==NULL||sess->cur_pkt->a_stream==NULL)
 	{
@@ -391,31 +373,10 @@ int session_is_outer_tunnel(struct session *sess, uint64_t *flag)
 	return 0;
 }
 
-int session_is_inner_most(struct session *sess, uint64_t *flag)
+int session_is_innermost(struct session *sess, uint64_t *flag)
 {
-	return !session_is_outer_tunnel(sess, flag);
+	return !session_is_outmost(sess, flag);
 }
-
-int stellar_get_worker_thread_num(struct stellar *st)
-{
-	return get_thread_count();
-}
-
-int stellar_get_current_thread_id(struct stellar *st)
-{
-	return get_current_worker_thread_id();
-}
-
-int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
-{
-	if(pkt == NULL || ts == NULL)return -1;
-	if(pkt->raw_pkt == NULL || pkt->a_stream == NULL)return -1;
-
-	get_opt_from_rawpkt(pkt->raw_pkt , RAW_PKT_GET_TIMESTAMP, &ts);
-	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
-	return 0;
-}
-
 
 const char *session_get0_current_l3_header(struct session *sess)
 {
@@ -443,21 +404,6 @@ int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, s
 
 }
 
-#if 0
-const char *session_get0_l2_l3_hdr(struct session *sess, int packet_direction, size_t *l2_l3_hdr_len)
-{
-	int len = sizeof(int);
-	const char *l2_header = NULL;
-	*l2_l3_hdr_len = 0;
-	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
-	if(packet_direction!=PACKET_DIRECTION_C2S && packet_direction!=PACKET_DIRECTION_S2C) return NULL;
-	enum MESA_stream_opt opt  = (packet_direction == PACKET_DIRECTION_C2S) ? MSO_STREAM_C2S_RAWPKT_HDR : MSO_STREAM_S2C_RAWPKT_HDR;
-    if(MESA_get_stream_opt(sess->cur_pkt->a_stream, opt, (void *)&l2_header, &len) == -1) return NULL;
-	*l2_l3_hdr_len = len;
-	return l2_header;
-}
-
-#else
 const char *session_get0_l2_l3_hdr(struct session *sess, int session_direction, size_t *l2_l3_hdr_len)
 {
 	int len = sizeof(int);
@@ -471,7 +417,6 @@ const char *session_get0_l2_l3_hdr(struct session *sess, int session_direction, 
 	*l2_l3_hdr_len = len;
 	return l2_header;
 }
-#endif
 
 
 static const void *session_get_rawpkt(struct session *sess, int session_direction)
@@ -509,10 +454,19 @@ const char *session_get0_route_ctx(struct session *sess, int session_direction, 
 	return (const char *)route_ctx;
 }
 
-enum session_state session_get_current_state(struct session *sess)
+inline enum session_state session_get_current_state(struct session *sess)
 {
-	assert(sess);
     return sess->state;
+}
+
+inline void session_set_current_state(struct session *sess, enum session_state state)
+{
+    sess->state = state;
+}
+
+inline enum session_type session_get_type(struct session *sess)
+{
+    return sess->type;
 }
 
 int session_get_current_thread_id(struct session *sess)
