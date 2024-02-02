@@ -18,13 +18,13 @@
 #include "http_decoder_string.h"
 #include "stellar/utils.h"
 
-#define MAX_HEADER_SIZE 16
-#define MAX_URI_CACHE_SIZE 1024
+#define INIT_HEADER_CNT 16
+#define MAX_URI_CACHE_SIZE 2048
 #define MAX_STATUS_CACHE_SIZE 32
 #define MAX_METHOD_CACHE_SIZE 8
 #define MAX_VERSION_CACHE_SIZE 4
-#define MAX_HEADER_KEY_CACHE_SIZE 128
-#define MAX_HEADER_VALUE_CACHE_SIZE 1024
+#define MAX_HEADER_KEY_CACHE_SIZE 4096
+#define MAX_HEADER_VALUE_CACHE_SIZE 4096
 
 struct http_decoder_header {
     struct http_decoder_string key;
@@ -38,7 +38,8 @@ struct http_decoder_table {
     struct http_decoder_string version;
     struct http_decoder_string body;
 
-    size_t header_size;
+    int header_complete; //flag for all headers parsed completely
+    size_t header_cnt;
     size_t header_index;
     size_t header_iter;
     struct http_decoder_header *headers;
@@ -58,7 +59,7 @@ static void http_decoder_table_init(struct http_decoder_table *table)
     http_decoder_string_init(&table->method, MAX_METHOD_CACHE_SIZE);
     http_decoder_string_init(&table->version, MAX_METHOD_CACHE_SIZE);
 
-    for (size_t i = 0; i < table->header_size; i++) {
+    for (size_t i = 0; i < table->header_cnt; i++) {
         header = &table->headers[i];
         http_decoder_string_init(&header->key, MAX_HEADER_KEY_CACHE_SIZE);
         http_decoder_string_init(&header->val, MAX_HEADER_VALUE_CACHE_SIZE);
@@ -72,8 +73,8 @@ struct http_decoder_table *http_decoder_table_new()
     struct http_decoder_table *table = CALLOC(struct http_decoder_table, 1);
     assert(table);
 
-    table->header_size = MAX_HEADER_SIZE;
-    table->headers = CALLOC(struct http_decoder_header, table->header_size);
+    table->header_cnt = INIT_HEADER_CNT;
+    table->headers = CALLOC(struct http_decoder_header, table->header_cnt);
 
     http_decoder_table_init(table);
 
@@ -107,7 +108,7 @@ void http_decoder_table_free(struct http_decoder_table *table)
     }
 
     if (table->headers != NULL) {
-        for (size_t i = 0; i < table->header_size; i++) {
+        for (size_t i = 0; i < table->header_cnt; i++) {
             if (table->headers[i].key.cache.str != NULL) {
                 FREE(table->headers[i].key.cache.str);
             }
@@ -148,12 +149,12 @@ http_decoder_table_state(struct http_decoder_table *table, enum http_item type)
         state = http_decoder_string_state(&table->version);
         break;
     case HTTP_ITEM_HDRKEY:
-        assert(table->header_index < table->header_size);
+        assert(table->header_index < table->header_cnt);
         header = &table->headers[table->header_index];
         state = http_decoder_string_state(&header->key);
         break;
     case HTTP_ITEM_HDRVAL:
-        assert(table->header_index < table->header_size);
+        assert(table->header_index < table->header_cnt);
         header = &table->headers[table->header_index];
         state = http_decoder_string_state(&header->val);
         break;
@@ -192,12 +193,12 @@ void http_decoder_table_refer(struct http_decoder_table *table, enum http_item t
         http_decoder_string_refer(&table->version, at, len);
         break;
     case HTTP_ITEM_HDRKEY:
-        assert(table->header_index < table->header_size);
+        assert(table->header_index < table->header_cnt);
         header = &table->headers[table->header_index];
         http_decoder_string_refer(&header->key, at, len);
         break;
     case HTTP_ITEM_HDRVAL:
-        assert(table->header_index < table->header_size);
+        assert(table->header_index < table->header_cnt);
         header = &table->headers[table->header_index];
         http_decoder_string_refer(&header->val, at, len);
         break;
@@ -233,12 +234,12 @@ void http_decoder_table_cache(struct http_decoder_table *table, enum http_item t
         http_decoder_string_cache(&table->version);
         break;
     case HTTP_ITEM_HDRKEY:
-        assert(table->header_index < table->header_size);
+        assert(table->header_index < table->header_cnt);
         header = &table->headers[table->header_index];
         http_decoder_string_cache(&header->key);
         break;
     case HTTP_ITEM_HDRVAL:
-        assert(table->header_index < table->header_size);
+        assert(table->header_index < table->header_cnt);
         header = &table->headers[table->header_index];
         http_decoder_string_cache(&header->val);
         break;
@@ -274,7 +275,7 @@ void http_decoder_table_commit(struct http_decoder_table *table, enum http_item 
         http_decoder_string_commit(&table->version);
         break;
     case HTTP_ITEM_HDRKEY:
-        assert(table->header_index < table->header_size);
+        assert(table->header_index < table->header_cnt);
         header = &table->headers[table->header_index];
         http_decoder_string_commit(&header->key);
         break;
@@ -282,13 +283,15 @@ void http_decoder_table_commit(struct http_decoder_table *table, enum http_item 
         header = &table->headers[table->header_index];
         http_decoder_string_commit(&header->val);
         // inc index
-        if ((table->header_index + 1) >= table->header_size) {
+        if ((table->header_index + 1) >= table->header_cnt) {
             table->headers = REALLOC(struct http_decoder_header, table->headers,
-                                     table->header_size * 2);
-            table->header_size *= 2;
-            for (size_t i = table->header_index + 1; i < table->header_size; i++) {
+                                     table->header_cnt * 2);
+            table->header_cnt *= 2;
+            for (size_t i = table->header_index + 1; i < table->header_cnt; i++) {
                 header = &table->headers[i];
                 memset(header, 0, sizeof(struct http_decoder_header));
+                http_decoder_string_init(&header->key, MAX_HEADER_KEY_CACHE_SIZE);
+                http_decoder_string_init(&header->val, MAX_HEADER_VALUE_CACHE_SIZE);
             }
         }
         table->header_index++;
@@ -375,7 +378,7 @@ void http_decoder_table_dump(struct http_decoder_table *table)
     http_decoder_string_dump(&table->version, "version");
     http_decoder_string_dump(&table->body, "body");
 
-    for (size_t i = 0; i < table->header_size; i++) {
+    for (size_t i = 0; i < table->header_cnt; i++) {
         struct http_decoder_header *header = &table->headers[i];
         if (NULL == header) {
             continue;
@@ -431,21 +434,6 @@ int http_decoder_table_get_body(struct http_decoder_table *table, struct hstring
     return http_decoder_string_get(&table->body, out);
 }
 
-int http_decoder_table_has_parsed_header(struct http_decoder_table *table)
-{
-    if (NULL == table) {
-        return 0;
-    }
-
-    struct http_decoder_header *tmp_header = &table->headers[table->header_iter];
-    if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT &&
-        http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
-        return 1;
-    }
-
-    return 0;
-}
-
 int http_decoder_table_get_header(struct http_decoder_table *table, struct hstring *key,
                                   struct http_header *hdr_array, size_t array_size)
 {
@@ -454,7 +442,7 @@ int http_decoder_table_get_header(struct http_decoder_table *table, struct hstri
     }
 
     int header_cnt = 0;
-    for (int i = 0; i < table->header_size && header_cnt < array_size; i++) {
+    for (size_t i = 0; i < table->header_cnt && header_cnt < array_size; i++) {
         struct http_decoder_header *tmp_header = &table->headers[i];
         if (tmp_header->key.commit.str_len != key->str_len) {
             continue;
@@ -465,8 +453,8 @@ int http_decoder_table_get_header(struct http_decoder_table *table, struct hstri
             struct hstring tmp_key;
             http_decoder_string_get(&tmp_header->key, &tmp_key);
 
-            if (tmp_key.str_len == key->str_len
-                && (0 == strncasecmp(tmp_key.str, key->str, key->str_len))) {
+            if (tmp_key.str_len == key->str_len &&
+                (0 == strncasecmp(tmp_key.str, key->str, key->str_len))) {
                 http_decoder_string_get(&tmp_header->key, &hdr_array[header_cnt].key);
                 http_decoder_string_get(&tmp_header->val, &hdr_array[header_cnt].val);
                 header_cnt++;
@@ -484,7 +472,7 @@ int http_decoder_table_iter_header(struct http_decoder_table *table,
         return -1;
     }
 
-    if (table->header_iter >= table->header_size) {
+    if (table->header_iter >= table->header_cnt) {
         return 0;
     }
 
@@ -508,4 +496,46 @@ int http_decoder_table_iter_header(struct http_decoder_table *table,
     hdr->val.str_len = 0;
 
     return 0;
+}
+
+int http_decoder_table_has_parsed_header(struct http_decoder_table *table)
+{
+    if (NULL == table || (table->header_iter == table->header_index)) {
+        return 0;
+    }
+
+    struct http_decoder_header *tmp_header = &table->headers[table->header_iter];
+    if (http_decoder_string_state(&tmp_header->key) == STRING_STATE_COMMIT &&
+        http_decoder_string_state(&tmp_header->val) == STRING_STATE_COMMIT) {
+        return 1;
+    }
+
+    return 0;
+}
+
+int http_decoder_table_header_complete(struct http_decoder_table *table)
+{
+    if (NULL == table) {
+        return -1;
+    }
+
+    return table->header_complete;
+}
+
+void http_decoder_table_set_header_complete(struct http_decoder_table *table)
+{
+    if (NULL == table) {
+        return;
+    }
+
+    table->header_complete = 1;
+}
+
+void http_decoder_table_reset_header_complete(struct http_decoder_table *table)
+{
+    if (NULL == table) {
+        return;
+    }
+
+    table->header_complete = 0;
 }

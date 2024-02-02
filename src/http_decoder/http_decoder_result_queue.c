@@ -72,6 +72,20 @@ void http_decoder_result_queue_inc_res_index(struct http_decoder_result_queue *q
     queue->res_index = queue->res_index % queue->queue_size;
 }
 
+size_t http_decoder_result_queue_req_index(struct http_decoder_result_queue *queue)
+{
+    assert(queue);
+
+    return queue->req_index;
+}
+
+size_t http_decoder_result_queue_res_index(struct http_decoder_result_queue *queue)
+{
+    assert(queue);
+
+    return queue->res_index;
+}
+
 int http_decoder_result_queue_push_req(struct http_decoder_result_queue *queue,
                                        struct http_decoder_half_data *req_data)
 {

@@ -62,8 +62,6 @@ int http_decoder_table_get_version(struct http_decoder_table *table, struct hstr
 
 int http_decoder_table_get_body(struct http_decoder_table *table, struct hstring *out);
 
-int http_decoder_table_has_parsed_header(struct http_decoder_table *table);
-
 int http_decoder_table_get_header(struct http_decoder_table *table,
                                   struct hstring *key,
                                   struct http_header *hdr_array,
@@ -71,6 +69,27 @@ int http_decoder_table_get_header(struct http_decoder_table *table,
 
 int http_decoder_table_iter_header(struct http_decoder_table *table,
                                    struct http_header *hdr);
+
+/**
+ * @brief Is there a parsed header
+ * 
+ * @retval yes(1) no(0)
+*/
+int http_decoder_table_has_parsed_header(struct http_decoder_table *table);
+
+/**
+ * @brief If headers have been parsed completely
+ *
+ * @retval yes(1) no(0)
+ */
+int http_decoder_table_header_complete(struct http_decoder_table *table);
+
+/**
+ * @brief set flag for headers parsed completely
+*/
+void http_decoder_table_set_header_complete(struct http_decoder_table *table);
+
+void http_decoder_table_reset_header_complete(struct http_decoder_table *table);
 
 #ifdef __cplusplus
 }

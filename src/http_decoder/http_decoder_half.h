@@ -89,6 +89,8 @@ int http_decoder_half_data_get_header(struct http_decoder_half_data *data,
 int http_decoder_half_data_iter_header(struct http_decoder_half_data *data,
                                        struct http_header *header);
 
+int http_decoder_half_data_has_parsed_header(struct http_decoder_half_data *data);
+
 int http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,
                                         struct hstring *body);
 

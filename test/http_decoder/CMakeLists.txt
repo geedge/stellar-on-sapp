@@ -79,8 +79,8 @@ add_test(NAME HTTP_NO_CONTENT_LENGTH_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_S
 add_test(NAME HTTP_POST_MULTIPART_FORM_DATA_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_post_multipart_form_data.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_post_multipart_form_data.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-add_test(NAME HTTP_HEADERS_EXCEED_MAXIMUM_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_headers_exceed_maximum.json
-         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_headers_exceed_maximum.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+add_test(NAME HTTP_HEADERS_EXCEED_MAXIMUM_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_hdrs_exceed_maximum.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_hdrs_exceed_maximum.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
 add_test(NAME HTTP_CONNECT_FLOOD_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_connect_flood.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_connect_flood.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
@@ -88,8 +88,8 @@ add_test(NAME HTTP_CONNECT_FLOOD_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURC
 add_test(NAME HTTP_GET_MALFORMED_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_get_malformed.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_get_malformed.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-add_test(NAME HTTP_HEADER_VALUE_EMPTY_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_header_value_empty.json
-         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_header_value_empty.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+add_test(NAME HTTP_HEADER_VALUE_EMPTY_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_hdr_value_empty.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_hdr_value_empty.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
 add_test(NAME HTTP_UPGRADE_WEBSOCKET_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_upgrade_websocket.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_upgrade_websocket.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
@@ -106,10 +106,12 @@ add_test(NAME HTTP_GET_REQ_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SO
 add_test(NAME HTTP_TRANS_PIPELINE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_trans_pipeline.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_trans_pipeline.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-# add_test(NAME COREDUMP_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/coredump.json
-#          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name coredump.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+add_test(NAME HTTP_HEADER_TRUNCATED_IN_KV_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_hdr_truncated_in_kv.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_hdr_truncated_in_kv.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
-# set_tests_properties(COREDUMP_TEST PROPERTIES FIXTURES_REQUIRED TestFixture)
+add_test(NAME HTTP_HEADER_TRUNCATED_AFTER_KV_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/http_hdr_truncated_after_kv.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/http_pcap/ -name http_hdr_truncated_after_kv.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
 set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_GET_MULTI_TRANS_TEST
                      HTTP_GET_LONG_COOKIE_TEST
@@ -134,4 +136,6 @@ set_tests_properties(HTTP_GET_SINGLE_TRANS_TEST
                      HTTP_UPGRADE_HTTP2_TEST
                      HTTP_GET_REQ_PIPELINE_TEST
                      HTTP_TRANS_PIPELINE_TEST
+                     HTTP_HEADER_TRUNCATED_IN_KV_TEST
+                     HTTP_HEADER_TRUNCATED_AFTER_KV_TEST
                      PROPERTIES FIXTURES_REQUIRED TestFixture)

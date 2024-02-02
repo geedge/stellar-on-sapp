@@ -35,7 +35,8 @@ const char *fs_file_name = "http_decoder.fs";
 */
 struct http_message {
 	enum http_message_type type;
-	struct http_decoder_half_data *data;
+    struct http_decoder_result_queue *ref_queue;
+    size_t queue_index;
 };
 
 struct http_decoder {
@@ -61,12 +62,15 @@ struct http_decoder_context {
 };
 
 struct http_message *
-http_message_new(enum http_message_type type, void *data)
+http_message_new(enum http_message_type type,
+                 struct http_decoder_result_queue *queue,
+                 int queue_index)
 {
     struct http_message *msg = CALLOC(struct http_message, 1);
 
     msg->type = type;
-    msg->data = data;
+    msg->ref_queue = queue;
+    msg->queue_index = queue_index;
 
     return msg;
 }
@@ -86,6 +90,7 @@ static void http_event_handler(enum http_event event,
 {
     assert(ev_ctx);
 
+    size_t queue_idx = 0;
     struct http_decoder_result_queue *queue = ev_ctx->ref_queue;
     struct http_message *msg = NULL;
     struct http_decoder_half_data *half_data = NULL;
@@ -115,17 +120,25 @@ static void http_event_handler(enum http_event event,
         *data = half_data;
         break;
     case HTTP_EVENT_REQ_LINE:
-        msg = http_message_new(HTTP_MESSAGE_REQ_LINE, *data);
+        queue_idx = http_decoder_result_queue_req_index(queue);
+        msg = http_message_new(HTTP_MESSAGE_REQ_LINE, queue, queue_idx);
         session_mq_publish_message(ev_ctx->ref_session, ev_ctx->topic_id, msg);
         break;
     case HTTP_EVENT_REQ_HDR_END:
-        msg = http_message_new(HTTP_MESSAGE_REQ_HEADER, *data);
+        ret = http_decoder_half_data_has_parsed_header(*data);
+        if (0 == ret) {
+            break;
+        }
+
+        queue_idx = http_decoder_result_queue_req_index(queue);
+        msg = http_message_new(HTTP_MESSAGE_REQ_HEADER, queue, queue_idx);
         session_mq_publish_message(ev_ctx->ref_session, ev_ctx->topic_id, msg);
         break;
     case HTTP_EVENT_REQ_BODY_BEGIN:
         break;
     case HTTP_EVENT_REQ_BODY_DATA:
-        msg = http_message_new(HTTP_MESSAGE_REQ_BODY, *data);
+        queue_idx = http_decoder_result_queue_req_index(queue);
+        msg = http_message_new(HTTP_MESSAGE_REQ_BODY, queue, queue_idx);
         session_mq_publish_message(ev_ctx->ref_session, ev_ctx->topic_id, msg);
         break;
     case HTTP_EVENT_REQ_BODY_END:
@@ -161,19 +174,27 @@ static void http_event_handler(enum http_event event,
         *data = half_data;
         break;
     case HTTP_EVENT_RES_LINE:
-        msg = http_message_new(HTTP_MESSAGE_RES_LINE, *data);
+        queue_idx = http_decoder_result_queue_res_index(queue); 
+        msg = http_message_new(HTTP_MESSAGE_RES_LINE, queue, queue_idx);
         session_mq_publish_message(ev_ctx->ref_session, ev_ctx->topic_id, msg);
         break;
     case HTTP_EVENT_RES_HDR:
         break;
     case HTTP_EVENT_RES_HDR_END:
-        msg = http_message_new(HTTP_MESSAGE_RES_HEADER, *data);
+        ret = http_decoder_half_data_has_parsed_header(*data);
+        if (0 == ret) {
+            break;
+        }
+
+        queue_idx = http_decoder_result_queue_res_index(queue);
+        msg = http_message_new(HTTP_MESSAGE_RES_HEADER, queue, queue_idx);
         session_mq_publish_message(ev_ctx->ref_session, ev_ctx->topic_id, msg); 
         break;
     case HTTP_EVENT_RES_BODY_BEGIN:
         break;
     case HTTP_EVENT_RES_BODY_DATA:
-        msg = http_message_new(HTTP_MESSAGE_RES_BODY, *data);
+        queue_idx = http_decoder_result_queue_res_index(queue);
+        msg = http_message_new(HTTP_MESSAGE_RES_BODY, queue, queue_idx);
         session_mq_publish_message(ev_ctx->ref_session, ev_ctx->topic_id, msg); 
         break;
     case HTTP_EVENT_RES_BODY_END:
@@ -338,7 +359,13 @@ int http_decoder_entry(struct session *sess, int events,
         cur_half = ex_data->decoder->s2c_half;
     }
 
-    http_decoder_half_reinit(cur_half, decoder_ctx->topic_id, ex_data->queue, sess);
+    // printf("<before parse> queue:%p req_index:%zu req:%p res_index:%zu, res:%p\n",
+    //        ex_data->queue, ex_data->queue->req_index,
+    //        ex_data->queue->array[ex_data->queue->req_index].req_data,
+    //        ex_data->queue->res_index,
+    //        ex_data->queue->array[ex_data->queue->res_index].res_data);
+    http_decoder_half_reinit(cur_half, decoder_ctx->topic_id, ex_data->queue,
+                             sess);
     ret = http_decoder_half_parse(cur_half, payload, payload_len);
     if (ret < 0) {
         // fieldstat_easy_counter_incrby(decoder_ctx->fse, thread_id,
@@ -359,6 +386,12 @@ int http_decoder_entry(struct session *sess, int events,
     //                               decoder_ctx->fs_incoming_trans_id,
     //                               NULL, 0, trans_cnt);
 
+    // printf("<after parse> queue:%p req_index:%zu req:%p res_index:%zu, res:%p, counter:%d\n",
+    //        ex_data->queue, ex_data->queue->req_index,
+    //        ex_data->queue->array[ex_data->queue->req_index].req_data,
+    //        ex_data->queue->res_index,
+    //        ex_data->queue->array[ex_data->queue->res_index].res_data,
+    //        decoder_ctx->counter);
     return 0;
 }
 
@@ -510,7 +543,13 @@ int http_message_get_request_line(struct http_message *msg,
 		return -1;
 	}
 
-	return http_decoder_half_data_get_request_line(msg->data, line);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *req_data =
+        msg->ref_queue->array[msg->queue_index].req_data;
+
+    return http_decoder_half_data_get_request_line(req_data, line);
 }
 
 int http_message_get_response_line(struct http_message *msg,
@@ -521,7 +560,13 @@ int http_message_get_response_line(struct http_message *msg,
 		return -1;
 	}
 
-	return http_decoder_half_data_get_response_line(msg->data, line);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *res_data =
+        msg->ref_queue->array[msg->queue_index].res_data;
+
+	return http_decoder_half_data_get_response_line(res_data, line);
 }
 
 int http_message_get_request_header(struct http_message *msg, struct hstring *key,
@@ -532,7 +577,13 @@ int http_message_get_request_header(struct http_message *msg, struct hstring *ke
 		return -1;
 	}
 
-	return http_decoder_half_data_get_header(msg->data, key, hdr_array, array_size);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *req_data =
+        msg->ref_queue->array[msg->queue_index].req_data;
+
+	return http_decoder_half_data_get_header(req_data, key, hdr_array, array_size);
 }
 
 int http_message_get_response_header(struct http_message *msg, struct hstring *key,
@@ -543,7 +594,13 @@ int http_message_get_response_header(struct http_message *msg, struct hstring *k
 		return -1;
 	}
 
-	return http_decoder_half_data_get_header(msg->data, key, hdr_array, array_size);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *res_data =
+        msg->ref_queue->array[msg->queue_index].res_data;
+
+	return http_decoder_half_data_get_header(res_data, key, hdr_array, array_size);
 }
 
 int http_message_request_header_next(struct http_message *msg,
@@ -554,7 +611,13 @@ int http_message_request_header_next(struct http_message *msg,
 		return -1;
 	}
 
-    return http_decoder_half_data_iter_header(msg->data, hdr);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *req_data =
+        msg->ref_queue->array[msg->queue_index].req_data;
+
+    return http_decoder_half_data_iter_header(req_data, hdr);
 }
 
 int http_message_response_header_next(struct http_message *msg,
@@ -565,7 +628,13 @@ int http_message_response_header_next(struct http_message *msg,
 		return -1;
 	}
 
-    return http_decoder_half_data_iter_header(msg->data, hdr);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *res_data =
+        msg->ref_queue->array[msg->queue_index].res_data;
+
+    return http_decoder_half_data_iter_header(res_data, hdr);
 }
 
 int http_message_get_request_raw_body(struct http_message *msg,
@@ -576,7 +645,13 @@ int http_message_get_request_raw_body(struct http_message *msg,
         return -1;
     }
 
-    return http_decoder_half_data_get_raw_body(msg->data, body);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *req_data =
+        msg->ref_queue->array[msg->queue_index].req_data;
+
+    return http_decoder_half_data_get_raw_body(req_data, body);
 }
 
 int http_message_get_response_raw_body(struct http_message *msg,
@@ -587,7 +662,13 @@ int http_message_get_response_raw_body(struct http_message *msg,
         return -1;
     }
 
-    return http_decoder_half_data_get_raw_body(msg->data, body);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *res_data =
+        msg->ref_queue->array[msg->queue_index].res_data;
+
+    return http_decoder_half_data_get_raw_body(res_data, body);
 }
 
 int http_message_get_request_decompress_body(struct http_message *msg,
@@ -598,7 +679,13 @@ int http_message_get_request_decompress_body(struct http_message *msg,
         return -1;
     }
 
-    return http_decoder_half_data_get_decompress_body(msg->data, body);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *req_data =
+        msg->ref_queue->array[msg->queue_index].req_data;
+
+    return http_decoder_half_data_get_decompress_body(req_data, body);
 }
 
 int http_message_get_response_decompress_body(struct http_message *msg,
@@ -609,5 +696,11 @@ int http_message_get_response_decompress_body(struct http_message *msg,
         return -1;
     }
 
-    return http_decoder_half_data_get_decompress_body(msg->data, body);
+    assert(msg->ref_queue);
+    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+
+    struct http_decoder_half_data *res_data =
+        msg->ref_queue->array[msg->queue_index].res_data;
+
+    return http_decoder_half_data_get_decompress_body(res_data, body);
 }

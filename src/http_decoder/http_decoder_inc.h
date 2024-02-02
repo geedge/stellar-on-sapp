@@ -16,8 +16,15 @@ extern "C"
 {
 #endif
 
+#include "http_decoder.h"
+#include "http_decoder_result_queue.h"
+
 struct http_message;
-struct http_message *http_message_new(enum http_message_type type, void *data);
+
+struct http_message *
+http_message_new(enum http_message_type type,
+                 struct http_decoder_result_queue *queue,
+                 int queue_index);
 
 #ifdef __cplusplus
 }

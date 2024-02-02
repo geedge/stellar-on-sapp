@@ -364,6 +364,7 @@ static int on_header_value(llhttp_t *http, const char *at, size_t length)
     return 0;
 }
 
+#define MAX_ENCODING_STR_LEN 8
 /* Information-only callbacks, return value is ignored */
 static int on_header_value_complete(llhttp_t *http)
 {
@@ -386,8 +387,12 @@ static int on_header_value_complete(llhttp_t *http)
 
         if (http_decoder_table_get_header(half->ref_data->table, &key,
                                           &http_hdr, 1) == 1) {
-            char encoding_str[16] = {0};
-            memcpy(encoding_str, http_hdr.val.str, http_hdr.val.str_len);
+            char encoding_str[MAX_ENCODING_STR_LEN + 1] = {0};
+            size_t str_len = http_hdr.val.str_len;
+            if (str_len > MAX_ENCODING_STR_LEN) {
+                str_len = MAX_ENCODING_STR_LEN;
+            }
+            memcpy(encoding_str, http_hdr.val.str, str_len);
             half->ref_data->content_encoding = http_content_encoding_str2int(encoding_str);
         }
     }
@@ -430,6 +435,9 @@ static int on_headers_complete(llhttp_t *http)
     struct http_decoder_half *half =
         container_of(http, struct http_decoder_half, parser);
     assert(half);
+    assert(half->ref_data);
+
+    http_decoder_table_set_header_complete(half->ref_data->table);
 
     if (half->parser.type == HTTP_REQUEST) {
         half->event = HTTP_EVENT_REQ_HDR_END;
@@ -595,19 +603,28 @@ void http_decoder_half_reinit(struct http_decoder_half *half, int topic_id,
 
 static void publish_message_for_parsed_header(struct http_decoder_half *half)
 {
-    if (http_decoder_table_has_parsed_header(half->ref_data->table) <= 0) {
+    if (0 == http_decoder_table_has_parsed_header(half->ref_data->table)) {
         return;
     }
 
     // publish complete kv-header message
     struct http_message *msg = NULL;
+    size_t queue_idx = 0;
+    struct http_decoder_result_queue *queue = half->http_ev_ctx->ref_queue;
+
     if (half->parser.type == HTTP_REQUEST) {
-        msg = http_message_new(HTTP_MESSAGE_REQ_HEADER, half->ref_data);
+        queue_idx = http_decoder_result_queue_req_index(queue);
+
+        msg = http_message_new(HTTP_MESSAGE_REQ_HEADER, queue, queue_idx);
+
         session_mq_publish_message(half->http_ev_ctx->ref_session,
                                    half->http_ev_ctx->topic_id, msg);
     } else {
         // http response
-        msg = http_message_new(HTTP_MESSAGE_RES_HEADER, half->ref_data);
+        queue_idx = http_decoder_result_queue_res_index(queue);
+
+        msg = http_message_new(HTTP_MESSAGE_RES_HEADER, queue, queue_idx);
+
         session_mq_publish_message(half->http_ev_ctx->ref_session,
                                    half->http_ev_ctx->topic_id, msg);
     }
@@ -671,16 +688,42 @@ int http_decoder_half_parse(struct http_decoder_half *half,
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_VERSION);
         }
 
-        if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY)
-            == STRING_STATE_REFER) {
+        if (http_decoder_table_header_complete(half->ref_data->table)) {
+            http_decoder_table_reset_header_complete(half->ref_data->table);
+        } else {
             publish_message_for_parsed_header(half);
+        }
+
+        enum string_state hdr_key_state =
+            http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRKEY);
+        enum string_state hdr_val_state =
+            http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL);
+
+        /*  Truncated in http header key 
+            For example http header k-v => User-Agent: Chrome
+            case1: 
+                packet1: User-     hdr_key_state == STRING_STATE_REFER         
+                packet2: Agent: Chrome
+
+            case2:
+                packet1: User-Agent: hdr_key_state == STRING_STATE_COMMIT
+                                     hdr_val_state == STRING_STATE_INIT                        
+                packet2: Chrome
+        */ 
+        if (hdr_key_state == STRING_STATE_REFER ||
+            (hdr_key_state == STRING_STATE_COMMIT && hdr_val_state == STRING_STATE_INIT)) {
             http_decoder_table_cache(half->ref_data->table, HTTP_ITEM_HDRKEY);
         }
 
+        /* Truncated in http header value 
+           For example http header k-v => User-Agent: Chrome
+           packet1: User-Agent: Ch   hdr_key_state == STRING_STATE_COMMIT
+                                     hdr_val_state == STRING_STATE_REFER                        
+
+           packet2: rome
+        */
         if (http_decoder_table_state(half->ref_data->table, HTTP_ITEM_HDRVAL)
             == STRING_STATE_REFER) {
-            publish_message_for_parsed_header(half);
-
             /* Header key should have been committed
                If it's not cached, cache it for next packet to use
             */
@@ -783,10 +826,12 @@ int http_decoder_half_data_get_response_line(struct http_decoder_half_data *data
 }
 
 int http_decoder_half_data_get_header(struct http_decoder_half_data *data,
-                                      struct hstring *key, struct http_header *hdr_array,
+                                      struct hstring *key,
+                                      struct http_header *hdr_array,
                                       size_t array_size)
 {
-    if (NULL == data) {
+    if (NULL == data || NULL == key ||
+        NULL == hdr_array || 0 == array_size) {
         return -1;
     }
 
@@ -801,6 +846,15 @@ int http_decoder_half_data_iter_header(struct http_decoder_half_data *data,
     }
 
     return http_decoder_table_iter_header(data->table, header);
+}
+
+int http_decoder_half_data_has_parsed_header(struct http_decoder_half_data *data)
+{
+    if (NULL == data) {
+        return 0;
+    }
+
+    return http_decoder_table_has_parsed_header(data->table);
 }
 
 int http_decoder_half_data_get_raw_body(struct http_decoder_half_data *data,

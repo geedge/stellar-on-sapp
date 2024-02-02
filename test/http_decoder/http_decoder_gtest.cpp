@@ -71,6 +71,7 @@ void output_http_header(struct http_header *header)
 {
     char tmp_key[MAX_KEY_STR_LEN] = {0};
     char tmp_val[MAX_KEY_STR_LEN] = {0};
+
     memcpy(tmp_key, header->key.str, header->key.str_len);
     memcpy(tmp_val, header->val.str, header->val.str_len);
     printf("<%s:%s>\n", tmp_key, tmp_val);
