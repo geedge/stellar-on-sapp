@@ -59,7 +59,8 @@ typedef void http_event_cb(enum http_event event, struct http_decoder_half_data 
                            struct http_event_context *ev_ctx);
 
 struct http_decoder_half *
-http_decoder_half_new(nmx_pool_t *mempool, http_event_cb *event_cb, int type);
+http_decoder_half_new(nmx_pool_t *mempool, http_event_cb *event_cb, int http_type,
+                      int decompress_switch);
 
 void http_decoder_half_free(nmx_pool_t *mempool, struct http_decoder_half *half);
 

@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
+#include "toml/toml.h"
 #include "stellar/utils.h"
 #include "stellar/session.h"
 #include "stellar/session_mq.h"
@@ -25,15 +26,22 @@
 #include "fieldstat/fieldstat_easy.h"
 
 #define HTTP_IDENTIFY_LEN 16
-#define HD_RESULT_QUEUE_SIZE 16
-#define MEMPOOL_SIZE (32 * 1024)
+#define HD_RESULT_QUEUE_LEN 16
+#define DEFAULT_MEMPOOL_SIZE (32 * 1024)
 
+const char *hd_config_path = "./etc/http/http_decoder.toml";
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
 const char *fs_file_name = "http_decoder.fs";
 
+struct http_decoder_config {
+    int decompress_switch;
+    size_t hd_result_queue_len;
+    size_t mempool_size; // per session mempool size
+};
+
 /**
  * NOTE: http_message don't have the ownership of data
-*/
+ */
 struct http_message {
 	enum http_message_type type;
     struct http_decoder_result_queue *ref_queue;
@@ -59,8 +67,9 @@ struct http_decoder_context {
     int fs_incoming_pkts_id;
     int fs_incoming_trans_id;
     int fs_err_pkts_id;
-    struct fieldstat_easy *fse;
     struct stellar *st;
+    struct fieldstat_easy *fse;
+    struct http_decoder_config hd_config;
 };
 
 struct http_message *
@@ -217,13 +226,16 @@ static void http_event_handler(enum http_event event,
 }
 
 static struct http_decoder *
-http_decoder_new(nmx_pool_t *mempool, http_event_cb *ev_cb)
+http_decoder_new(nmx_pool_t *mempool, http_event_cb *ev_cb,
+                 int decompress_switch)
 {
 	struct http_decoder *decoder = MEMPOOL_CALLOC(mempool, struct http_decoder, 1);
 	assert(decoder);
 
-	decoder->c2s_half = http_decoder_half_new(mempool, ev_cb, HTTP_REQUEST);
-	decoder->s2c_half = http_decoder_half_new(mempool, ev_cb, HTTP_RESPONSE);
+	decoder->c2s_half = http_decoder_half_new(mempool, ev_cb, HTTP_REQUEST,
+                                              decompress_switch);
+	decoder->s2c_half = http_decoder_half_new(mempool, ev_cb, HTTP_RESPONSE,
+                                              decompress_switch);
 
 	return decoder;
 }
@@ -248,13 +260,16 @@ http_decoder_free(nmx_pool_t *mempool, struct http_decoder *decoder)
     MEMPOOL_FREE(mempool, decoder);
 }
 
-static struct http_decoder_exdata *http_decoder_exdata_new(size_t queue_size)
+static struct http_decoder_exdata *
+http_decoder_exdata_new(size_t mempool_size, size_t queue_size,
+                        int decompress_switch)
 {
     struct http_decoder_exdata *ex_data = CALLOC(struct http_decoder_exdata, 1);
 
-    ex_data->mempool = nmx_create_pool(MEMPOOL_SIZE);
-    ex_data->decoder = http_decoder_new(ex_data->mempool, http_event_handler);
-    ex_data->queue = http_decoder_result_queue_new(ex_data->mempool, HD_RESULT_QUEUE_SIZE);
+    ex_data->mempool = nmx_create_pool(mempool_size);
+    ex_data->decoder = http_decoder_new(ex_data->mempool, http_event_handler,
+                                        decompress_switch);
+    ex_data->queue = http_decoder_result_queue_new(ex_data->mempool, queue_size);
 
     return ex_data;
 }
@@ -300,7 +315,7 @@ static int http_protocol_identify(const char *data, size_t data_len)
 int http_decoder_entry(struct session *sess, int events,
                        const struct packet *pkt, void *cb_arg)
 {
-    struct http_decoder_context *decoder_ctx = (struct http_decoder_context *)cb_arg;
+    struct http_decoder_context *ctx = (struct http_decoder_context *)cb_arg;
     size_t payload_len = 0;
     uint64_t inner_flag = 0;
 
@@ -310,12 +325,12 @@ int http_decoder_entry(struct session *sess, int events,
     }
 
     struct http_decoder_exdata *ex_data =
-        session_get_ex_data(sess, decoder_ctx->ex_data_idx);
+        session_get_ex_data(sess, ctx->ex_data_idx);
 
     if (events & SESS_EV_CLOSING) {
         if (ex_data != NULL) {
             http_decoder_exdata_free(ex_data);
-            session_set_ex_data(sess, decoder_ctx->ex_data_idx, NULL);
+            session_set_ex_data(sess, ctx->ex_data_idx, NULL);
         }
 
         return 0;
@@ -336,16 +351,18 @@ int http_decoder_entry(struct session *sess, int events,
             if (ret < 0) {
                 // ignore this session's event
                 struct session_event *s_event =
-                    session_get_intrinsic_event(sess, decoder_ctx->plugin_id);
+                    session_get_intrinsic_event(sess, ctx->plugin_id);
 
-                session_event_assign(s_event, decoder_ctx->st, sess, 0,
-                                     http_decoder_entry, decoder_ctx);
+                session_event_assign(s_event, ctx->st, sess, 0,
+                                     http_decoder_entry, ctx);
                 return 0;
             }
         }
 
-        ex_data = http_decoder_exdata_new(HD_RESULT_QUEUE_SIZE);
-        session_set_ex_data(sess, decoder_ctx->ex_data_idx, ex_data);
+        ex_data = http_decoder_exdata_new(ctx->hd_config.mempool_size,
+                                          ctx->hd_config.hd_result_queue_len,
+                                          ctx->hd_config.decompress_switch);
+        session_set_ex_data(sess, ctx->ex_data_idx, ex_data);
     }
 
     if (0 == payload_len || NULL == ex_data) {
@@ -366,12 +383,7 @@ int http_decoder_entry(struct session *sess, int events,
         cur_half = ex_data->decoder->s2c_half;
     }
 
-    // printf("<before parse> queue:%p req_index:%zu req:%p res_index:%zu, res:%p\n",
-    //        ex_data->queue, ex_data->queue->req_index,
-    //        ex_data->queue->array[ex_data->queue->req_index].req_data,
-    //        ex_data->queue->res_index,
-    //        ex_data->queue->array[ex_data->queue->res_index].res_data);
-    http_decoder_half_reinit(cur_half, decoder_ctx->topic_id, ex_data->queue,
+    http_decoder_half_reinit(cur_half, ctx->topic_id, ex_data->queue,
                              ex_data->mempool, sess);
     ret = http_decoder_half_parse(cur_half, payload, payload_len);
     if (ret < 0) {
@@ -393,12 +405,6 @@ int http_decoder_entry(struct session *sess, int events,
     //                               decoder_ctx->fs_incoming_trans_id,
     //                               NULL, 0, trans_cnt);
 
-    // printf("<after parse> queue:%p req_index:%zu req:%p res_index:%zu, res:%p, counter:%d\n",
-    //        ex_data->queue, ex_data->queue->req_index,
-    //        ex_data->queue->array[ex_data->queue->req_index].req_data,
-    //        ex_data->queue->res_index,
-    //        ex_data->queue->array[ex_data->queue->res_index].res_data,
-    //        decoder_ctx->counter);
     return 0;
 }
 
@@ -480,24 +486,81 @@ static int http_decoder_fs_init(struct http_decoder_context *ctx, int thread_num
     return 0;
 }
 
+static int load_http_decoder_config(const char *config_path,
+                                    struct http_decoder_config *hd_config)
+{
+    FILE *fp = fopen(config_path, "r");
+    if (NULL == fp) {
+        fprintf(stderr, "[%s:%d]Can't open config file:%s",
+                __FUNCTION__, __LINE__, config_path);
+        return -1;
+    }
+
+    int ret = 0;
+    char errbuf[256] = {0};
+
+    toml_table_t *root = toml_parse_file(fp, errbuf, sizeof(errbuf));
+    fclose(fp);
+
+    toml_table_t *basic_sec_tbl = toml_table_in(root, "basic");
+    if (NULL == basic_sec_tbl) {
+        fprintf(stderr, "[%s:%d]config file:%s has no key: [basic]",
+                __FUNCTION__, __LINE__, config_path);
+        ret = -1;
+        goto next;
+    }
+
+    toml_datum_t int_val = toml_int_in(basic_sec_tbl, "decompress");
+    if (int_val.ok != 0) {
+        hd_config->decompress_switch = int_val.u.b;
+    }
+
+    int_val = toml_int_in(basic_sec_tbl, "mempool_size");
+    if (int_val.ok != 0) {
+        hd_config->mempool_size = int_val.u.i;
+    } else {
+        hd_config->mempool_size = DEFAULT_MEMPOOL_SIZE;
+    }
+
+    int_val = toml_int_in(basic_sec_tbl, "hd_result_queue_len");
+    if (int_val.ok != 0) {
+        hd_config->hd_result_queue_len = int_val.u.i;
+    } else {
+        hd_config->hd_result_queue_len = HD_RESULT_QUEUE_LEN;
+    }
+
+next:
+    toml_free(root);
+    return ret;
+}
+
 void *http_decoder_init(struct stellar *st)
 {
+    int plugin_id = -1;
+    int topic_id = -1;
+    int thread_num = 0;
+
     struct http_decoder_context *ctx = CALLOC(struct http_decoder_context, 1);
+
+    int ret = load_http_decoder_config(hd_config_path, &ctx->hd_config);
+    if (ret < 0) {
+        goto failed;
+    }
 
     ctx->st = st;
     ctx->ex_data_idx = stellar_session_get_ex_new_index(st, "HTTP_DECODER",
 														http_decoder_ex_data_free,
                                                         NULL);
 
-    int plugin_id = stellar_plugin_register(st, SESS_EV_TCP|SESS_EV_CLOSING,
+    plugin_id = stellar_plugin_register(st, SESS_EV_TCP|SESS_EV_CLOSING,
                                             http_decoder_entry, ctx);
     if (plugin_id < 0) {
-        return NULL;
+        goto failed;
     }
 
     ctx->plugin_id = plugin_id;
 
-    int topic_id = session_mq_get_topic_id(st, http_decoder_topic);
+    topic_id = session_mq_get_topic_id(st, http_decoder_topic);
     if (topic_id < 0) {
         topic_id = session_mq_create_topic(st, http_decoder_topic,
                                            http_message_free, NULL);
@@ -505,7 +568,7 @@ void *http_decoder_init(struct stellar *st)
 
     ctx->topic_id = topic_id;
 
-    int thread_num = stellar_get_worker_thread_num(st);
+    thread_num = stellar_get_worker_thread_num(st);
 
     if (http_decoder_fs_init(ctx, thread_num) < 0) {
         goto failed;
@@ -551,7 +614,7 @@ int http_message_get_request_line(struct http_message *msg,
 	}
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *req_data =
         msg->ref_queue->array[msg->queue_index].req_data;
@@ -568,7 +631,7 @@ int http_message_get_response_line(struct http_message *msg,
 	}
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *res_data =
         msg->ref_queue->array[msg->queue_index].res_data;
@@ -585,7 +648,7 @@ int http_message_get_request_header(struct http_message *msg, struct hstring *ke
 	}
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *req_data =
         msg->ref_queue->array[msg->queue_index].req_data;
@@ -602,7 +665,7 @@ int http_message_get_response_header(struct http_message *msg, struct hstring *k
 	}
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *res_data =
         msg->ref_queue->array[msg->queue_index].res_data;
@@ -619,7 +682,7 @@ int http_message_request_header_next(struct http_message *msg,
 	}
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *req_data =
         msg->ref_queue->array[msg->queue_index].req_data;
@@ -636,7 +699,7 @@ int http_message_response_header_next(struct http_message *msg,
 	}
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *res_data =
         msg->ref_queue->array[msg->queue_index].res_data;
@@ -653,7 +716,7 @@ int http_message_get_request_raw_body(struct http_message *msg,
     }
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *req_data =
         msg->ref_queue->array[msg->queue_index].req_data;
@@ -670,7 +733,7 @@ int http_message_get_response_raw_body(struct http_message *msg,
     }
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *res_data =
         msg->ref_queue->array[msg->queue_index].res_data;
@@ -687,7 +750,7 @@ int http_message_get_request_decompress_body(struct http_message *msg,
     }
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *req_data =
         msg->ref_queue->array[msg->queue_index].req_data;
@@ -704,7 +767,7 @@ int http_message_get_response_decompress_body(struct http_message *msg,
     }
 
     assert(msg->ref_queue);
-    assert(msg->queue_index < HD_RESULT_QUEUE_SIZE);
+    assert(msg->queue_index < HD_RESULT_QUEUE_LEN);
 
     struct http_decoder_half_data *res_data =
         msg->ref_queue->array[msg->queue_index].res_data;

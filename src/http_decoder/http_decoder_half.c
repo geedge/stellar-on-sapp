@@ -40,10 +40,14 @@ struct http_decoder_half {
     llhttp_settings_t settings;
     enum llhttp_errno error;
 
-    struct http_decoder_half_data *ref_data;
+    int decompress_switch;
+    
     enum http_event event;
     http_event_cb *http_ev_cb;
     struct http_event_context *http_ev_ctx;
+
+    struct http_decoder_half_data *ref_data;
+
     long long trans_counter;
     long long err_counter;
 };
@@ -493,7 +497,8 @@ static int on_body(llhttp_t *http, const char *at, size_t length)
         http_decoder_table_commit(half->ref_data->table, HTTP_ITEM_BODY);
     }
 
-    if (half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE) {
+    if (1 == half->decompress_switch &&
+        half->ref_data->content_encoding != HTTP_CONTENT_ENCODING_NONE) {
         http_decoder_half_data_decompress(half->ref_data);
     }
 
@@ -559,13 +564,15 @@ http_decoder_half_init(struct http_decoder_half *half,
 }
 
 struct http_decoder_half *
-http_decoder_half_new(nmx_pool_t *mempool, http_event_cb *ev_cb, int type)
+http_decoder_half_new(nmx_pool_t *mempool, http_event_cb *ev_cb, int http_type,
+                      int decompress_switch)
 {
     struct http_decoder_half *half = MEMPOOL_CALLOC(mempool, struct http_decoder_half, 1);
     assert(half);
 
+    half->decompress_switch = decompress_switch;
     half->http_ev_ctx = MEMPOOL_CALLOC(mempool, struct http_event_context, 1);
-    http_decoder_half_init(half, ev_cb, type);
+    http_decoder_half_init(half, ev_cb, http_type);
 
     return half;
 }

@@ -1,4 +1,9 @@
-[[plugin]]
-path = "./src/http_decoder/http_decoder.so"
-init = "http_decoder_init"
-exit = "http_decoder_exit"
+[basic]
+# Switch for decompress body, open(1) closed(0), default(0)
+decompress=1
+
+# per session mempool size, default(32Ki)
+mempool_size=32768
+
+# per session http parsed result queue length
+hd_result_queue_len=16
