@@ -6,4 +6,10 @@ decompress=1
 mempool_size=32768
 
 # per session http parsed result queue length
-hd_result_queue_len=16
+result_queue_len=16
+
+# call fieldstat every stat_interval_pkts
+stat_interval_pkts=1000
+
+# fieldstat output interval
+stat_output_interval=1

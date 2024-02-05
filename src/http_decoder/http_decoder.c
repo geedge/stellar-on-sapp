@@ -27,16 +27,21 @@
 
 #define HTTP_IDENTIFY_LEN 16
 #define HD_RESULT_QUEUE_LEN 16
+
+#define DEFAULT_STAT_OUTPUT_INTERVAL 1
+#define DEFAULT_STAT_INTERVAL_PKTS 1000
 #define DEFAULT_MEMPOOL_SIZE (32 * 1024)
 
-const char *hd_config_path = "./etc/http/http_decoder.toml";
+const char *g_hd_cfg_path = "./etc/http/http_decoder.toml";
 const char *http_decoder_topic = "HTTP_DECODER_MESSAGE";
 const char *fs_file_name = "http_decoder.fs";
 
 struct http_decoder_config {
     int decompress_switch;
-    size_t hd_result_queue_len;
-    size_t mempool_size; // per session mempool size
+    int stat_interval_pkts;  //call fieldstat_incrby every stat_interval_pkts
+    int stat_output_interval;
+    size_t result_queue_len; // per session result queue length
+    size_t mempool_size;     // per session mempool size
 };
 
 /**
@@ -59,6 +64,14 @@ struct http_decoder_exdata {
     nmx_pool_t *mempool;
 };
 
+struct http_decoder_stat {
+    long long incoming_bytes;
+    long long incoming_pkts;
+    long long incoming_trans;
+    long long err_pkts;
+    int counter;
+};
+
 struct http_decoder_context {
     int plugin_id;
 	int topic_id;
@@ -69,8 +82,10 @@ struct http_decoder_context {
     int fs_err_pkts_id;
     struct stellar *st;
     struct fieldstat_easy *fse;
-    struct http_decoder_config hd_config;
+    struct http_decoder_config hd_cfg;
 };
+
+__thread struct http_decoder_stat _th_stat;
 
 struct http_message *
 http_message_new(enum http_message_type type,
@@ -312,6 +327,97 @@ static int http_protocol_identify(const char *data, size_t data_len)
 	return 0;
 }
 
+static int
+http_decoder_stat_init(struct http_decoder_context *ctx, int thread_num)
+{
+    ctx->fse =
+        fieldstat_easy_new(thread_num, "http_decoder_statistics", NULL, 0);
+    if (NULL == ctx->fse) {
+        fprintf(stderr, "fieldstat_easy_new failed.");
+        return -1;
+    }
+
+    ctx->fs_incoming_bytes_id =
+        fieldstat_easy_register_counter(ctx->fse, "incoming_bytes");
+    if (ctx->fs_incoming_bytes_id < 0) {
+        fprintf(stderr, "fieldstat_easy_register_counter incoming_bytes failed.");
+        return -1;
+    }
+
+    ctx->fs_incoming_trans_id =
+        fieldstat_easy_register_counter(ctx->fse, "incoming_trans");
+    if (ctx->fs_incoming_trans_id < 0) {
+        fprintf(stderr, "fieldstat_easy_register_counter incoming_trans failed.");
+        return -1;
+    }
+
+    ctx->fs_incoming_pkts_id =
+        fieldstat_easy_register_counter(ctx->fse, "incoming_pkts");
+    if (ctx->fs_incoming_pkts_id < 0) {
+        fprintf(stderr, "fieldstat_easy_register_counter incoming_pkts failed.");
+        return -1;
+    }
+
+    ctx->fs_err_pkts_id = fieldstat_easy_register_counter(ctx->fse, "err_pkts");
+    if (ctx->fs_err_pkts_id < 0) {
+        fprintf(stderr, "fieldstat_easy_register_counter err_pkts failed.");
+        return -1;
+    }
+
+    int stat_output_interval = DEFAULT_STAT_OUTPUT_INTERVAL;
+    if (ctx->hd_cfg.stat_output_interval > 0) {
+        stat_output_interval = ctx->hd_cfg.stat_output_interval;
+    }
+
+    int ret = fieldstat_easy_enable_auto_output(ctx->fse, fs_file_name,
+                                                stat_output_interval);
+    if (ret < 0) {
+        fprintf(stderr, "fieldstat_easy_enable_auto_output failed.");
+        return -1;
+    }
+
+    sleep(1);
+
+    return 0;
+}
+
+static void
+http_decoder_stat_output(struct http_decoder_context *ctx, int thread_id)
+{
+    if (NULL == ctx || thread_id < 0) {
+        return;
+    }
+
+    int stat_interval_pkts = DEFAULT_STAT_INTERVAL_PKTS;
+    if (ctx->hd_cfg.stat_interval_pkts > 0) {
+        stat_interval_pkts = ctx->hd_cfg.stat_interval_pkts;
+    }
+
+    if (_th_stat.counter >= stat_interval_pkts) {
+        fieldstat_easy_counter_incrby(ctx->fse, thread_id,
+                                      ctx->fs_incoming_bytes_id, NULL, 0,
+                                      _th_stat.incoming_bytes);
+
+        fieldstat_easy_counter_incrby(ctx->fse, thread_id,
+                                      ctx->fs_incoming_pkts_id, NULL, 0,
+                                      _th_stat.incoming_pkts);
+        
+        fieldstat_easy_counter_incrby(ctx->fse, thread_id,
+                                      ctx->fs_incoming_trans_id, NULL, 0,
+                                      _th_stat.incoming_trans);
+
+        fieldstat_easy_counter_incrby(ctx->fse, thread_id,
+                                      ctx->fs_err_pkts_id, NULL, 0,
+                                      _th_stat.err_pkts);
+
+        _th_stat.counter = 0;
+        _th_stat.err_pkts = 0;
+        _th_stat.incoming_bytes = 0;
+        _th_stat.incoming_pkts = 0;
+        _th_stat.incoming_trans = 0;
+    }
+}
+
 int http_decoder_entry(struct session *sess, int events,
                        const struct packet *pkt, void *cb_arg)
 {
@@ -359,9 +465,9 @@ int http_decoder_entry(struct session *sess, int events,
             }
         }
 
-        ex_data = http_decoder_exdata_new(ctx->hd_config.mempool_size,
-                                          ctx->hd_config.hd_result_queue_len,
-                                          ctx->hd_config.decompress_switch);
+        ex_data = http_decoder_exdata_new(ctx->hd_cfg.mempool_size,
+                                          ctx->hd_cfg.result_queue_len,
+                                          ctx->hd_cfg.decompress_switch);
         session_set_ex_data(sess, ctx->ex_data_idx, ex_data);
     }
 
@@ -387,23 +493,15 @@ int http_decoder_entry(struct session *sess, int events,
                              ex_data->mempool, sess);
     ret = http_decoder_half_parse(cur_half, payload, payload_len);
     if (ret < 0) {
-        // fieldstat_easy_counter_incrby(decoder_ctx->fse, thread_id,
-        //                               decoder_ctx->fs_err_pkts_id,
-        //                               NULL, 0, 1);
+        _th_stat.err_pkts += 1;
     }
 
-    // fieldstat_easy_counter_incrby(decoder_ctx->fse, thread_id,
-    //                               decoder_ctx->fs_incoming_bytes_id,
-    //                               NULL, 0, payload_len);
+    _th_stat.incoming_bytes += payload_len;
+    _th_stat.incoming_pkts += 1;
+    _th_stat.incoming_trans += http_decoder_half_trans_count(cur_half);
+    _th_stat.counter++;
 
-    // fieldstat_easy_counter_incrby(decoder_ctx->fse, thread_id,
-    //                               decoder_ctx->fs_incoming_pkts_id,
-    //                               NULL, 0, 1);
-
-    // long long trans_cnt = http_decoder_half_trans_count(cur_half);
-    // fieldstat_easy_counter_incrby(decoder_ctx->fse, thread_id,
-    //                               decoder_ctx->fs_incoming_trans_id,
-    //                               NULL, 0, trans_cnt);
+    http_decoder_stat_output(ctx, thread_id);
 
     return 0;
 }
@@ -438,61 +536,13 @@ static void http_decoder_ex_data_free(struct session *s, int idx,
     http_decoder_exdata_free(exdata);
 }
 
-#define FS_OUTPUT_INTERVAL_S 1
-static int http_decoder_fs_init(struct http_decoder_context *ctx, int thread_num)
+static int load_http_decoder_config(const char *cfg_path,
+                                    struct http_decoder_config *hd_cfg)
 {
-    ctx->fse = fieldstat_easy_new(thread_num, "http_decoder_statistics", NULL, 0);
-    if (NULL == ctx->fse) {
-        fprintf(stderr, "fieldstat_easy_new failed.");
-        return -1;
-    }
-
-    ctx->fs_incoming_bytes_id =
-        fieldstat_easy_register_counter(ctx->fse, "incoming_bytes");
-    if (ctx->fs_incoming_bytes_id < 0) {
-        fprintf(stderr, "fieldstat_easy_register_counter incoming_bytes failed.");
-        return -1;
-    }
-
-    ctx->fs_incoming_trans_id =
-        fieldstat_easy_register_counter(ctx->fse, "incoming_trans");
-    if (ctx->fs_incoming_trans_id < 0) {
-        fprintf(stderr, "fieldstat_easy_register_counter incoming_trans failed.");
-        return -1;
-    }
-
-    ctx->fs_incoming_pkts_id =
-        fieldstat_easy_register_counter(ctx->fse, "incoming_pkts");
-    if (ctx->fs_incoming_pkts_id < 0) {
-        fprintf(stderr, "fieldstat_easy_register_counter incoming_pkts failed.");
-        return -1;
-    }
-
-    ctx->fs_err_pkts_id = fieldstat_easy_register_counter(ctx->fse, "err_pkts");
-    if (ctx->fs_err_pkts_id < 0) {
-        fprintf(stderr, "fieldstat_easy_register_counter err_pkts failed.");
-        return -1;
-    }
-
-    int ret = fieldstat_easy_enable_auto_output(ctx->fse, fs_file_name,
-                                                FS_OUTPUT_INTERVAL_S);
-    if (ret < 0) {
-        fprintf(stderr, "fieldstat_easy_enable_auto_output failed.");
-        return -1;
-    }
-
-    sleep(1);
-
-    return 0;
-}
-
-static int load_http_decoder_config(const char *config_path,
-                                    struct http_decoder_config *hd_config)
-{
-    FILE *fp = fopen(config_path, "r");
+    FILE *fp = fopen(cfg_path, "r");
     if (NULL == fp) {
         fprintf(stderr, "[%s:%d]Can't open config file:%s",
-                __FUNCTION__, __LINE__, config_path);
+                __FUNCTION__, __LINE__, cfg_path);
         return -1;
     }
 
@@ -505,28 +555,42 @@ static int load_http_decoder_config(const char *config_path,
     toml_table_t *basic_sec_tbl = toml_table_in(root, "basic");
     if (NULL == basic_sec_tbl) {
         fprintf(stderr, "[%s:%d]config file:%s has no key: [basic]",
-                __FUNCTION__, __LINE__, config_path);
+                __FUNCTION__, __LINE__, cfg_path);
         ret = -1;
         goto next;
     }
 
     toml_datum_t int_val = toml_int_in(basic_sec_tbl, "decompress");
     if (int_val.ok != 0) {
-        hd_config->decompress_switch = int_val.u.b;
+        hd_cfg->decompress_switch = int_val.u.b;
     }
 
     int_val = toml_int_in(basic_sec_tbl, "mempool_size");
     if (int_val.ok != 0) {
-        hd_config->mempool_size = int_val.u.i;
+        hd_cfg->mempool_size = int_val.u.i;
     } else {
-        hd_config->mempool_size = DEFAULT_MEMPOOL_SIZE;
+        hd_cfg->mempool_size = DEFAULT_MEMPOOL_SIZE;
     }
 
-    int_val = toml_int_in(basic_sec_tbl, "hd_result_queue_len");
+    int_val = toml_int_in(basic_sec_tbl, "result_queue_len");
     if (int_val.ok != 0) {
-        hd_config->hd_result_queue_len = int_val.u.i;
+        hd_cfg->result_queue_len = int_val.u.i;
     } else {
-        hd_config->hd_result_queue_len = HD_RESULT_QUEUE_LEN;
+        hd_cfg->result_queue_len = HD_RESULT_QUEUE_LEN;
+    }
+
+    int_val = toml_int_in(basic_sec_tbl, "stat_interval_pkts");
+    if (int_val.ok != 0) {
+        hd_cfg->stat_interval_pkts = int_val.u.i;
+    } else {
+        hd_cfg->stat_interval_pkts = DEFAULT_STAT_INTERVAL_PKTS;
+    }
+
+    int_val = toml_int_in(basic_sec_tbl, "stat_output_interval");
+    if (int_val.ok != 0) {
+        hd_cfg->stat_output_interval = int_val.u.i;
+    } else {
+        hd_cfg->stat_output_interval = DEFAULT_STAT_OUTPUT_INTERVAL;
     }
 
 next:
@@ -542,7 +606,7 @@ void *http_decoder_init(struct stellar *st)
 
     struct http_decoder_context *ctx = CALLOC(struct http_decoder_context, 1);
 
-    int ret = load_http_decoder_config(hd_config_path, &ctx->hd_config);
+    int ret = load_http_decoder_config(g_hd_cfg_path, &ctx->hd_cfg);
     if (ret < 0) {
         goto failed;
     }
@@ -570,7 +634,7 @@ void *http_decoder_init(struct stellar *st)
 
     thread_num = stellar_get_worker_thread_num(st);
 
-    if (http_decoder_fs_init(ctx, thread_num) < 0) {
+    if (http_decoder_stat_init(ctx, thread_num) < 0) {
         goto failed;
     }
     

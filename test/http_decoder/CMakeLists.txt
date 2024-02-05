@@ -16,18 +16,17 @@ add_test(NAME COPY_CONF COMMAND sh -c "mkdir -p ${TEST_RUN_DIR}/tsgconf/ && cp $
 add_test(NAME COPY_SPEC COMMAND sh -c "mkdir -p ${TEST_RUN_DIR}/stellar_plugin/ && cp ${CMAKE_CURRENT_SOURCE_DIR}/test_env/spec.toml ${TEST_RUN_DIR}/stellar_plugin/spec.toml")
 add_test(NAME COPY_CONFLIST COMMAND sh -c "mkdir -p ${TEST_RUN_DIR}/plug/ && cp ${CMAKE_CURRENT_SOURCE_DIR}/test_env/conflist.inf ${TEST_RUN_DIR}/plug/conflist.inf")
 add_test(NAME COPY_INF COMMAND sh -c "mkdir -p ${TEST_RUN_DIR}/plug/stellar_on_sapp && cp ${CMAKE_CURRENT_SOURCE_DIR}/test_env/start_loader.inf ${TEST_RUN_DIR}/plug/stellar_on_sapp/start_loader.inf")
+add_test(NAME COPY_HTTP_DECODER_CONF COMMAND sh -c "mkdir -p ${TEST_RUN_DIR}/etc/http && cp ${PROJECT_SOURCE_DIR}/src/http_decoder/http_decoder.toml ${TEST_RUN_DIR}/etc/http/")
 
 # update config files
 add_test(NAME UPDATE_SAPP_LOG COMMAND bash -c "sed -i 's/sapp_log.fatal/sapp_log.info/' ${TEST_RUN_DIR}/etc/sapp_log.conf")
 add_test(NAME UPDATE_SAPP_SYN_MODE COMMAND bash -c "sed -i 's/syn_mandatory=1/syn_mandatory=0/' ${TEST_RUN_DIR}/etc/sapp.toml")
 add_test(NAME UPDATE_SAPP_REORDER COMMAND bash -c "sed -i 's/reorder_pkt_max=32/reorder_pkt_max=5/' ${TEST_RUN_DIR}/etc/sapp.toml")         
 
-
 # update plugin to be tested
 add_test(NAME UPDATE_STELLAR_ON_SAPP_SO COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/src/stellar_on_sapp/stellar_on_sapp.so ${TEST_RUN_DIR}/plug/stellar_on_sapp/stellar_on_sapp.so")
 add_test(NAME UPDATE_PLUG_SO COMMAND sh -c "cp ${CMAKE_BINARY_DIR}/src/${DECODER_NAME}/${DECODER_NAME}.so ${TEST_RUN_DIR}/stellar_plugin/${DECODER_NAME}.so")
 add_test(NAME UPDATE_TEST_SO COMMAND sh -c "cp ${CMAKE_CURRENT_BINARY_DIR}/${DECODER_NAME}_test.so ${TEST_RUN_DIR}/stellar_plugin/${DECODER_NAME}_test.so")
-add_test(NAME COPY_HTTP_DECODER_CONF COMMAND sh -c "mkdir -p ${TEST_RUN_DIR}/etc/http && cp ${PROJECT_SOURCE_DIR}/src/http_decoder/http_decoder.toml ${TEST_RUN_DIR}/etc/http/")
 
 set_tests_properties(INSTALL_TEST_MAIN COPY_TEST_MAIN COPY_CONF COPY_SPEC COPY_CONFLIST COPY_INF
                      UPDATE_SAPP_LOG UPDATE_SAPP_SYN_MODE UPDATE_SAPP_REORDER     
