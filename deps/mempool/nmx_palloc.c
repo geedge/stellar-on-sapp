@@ -11,13 +11,10 @@ size_t nmx_pagesize = 0;
 
 #define NMX_POOL_ALIGNMENT       16
 
-
 static void *nmx_palloc_block(nmx_pool_t *pool, size_t size);
 static void *nmx_palloc_large(nmx_pool_t *pool, size_t size);
 
-
-nmx_pool_t *
-nmx_create_pool(size_t size)
+nmx_pool_t *nmx_create_pool(size_t size)
 {
     nmx_pool_t  *p;
 
@@ -40,9 +37,7 @@ nmx_create_pool(size_t size)
     return p;
 }
 
-
-void
-nmx_destroy_pool(nmx_pool_t *pool)
+void nmx_destroy_pool(nmx_pool_t *pool)
 {
     nmx_pool_t          *p, *n;
     nmx_pool_large_t    *l;
@@ -63,9 +58,7 @@ nmx_destroy_pool(nmx_pool_t *pool)
     }
 }
 
-
-void
-nmx_reset_pool(nmx_pool_t *pool)
+void nmx_reset_pool(nmx_pool_t *pool)
 {
     nmx_pool_t        *p;
     nmx_pool_large_t  *l;
@@ -85,9 +78,7 @@ nmx_reset_pool(nmx_pool_t *pool)
     pool->large = NULL;
 }
 
-
-void *
-nmx_palloc(nmx_pool_t *pool, size_t size)
+void *nmx_palloc(nmx_pool_t *pool, size_t size)
 {
     unsigned char      *m;
     nmx_pool_t  *p;
@@ -112,18 +103,14 @@ nmx_palloc(nmx_pool_t *pool, size_t size)
         return nmx_palloc_block(pool, size);
     }
 
-
-
     return nmx_palloc_large(pool, size);
 }
 
 
-void *
-nmx_pnalloc(nmx_pool_t *pool, size_t size)
+void *nmx_pnalloc(nmx_pool_t *pool, size_t size)
 {
     unsigned char      *m;
     nmx_pool_t  *p;
-
 
     if (size <= pool->max) {
 
@@ -144,7 +131,6 @@ nmx_pnalloc(nmx_pool_t *pool, size_t size)
 
         return nmx_palloc_block(pool, size);
     }
-
 
     return nmx_palloc_large(pool, size);
 }
@@ -185,7 +171,6 @@ nmx_palloc_block(nmx_pool_t *pool, size_t size)
     return m;
 }
 
-
 static void *
 nmx_palloc_large(nmx_pool_t *pool,size_t size)
 {
@@ -224,9 +209,7 @@ nmx_palloc_large(nmx_pool_t *pool,size_t size)
     return p;
 }
 
-
-void *
-nmx_pmemalign(nmx_pool_t *pool, size_t size, size_t alignment)
+void *nmx_pmemalign(nmx_pool_t *pool, size_t size, size_t alignment)
 {
     void              *p;
     nmx_pool_large_t  *large;
@@ -249,9 +232,7 @@ nmx_pmemalign(nmx_pool_t *pool, size_t size, size_t alignment)
     return p;
 }
 
-
-int
-nmx_pfree(nmx_pool_t *pool, void *p)
+int nmx_pfree(nmx_pool_t *pool, void *p)
 {
     nmx_pool_large_t  *l;
 
@@ -268,8 +249,7 @@ nmx_pfree(nmx_pool_t *pool, void *p)
     return 0;
 }
 
-void *
-nmx_pcalloc(nmx_pool_t *pool, size_t size)
+void *nmx_pcalloc(nmx_pool_t *pool, size_t size)
 {
     void *p;
 

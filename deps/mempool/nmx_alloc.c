@@ -1,8 +1,7 @@
 #include "nmx_alloc.h"
 #include <string.h>
 
-void *
-nmx_alloc(size_t size)
+void *nmx_alloc(size_t size)
 {
     void  *p;
 
@@ -11,9 +10,7 @@ nmx_alloc(size_t size)
     return p;
 }
 
-
-void *
-nmx_calloc(size_t size)
+void *nmx_calloc(size_t size)
 {
     void  *p;
 
@@ -36,8 +33,7 @@ void *nmx_realloc(void *p, size_t size){
 
 }
 
-void *
-        nmx_memalign(size_t alignment, size_t size)
+void *nmx_memalign(size_t alignment, size_t size)
 {
     void  *p;
     int    err;

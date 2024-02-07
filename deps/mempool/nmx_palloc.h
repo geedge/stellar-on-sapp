@@ -6,7 +6,6 @@
 #include "nmx_alloc.h"
 
 typedef struct nmx_pool_large_s nmx_pool_large_t;
-
 typedef struct nmx_pool_s nmx_pool_t;
 
 struct nmx_pool_large_s {
@@ -29,12 +28,10 @@ struct nmx_pool_s {
     nmx_pool_large_t *large;
 };
 
-
 /*  ======================================
  *  ++++++++  Library Open API  ++++++++++
  *  ======================================
  */
-
 
 void *nmx_alloc (size_t size);
 
@@ -57,6 +54,5 @@ void *nmx_pcalloc (nmx_pool_t *pool, size_t size);
 void *nmx_pmemalign (nmx_pool_t *pool, size_t size, size_t alignment);
 
 int nmx_pfree (nmx_pool_t *pool, void *p);
-
 
 #endif //nmx_palloc.h_H_

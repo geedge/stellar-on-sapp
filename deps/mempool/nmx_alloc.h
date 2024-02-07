@@ -1,6 +1,7 @@
 #ifndef __nmx_alloc_H_
 #define __nmx_alloc_H_
 #include <stdlib.h>
+
 void *nmx_alloc(size_t size);
 void *nmx_calloc(size_t size);
 void *nmx_realloc(void *p, size_t size);
