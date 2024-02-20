@@ -509,11 +509,18 @@ const char *session_get0_route_ctx(struct session *sess, int session_direction, 
 	return (const char *)route_ctx;
 }
 
-enum session_state session_get_current_state(struct session *sess)
+inline enum session_state session_get_current_state(struct session *sess)
 {
 	assert(sess);
     return sess->state;
 }
+
+inline enum session_type session_get_type(struct session *sess)
+{
+	assert(sess);
+	return sess->type;
+}
+
 
 int session_get_current_thread_id(struct session *sess)
 {
