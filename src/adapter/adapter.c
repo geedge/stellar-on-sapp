@@ -415,11 +415,10 @@ int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 	if(pkt == NULL || ts == NULL)return -1;
 	if(pkt->raw_pkt == NULL || pkt->a_stream == NULL)return -1;
 
-	get_opt_from_rawpkt(pkt->raw_pkt , RAW_PKT_GET_TIMESTAMP, &ts);
+	get_opt_from_rawpkt(pkt->raw_pkt , RAW_PKT_GET_TIMESTAMP, ts);
 	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
 	return 0;
 }
-
 
 const char *session_get0_current_l3_header(struct session *sess)
 {
