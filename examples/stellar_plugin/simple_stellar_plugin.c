@@ -21,6 +21,7 @@ struct simple_stellar_plugin_env
 	long long udp_packet_count;
 	long long icmp_packet_count;
 	long long icmp6_packet_count;
+	long long polling_times;
 };
 
 struct mq_message_stat
@@ -149,6 +150,12 @@ void simple_stellar_event_on_packet_func(struct packet *pkt,  unsigned char ip_p
 	return;
 }
 
+void simple_stellar_plugin_on_polling_func(void *plugin_env)
+{
+	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
+	env->polling_times++;
+	return;
+}
 
 void *simple_stellar_event_plugin_init(struct stellar *st)
 {
@@ -166,7 +173,14 @@ void *simple_stellar_event_plugin_init(struct stellar *st)
 
 	if(tcp_plugin_id <= 0x10000 || udp_plugin_id <= 0x10000 || icmp_plugin_id <= 0x10000 || icmp6_plugin_id <= 0x10000)
 	{
-		perror("register packet plugin failed\n");
+		perror("register packet plugin return invalid plugin id\n");
+		exit(-1);
+	}
+
+	int polling_plugin_id=stellar_polling_plugin_register(st, simple_stellar_plugin_on_polling_func, env);
+	if(polling_plugin_id <= 0x20000)
+	{
+		perror("register polling plugin return invalid plugin id \n");
 		exit(-1);
 	}
 
@@ -197,13 +211,11 @@ void simple_stellar_event_plugin_exit(void *plugin_env)
 	if(plugin_env)
 	{
 		struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
-		printf("(%s):tcp_packet_num:%lld, udp_packet_num:%lld, icmp_packet_num:%lld, icmp6_packet_num:%lld \n", __FUNCTION__, env->tcp_packet_count, env->udp_packet_count, env->icmp_packet_count, env->icmp6_packet_count);
+		printf("(%s):tcp_packet_num:%lld, udp_packet_num:%lld, icmp_packet_num:%lld, icmp6_packet_num:%lld, polling_times:%lld\n", __FUNCTION__, env->tcp_packet_count, env->udp_packet_count, env->icmp_packet_count, env->icmp6_packet_count, env->polling_times);
 		FREE(plugin_env);
 	}
 	return;
 }
-
-// TODO: add polling entry
 
 /*******************************
  * mq plugin *

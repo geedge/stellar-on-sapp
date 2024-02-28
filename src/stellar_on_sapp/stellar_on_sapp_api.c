@@ -178,8 +178,14 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	}
 	plugin_manager_on_packet(st->plug_mgr, &pkt);
 }
+
+void polling_on_sapp(struct stellar *st)
+{
+	plugin_manager_on_polling(st->plug_mgr);
+}
+
 /*********************************************
- * STELLAR INFO INTERFACE WRAPPER ON SAPP*
+ * STELLAR INFO INTERFACE WRAPPER ON SAPP
  *********************************************/
 
 int stellar_get_worker_thread_num(struct stellar *st)

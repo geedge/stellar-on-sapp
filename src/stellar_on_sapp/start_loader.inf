@@ -28,6 +28,6 @@ FUNC_NAME=stellar_on_sapp_ip4_entry
 FUNC_FLAG=ALL
 FUNC_NAME=stellar_on_sapp_ip6_entry
 
-#[POLLING]
-#FUNC_FLAG=ALL
-#FUNC_NAME=stellar_on_sapp_polling_entry
+[POLLING]
+FUNC_FLAG=ALL
+FUNC_NAME=stellar_on_sapp_polling_entry

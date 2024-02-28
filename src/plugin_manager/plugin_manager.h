@@ -10,6 +10,8 @@ void plugin_manager_exit(struct plugin_manager_schema *plug_mgr);
 
 void plugin_manager_on_packet(struct plugin_manager_schema *plug_mgr, struct packet *pkt);
 
+void plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr);
+
 //publish and dispatch session msg(msg, pkt) on session_mq
 void plugin_manager_on_session_ingress(struct session *sess,const struct packet *pkt);
 void plugin_manager_on_session_egress(struct session *sess,const struct packet *pkt);

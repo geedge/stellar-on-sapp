@@ -17,6 +17,7 @@ struct plugin_manager_schema
 	UT_array *session_mq_schema_array;
 	UT_array *registered_session_plugin_array;
 	UT_array *registered_packet_plugin_array;
+	UT_array *registered_polling_plugin_array;
 	int topic_num;
 	int subscriber_num;
 	int tcp_topic_id;
@@ -88,12 +89,16 @@ struct plugin_manager_runtime
 
 struct registered_packet_plugin_schema
 {
-	int plugin_spec_idx;
 	char ip_protocol;
 	plugin_on_packet_func *on_packet;
 	void *plugin_env;
 };
 
+struct registered_polling_plugin_schema
+{
+	plugin_on_polling_func *on_polling;
+	void *plugin_env;
+};
 
 struct session_mq_subscriber_info
 {
@@ -103,7 +108,6 @@ struct session_mq_subscriber_info
 
 struct registered_session_plugin_schema
 {
-	int plugin_spec_idx;
 	session_ctx_new_func *on_ctx_new;
 	session_ctx_free_func *on_ctx_free;
 	void *plugin_env;
@@ -111,6 +115,7 @@ struct registered_session_plugin_schema
 };
 
 #define PACKET_PULGIN_ID_BASE 0x10000
+#define POLLING_PULGIN_ID_BASE 0x20000
 
 /*******************************
  * PLUGIN MANAGER INIT & EXIT *
@@ -246,6 +251,7 @@ void plugin_manager_exit(struct plugin_manager_schema *plug_mgr)
 	}
 	if(plug_mgr->session_exdata_schema_array)utarray_free(plug_mgr->session_exdata_schema_array);
 	if(plug_mgr->registered_packet_plugin_array)utarray_free(plug_mgr->registered_packet_plugin_array);
+	if(plug_mgr->registered_polling_plugin_array)utarray_free(plug_mgr->registered_polling_plugin_array);
 	if(plug_mgr->registered_session_plugin_array)
 	{
         struct registered_session_plugin_schema *s = NULL;
@@ -717,6 +723,43 @@ void plugin_manager_on_packet(struct plugin_manager_schema *plug_mgr, struct pac
 		if(p->ip_protocol == ip_proto && p->on_packet)
 		{
 			p->on_packet(pkt, ip_proto, p->plugin_env);
+		}
+	}
+	return;
+}
+
+/*********************************************
+ * PLUGIN MANAGER POLLING PLUGIN *
+ *********************************************/
+
+
+UT_icd registered_polling_plugin_array_icd = {sizeof(struct registered_polling_plugin_schema), NULL, NULL, NULL};
+
+int stellar_polling_plugin_register(struct stellar *st, plugin_on_polling_func on_polling, void *plugin_env)
+{
+	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
+	if(plug_mgr->registered_polling_plugin_array == NULL)
+	{
+		utarray_new(plug_mgr->registered_polling_plugin_array, &registered_polling_plugin_array_icd);
+	}
+	struct registered_polling_plugin_schema polling_plugin_schema;
+	memset(&polling_plugin_schema, 0, sizeof(polling_plugin_schema));
+	polling_plugin_schema.on_polling = on_polling;
+	polling_plugin_schema.plugin_env = plugin_env;
+	utarray_push_back(plug_mgr->registered_polling_plugin_array, &polling_plugin_schema);
+	return (POLLING_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_polling_plugin_array));// return polling plugin_id
+}
+
+// FIXME: scheduler with return value
+void plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr)
+{
+	if(plug_mgr->registered_polling_plugin_array == NULL)return;
+	struct registered_polling_plugin_schema *p=NULL;
+	while ((p = (struct registered_polling_plugin_schema *)utarray_next(plug_mgr->registered_polling_plugin_array, p)))
+	{
+		if(p->on_polling)
+		{
+			p->on_polling(p->plugin_env);
 		}
 	}
 	return;

@@ -17,3 +17,5 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, struct ses
 void session_poll_on_sapp(struct session *sess);
 
 void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void *a_packet, enum packet_type type);
+
+void polling_on_sapp(struct stellar *st);

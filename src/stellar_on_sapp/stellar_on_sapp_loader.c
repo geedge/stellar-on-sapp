@@ -223,4 +223,8 @@ char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedi
 	return APP_STATE_GIVEME;
 }
 
-// TODO: add polling entry and call plugin_manager_on_polling
+char stellar_on_sapp_polling_entry(struct streaminfo *stream,  void **pme, int thread_seq,void *a_packet)
+{
+	polling_on_sapp(g_stellar);
+	return APP_STATE_GIVEME;
+}
