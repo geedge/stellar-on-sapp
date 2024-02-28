@@ -79,6 +79,7 @@ add_subdirectory(deps/toml)
 add_subdirectory(src/adapter)
 add_subdirectory(src/stellar_on_sapp)
 add_subdirectory(src/http_decoder)
+add_subdirectory(src/dns_decoder)
 add_subdirectory(examples/sapp_plugin)
 add_subdirectory(examples/stellar_plugin)
 

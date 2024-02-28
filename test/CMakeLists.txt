@@ -11,6 +11,7 @@ target_link_libraries(
 )
 
 add_subdirectory(http_decoder)
+add_subdirectory(dns_decoder)
 
 include(GoogleTest)
 gtest_discover_tests(gtest_stellar)
