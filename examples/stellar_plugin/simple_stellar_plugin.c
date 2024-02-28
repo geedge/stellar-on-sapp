@@ -9,14 +9,18 @@
 
 struct simple_stellar_plugin_env
 {
-    int plugin_id;
-    int exdata_idx;
 	struct stellar *st;
+    int session_plugin_id;
+    int exdata_idx;
 	int stat_topic_id;
 	int egress_topic_id;
 	int tcp_topic_id;
 	int udp_topic_id;
 	int tcp_stream_topic_id;
+	long long tcp_packet_count;
+	long long udp_packet_count;
+	long long icmp_packet_count;
+	long long icmp6_packet_count;
 };
 
 struct mq_message_stat
@@ -43,7 +47,7 @@ static void print_session_stat(struct session *sess, struct mq_message_stat *sta
         printf("total-count=%u\n", stat->c2s_bytes + stat->s2c_bytes);
 		if(stat->c2s_stream_pkts+stat->s2c_stream_pkts > 0)
 		{
-        	printf("server-stream_pkt=%u, server-stream_count=%u, client-stream_pkt=%u, client-stream_count=%u, ", stat->c2s_stream_pkts, stat->c2s_stream_bytes,
+        	printf("----------------server-stream_pkt=%u, server-stream_count=%u, client-stream_pkt=%u, client-stream_count=%u\n", stat->c2s_stream_pkts, stat->c2s_stream_bytes,
             stat->s2c_stream_pkts, stat->s2c_stream_bytes);			
 		}
     }
@@ -66,7 +70,7 @@ static void simple_session_plugin_ctx_free(struct session *sess, void *session_c
 {
 	struct simple_stellar_plugin_env *env=(struct simple_stellar_plugin_env *)plugin_env;
 	struct mq_message_stat *stat = (struct mq_message_stat *)session_ctx;
-	print_session_stat(sess, stat, env->plugin_id, __FUNCTION__);
+	print_session_stat(sess, stat, env->session_plugin_id, __FUNCTION__);
 	session_exdata_set(sess, env->exdata_idx, NULL);
 	if(session_ctx)FREE(session_ctx);
 	return;
@@ -120,6 +124,30 @@ static void simple_event_plugin_entry(struct session *sess, int topic_id, const 
     return;
 }
 
+void simple_stellar_event_on_packet_func(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env)
+{
+	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
+	switch (ip_protocol)
+	{
+	case IPPROTO_TCP:
+		env->tcp_packet_count++;
+		break;
+	case IPPROTO_UDP:
+		env->udp_packet_count++;
+		break;	
+	case IPPROTO_ICMP:
+		env->icmp_packet_count++;
+		break;			
+	case IPPROTO_ICMPV6:
+		env->icmp6_packet_count++;
+		break;		
+	default:
+		perror("invalid ip_protocol\n");
+		exit(-1);
+		break;
+	}
+	return;
+}
 
 
 void *simple_stellar_event_plugin_init(struct stellar *st)
@@ -127,11 +155,21 @@ void *simple_stellar_event_plugin_init(struct stellar *st)
 	struct simple_stellar_plugin_env *env = CALLOC(struct simple_stellar_plugin_env, 1);
 	env->st = st;
 	env->exdata_idx = stellar_session_exdata_new_index(st, "EXDATA_SESSION_STAT", NULL, NULL);
-	env->plugin_id = stellar_session_plugin_register(st, 
+	env->session_plugin_id = stellar_session_plugin_register(st, 
 									simple_session_plugin_ctx_new, 
 									simple_session_plugin_ctx_free, 
 									env);
-	
+	int tcp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_TCP, simple_stellar_event_on_packet_func, env);	
+	int udp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_UDP, simple_stellar_event_on_packet_func, env);	
+	int icmp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMP, simple_stellar_event_on_packet_func, env);	
+	int icmp6_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMPV6, simple_stellar_event_on_packet_func, env);	
+
+	if(tcp_plugin_id <= 0x10000 || udp_plugin_id <= 0x10000 || icmp_plugin_id <= 0x10000 || icmp6_plugin_id <= 0x10000)
+	{
+		perror("register packet plugin failed\n");
+		exit(-1);
+	}
+
 	env->tcp_stream_topic_id=stellar_session_mq_get_topic_id(st, TOPIC_TCP_STREAM);
 	env->tcp_topic_id=stellar_session_mq_get_topic_id(st, TOPIC_TCP);
 	env->udp_topic_id=stellar_session_mq_get_topic_id(st, TOPIC_UDP);
@@ -141,9 +179,9 @@ void *simple_stellar_event_plugin_init(struct stellar *st)
 		exit(-1);
 	}
 
-	stellar_session_mq_subscribe(st, env->tcp_stream_topic_id, simple_event_plugin_entry, env->plugin_id);
-	stellar_session_mq_subscribe(st, env->tcp_topic_id, simple_event_plugin_entry, env->plugin_id);
-	stellar_session_mq_subscribe(st, env->udp_topic_id, simple_event_plugin_entry, env->plugin_id);
+	stellar_session_mq_subscribe(st, env->tcp_stream_topic_id, simple_event_plugin_entry, env->session_plugin_id);
+	stellar_session_mq_subscribe(st, env->tcp_topic_id, simple_event_plugin_entry, env->session_plugin_id);
+	stellar_session_mq_subscribe(st, env->udp_topic_id, simple_event_plugin_entry, env->session_plugin_id);
 
 	int stat_topic_id=stellar_session_mq_get_topic_id(st, "TOPIC_SESSION_STAT");
 	if(stat_topic_id < 0)
@@ -156,11 +194,15 @@ void *simple_stellar_event_plugin_init(struct stellar *st)
 
 void simple_stellar_event_plugin_exit(void *plugin_env)
 {
-	if(plugin_env)FREE(plugin_env);
+	if(plugin_env)
+	{
+		struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
+		printf("(%s):tcp_packet_num:%lld, udp_packet_num:%lld, icmp_packet_num:%lld, icmp6_packet_num:%lld \n", __FUNCTION__, env->tcp_packet_count, env->udp_packet_count, env->icmp_packet_count, env->icmp6_packet_count);
+		FREE(plugin_env);
+	}
 	return;
 }
 
-// TODO: add packet entry
 // TODO: add polling entry
 
 /*******************************
@@ -173,7 +215,7 @@ static void session_mq_plugin_sub_fn(struct session *sess, int topic_id, const v
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
 	if(topic_id == env->egress_topic_id)
 	{
-		session_mq_ignore_message(sess, topic_id, env->plugin_id);
+		session_mq_ignore_message(sess, topic_id, env->session_plugin_id);
 	}
     if (topic_id == env->stat_topic_id)
     {
@@ -185,7 +227,7 @@ static void session_mq_plugin_sub_fn(struct session *sess, int topic_id, const v
             exit(-1);
         }
         // print_session_stat(sess, stat, env->plugin_id, __FUNCTION__);
-		session_mq_unignore_message(sess,  env->egress_topic_id, env->plugin_id);
+		session_mq_unignore_message(sess,  env->egress_topic_id, env->session_plugin_id);
     }
     return;
 }
@@ -201,11 +243,11 @@ void *simple_stellar_mq_plugin_init(struct stellar *st)
 		topic_id=stellar_session_mq_create_topic(st, "TOPIC_SESSION_STAT", NULL, NULL);
 	}
 	env->stat_topic_id = topic_id;								
-	env->plugin_id = stellar_session_plugin_register(st, 
+	env->session_plugin_id = stellar_session_plugin_register(st, 
 									NULL, 
 									NULL, 
 									env);
-	stellar_session_mq_subscribe(st, topic_id, session_mq_plugin_sub_fn, env->plugin_id);
+	stellar_session_mq_subscribe(st, topic_id, session_mq_plugin_sub_fn, env->session_plugin_id);
 
 	// TEST: subscirbe egress message then ignore
 	env->egress_topic_id=stellar_session_mq_get_topic_id(st, TOPIC_EGRESS);
@@ -214,7 +256,7 @@ void *simple_stellar_mq_plugin_init(struct stellar *st)
 		perror("get egress topic id failed\n");
 		exit(-1);
 	}
-	stellar_session_mq_subscribe(st, env->egress_topic_id, session_mq_plugin_sub_fn, env->plugin_id);
+	stellar_session_mq_subscribe(st, env->egress_topic_id, session_mq_plugin_sub_fn, env->session_plugin_id);
 	return env;
 }
 

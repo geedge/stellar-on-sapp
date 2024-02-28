@@ -211,5 +211,16 @@ unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, i
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet, ENTRY_TYPE_TCP);
 }
 
-// TODO: add packet entry and call plugin_manager_on_packet
+char stellar_on_sapp_ip4_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
+{
+	packet_update_on_sapp(g_stellar, pstream, a_packet, IPv4);
+	return APP_STATE_GIVEME;
+}
+
+char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
+{
+	packet_update_on_sapp(g_stellar, pstream, a_packet, IPv6);
+	return APP_STATE_GIVEME;
+}
+
 // TODO: add polling entry and call plugin_manager_on_polling

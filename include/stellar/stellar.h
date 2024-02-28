@@ -28,7 +28,7 @@ void stellar_session_plugin_dettach_current_session(struct session *sess);
 
 
 struct packet;
-typedef void *plugin_on_packet_func(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env);
+typedef void plugin_on_packet_func(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env);
 
 //return packet plugin_id
 int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol, plugin_on_packet_func on_packet, void *plugin_env);

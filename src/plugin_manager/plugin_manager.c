@@ -74,12 +74,12 @@ struct plugin_exdata
 	void *exdata;
 };
 
-// TODO:  add delivered mq, free message in egress stage
 struct plugin_manager_runtime
 {
 	struct plugin_manager_schema *plug_mgr;
 	struct session *sess;
-	struct session_message *mq;// message list
+	struct session_message *pending_mq;// message list
+	struct session_message *delivered_mq;// message list
 	char *session_mq_status; //N * M bits, N topic, M subscriber
 	struct plugin_exdata *plugin_exdata_array;
 	struct session_plugin_ctx_runtime *plugin_ctx_array;//N plugins TODO: call alloc and free
@@ -456,10 +456,10 @@ int session_mq_publish_message(struct session *sess, int topic_id, void *data)
 	if(plug_mgr_rt->plug_mgr->session_mq_schema_array==NULL)return -1;
     unsigned int len = utarray_len(plug_mgr_rt->plug_mgr->session_mq_schema_array);
     if (len <= (unsigned int)topic_id)return -1;
-	struct session_message *node= CALLOC(struct session_message,1);
-	node->topic_id = topic_id;
-	node->msg_data = data;
-	DL_APPEND(plug_mgr_rt->mq, node);
+	struct session_message *msg= CALLOC(struct session_message,1);
+	msg->topic_id = topic_id;
+	msg->msg_data = data;
+	DL_APPEND(plug_mgr_rt->pending_mq, msg);
 	return 0;
 }
 
@@ -526,7 +526,13 @@ int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_msg_cb_fun
 		utarray_new(session_plugin_schema->registed_session_mq_subscriber_info, &session_mq_subscriber_info_icd);
 	}
 
-	// TODO: check if the plugin already subscribe current topic
+	// if plugin already subscribe current topic, return 0
+	struct session_mq_subscriber_info *p=NULL;
+  	while( (p=(struct session_mq_subscriber_info *)utarray_next(session_plugin_schema->registed_session_mq_subscriber_info,p))) 
+	{
+		if(p->topic_id==topic_id)
+		return 0;
+	};
 
 	struct session_mq_subscriber *new_subscriber = CALLOC(struct session_mq_subscriber,1);
 	new_subscriber->topic_subscriber_idx = topic->subscriber_cnt;
@@ -554,9 +560,9 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
 	struct session_mq_topic_schema *topic;
 	struct registered_session_plugin_schema *session_plugin_schema;
 	struct session_plugin_ctx_runtime *plugin_ctx_rt;
-    while (plug_mgr_rt->mq != NULL)
+    while (plug_mgr_rt->pending_mq != NULL)
     {
-        DL_FOREACH_SAFE(plug_mgr_rt->mq, mq_elt, mq_tmp)
+        DL_FOREACH_SAFE(plug_mgr_rt->pending_mq, mq_elt, mq_tmp)
         {
             topic = (struct session_mq_topic_schema *)utarray_eltptr(plug_mgr_rt->plug_mgr->session_mq_schema_array,
                                                                     (unsigned int)(mq_elt->topic_id));
@@ -587,8 +593,8 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
                     topic->free_cb(mq_elt->msg_data, topic->free_cb_arg);
                 }
             }
-            DL_DELETE(plug_mgr_rt->mq, mq_elt);
-            FREE(mq_elt);
+            DL_DELETE(plug_mgr_rt->pending_mq, mq_elt);
+			DL_APPEND(plug_mgr_rt->delivered_mq, mq_elt);// move to delivered message list
         }
     }
 	return;
@@ -634,7 +640,8 @@ struct plugin_manager_runtime *plugin_manager_session_runtime_new(struct plugin_
 	struct plugin_manager_runtime *rt = CALLOC(struct plugin_manager_runtime, 1);
 	rt->plug_mgr = plug_mgr;
 	rt->sess = sess;
-	rt->mq = NULL;
+	rt->pending_mq = NULL;
+	rt->delivered_mq = NULL;
 	rt->session_mq_status=CALLOC(char, plug_mgr->topic_num*plug_mgr->subscriber_num);
 	memset(rt->session_mq_status, 1, plug_mgr->topic_num*plug_mgr->subscriber_num);
 	rt->plugin_exdata_array = (struct plugin_exdata *)session_exdata_runtime_new(plug_mgr);
@@ -646,10 +653,16 @@ struct plugin_manager_runtime *plugin_manager_session_runtime_new(struct plugin_
 void plugin_manager_session_runtime_free(struct plugin_manager_runtime *rt)
 {
 	if(rt==NULL)return;
-	if(rt->mq != NULL)
+	if(rt->pending_mq != NULL)
 	{
-		session_mq_free(rt->mq);
+		session_mq_free(rt->pending_mq);
+		rt->pending_mq=NULL;
 	}
+	if(rt->delivered_mq != NULL)
+	{
+		session_mq_free(rt->delivered_mq);
+		rt->delivered_mq=NULL;
+	}	
 	if(rt->session_mq_status != NULL)
 	{
 		FREE(rt->session_mq_status);
@@ -685,12 +698,13 @@ int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol
 	{
 		utarray_new(plug_mgr->registered_packet_plugin_array, &registered_packet_plugin_array_icd);
 	}
-	struct registered_packet_plugin_schema* packet_plugin_schema = CALLOC(struct registered_packet_plugin_schema, 1);
-	packet_plugin_schema->ip_protocol = ip_protocol;
-	packet_plugin_schema->on_packet = on_packet;
-	packet_plugin_schema->plugin_env = plugin_env;
-	utarray_push_back(plug_mgr->registered_packet_plugin_array, packet_plugin_schema);
-	return (PACKET_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_packet_plugin_array)-1);// return packet plugin_id
+	struct registered_packet_plugin_schema packet_plugin_schema;
+	memset(&packet_plugin_schema, 0, sizeof(packet_plugin_schema));
+	packet_plugin_schema.ip_protocol = ip_protocol;
+	packet_plugin_schema.on_packet = on_packet;
+	packet_plugin_schema.plugin_env = plugin_env;
+	utarray_push_back(plug_mgr->registered_packet_plugin_array, &packet_plugin_schema);
+	return (PACKET_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_packet_plugin_array));// return packet plugin_id
 }
 
 void plugin_manager_on_packet(struct plugin_manager_schema *plug_mgr, struct packet *pkt)
@@ -770,6 +784,8 @@ void plugin_manager_on_session_egress(struct session *sess,const struct packet *
 	if(plug_mgr_rt==NULL)return;
 	session_mq_publish_message(sess, plug_mgr_rt->plug_mgr->egress_topic_id ,(void *)pkt);
 	plugin_manager_session_message_dispatch(sess);
+	session_mq_free(plug_mgr_rt->delivered_mq);
+	plug_mgr_rt->delivered_mq=NULL;
     return;
 }
 

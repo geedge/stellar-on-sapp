@@ -12,6 +12,8 @@ struct plugin_manager_runtime * session_plugin_manager_runtime_get(struct sessio
 enum packet_type
 {
 	UNKNOWN,
+	IPv4,
+	IPv6,
 	UDP,
 	TCP,
 	TCP_STREAM,

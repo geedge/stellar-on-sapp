@@ -69,6 +69,8 @@ void stellar_exit_on_sapp(struct stellar *st)
 struct packet
 {
 	enum packet_type type;
+	unsigned char ip_proto;
+	unsigned char pad[3];
 	void *raw_pkt;
 	struct streaminfo *a_stream;
 };
@@ -147,6 +149,36 @@ void session_poll_on_sapp(struct session *sess)
 }
 
 /*********************************************
+ * PACKET STATE UPDATE ON SAPP *
+ *********************************************/
+#include <netinet/in.h>
+void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void *pkt_hdr, enum packet_type type)
+{
+	struct packet pkt;
+	pkt.type=type;
+	pkt.a_stream=pstream;
+	pkt.raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
+
+	switch (type)
+	{
+	case IPv4:
+	{
+		struct iphdr *ip4_hdr=(struct iphdr *)pkt_hdr;
+		pkt.ip_proto=ip4_hdr->protocol;
+		break;
+	}
+	case IPv6:
+	{
+		struct ip6_hdr *ip6_hdr=(struct ip6_hdr *)pkt_hdr;
+		pkt.ip_proto=ip6_hdr->ip6_nxt;
+		break;	
+	}
+	default:
+		return;
+	}
+	plugin_manager_on_packet(st->plug_mgr, &pkt);
+}
+/*********************************************
  * STELLAR INFO INTERFACE WRAPPER ON SAPP*
  *********************************************/
 
@@ -212,22 +244,10 @@ int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 	return 0;
 }
 
-unsigned char packet_get_ip_protocol(struct packet *pkt)
+inline unsigned char packet_get_ip_protocol(struct packet *pkt)
 {
 	if(pkt == NULL || pkt->a_stream == NULL)return 0;
-	unsigned char ip_protocol=0;
-	switch(pkt->a_stream->type)
-	{
-		case STREAM_TYPE_TCP:
-			ip_protocol=IPPROTO_TCP;
-			break;
-		case STREAM_TYPE_UDP:
-			ip_protocol=IPPROTO_UDP;
-			break;
-		default:
-			break;
-	}
-	return ip_protocol; // FIXME: to be improved to support ICMP, etc.
+	return pkt->ip_proto;
 }
 
 /*********************************************
