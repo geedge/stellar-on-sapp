@@ -4,30 +4,96 @@
 		"transaction_id": "5e63",
 		"dns_type": "query",
 		"qname": "google.com",
+		"qtype": "A",
+		"flag_qr": "0",
+		"flag_opcode": "0",
+		"flag_rd": "1",
 		"name": "DNS_DECODER_RESULT_1"
 	},
 	{
 		"Tuple4": "10.180.156.141.49342>10.2.95.39.53",
 		"dns_type": "response",
-		"ans_rr0": "74.125.228.46",
-		"ans_rr1": "74.125.228.32",
-		"ans_rr2": "74.125.228.33",
-		"ans_rr3": "74.125.228.34",
-		"ans_rr4": "74.125.228.35",
-		"ans_rr5": "74.125.228.36",
-		"ans_rr6": "74.125.228.37",
-		"ans_rr7": "74.125.228.38",
-		"ans_rr8": "74.125.228.39",
-		"ans_rr9": "74.125.228.40",
-		"ans_rr10": "74.125.228.41",
-		"auth_rr0": "ns4.google.com",
-		"auth_rr1": "ns2.google.com",
-		"auth_rr2": "ns3.google.com",
-		"auth_rr3": "ns1.google.com",
-		"addt_rr0": "216.239.32.10",
-		"addt_rr1": "216.239.36.10",
-		"addt_rr2": "216.239.38.10",
-		"addt_rr3": "216.239.34.10",
+		"qname": "google.com",
+		"qtype": "A",
+		"flag_qr": "1",
+		"flag_opcode": "0",
+		"flag_rd": "1",
+		"ans_rr0": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.46"
+		},
+		"ans_rr1": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.32"
+		},
+		"ans_rr2": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.33"
+		},
+		"ans_rr3": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.34"
+		},
+		"ans_rr4": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.35"
+		},
+		"ans_rr5": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.36"
+		},
+		"ans_rr6": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.37"
+		},
+		"ans_rr7": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.38"
+		},
+		"ans_rr8": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.39"
+		},
+		"ans_rr9": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.40"
+		},
+		"ans_rr10": {
+			"rr_type": "A",
+			"rr_data": "74.125.228.41"
+		},
+		"auth_rr0": {
+			"rr_type": "NS",
+			"rr_data": "ns4.google.com"
+		},
+		"auth_rr1": {
+			"rr_type": "NS",
+			"rr_data": "ns2.google.com"
+		},
+		"auth_rr2": {
+			"rr_type": "NS",
+			"rr_data": "ns3.google.com"
+		},
+		"auth_rr3": {
+			"rr_type": "NS",
+			"rr_data": "ns1.google.com"
+		},
+		"addt_rr0": {
+			"rr_type": "A",
+			"rr_data": "216.239.32.10"
+		},
+		"addt_rr1": {
+			"rr_type": "A",
+			"rr_data": "216.239.36.10"
+		},
+		"addt_rr2": {
+			"rr_type": "A",
+			"rr_data": "216.239.38.10"
+		},
+		"addt_rr3": {
+			"rr_type": "A",
+			"rr_data": "216.239.34.10"
+		},
 		"name": "DNS_DECODER_RESULT_2"
 	},
 	{
@@ -35,24 +101,72 @@
 		"transaction_id": "e2ec",
 		"dns_type": "query",
 		"qname": "aol.com",
+		"qtype": "A",
+		"flag_qr": "0",
+		"flag_opcode": "0",
+		"flag_rd": "1",
 		"name": "DNS_DECODER_RESULT_3"
 	},
 	{
 		"Tuple4": "10.180.156.141.49343>10.2.95.39.53",
 		"dns_type": "response",
-		"ans_rr0": "205.188.100.58",
-		"ans_rr1": "205.188.101.58",
-		"ans_rr2": "207.200.74.38",
-		"ans_rr3": "64.12.79.57",
-		"ans_rr4": "64.12.89.186",
-		"auth_rr0": "dns-01.ns.aol.com",
-		"auth_rr1": "dns-02.ns.aol.com",
-		"auth_rr2": "dns-06.ns.aol.com",
-		"auth_rr3": "dns-07.ns.aol.com",
-		"addt_rr0": "64.236.1.107",
-		"addt_rr1": "207.200.73.80",
-		"addt_rr2": "64.12.51.132",
-		"addt_rr3": "205.188.157.232",
+		"qname": "aol.com",
+		"qtype": "A",
+		"flag_qr": "1",
+		"flag_opcode": "0",
+		"flag_rd": "1",
+		"ans_rr0": {
+			"rr_type": "A",
+			"rr_data": "205.188.100.58"
+		},
+		"ans_rr1": {
+			"rr_type": "A",
+			"rr_data": "205.188.101.58"
+		},
+		"ans_rr2": {
+			"rr_type": "A",
+			"rr_data": "207.200.74.38"
+		},
+		"ans_rr3": {
+			"rr_type": "A",
+			"rr_data": "64.12.79.57"
+		},
+		"ans_rr4": {
+			"rr_type": "A",
+			"rr_data": "64.12.89.186"
+		},
+		"auth_rr0": {
+			"rr_type": "NS",
+			"rr_data": "dns-01.ns.aol.com"
+		},
+		"auth_rr1": {
+			"rr_type": "NS",
+			"rr_data": "dns-02.ns.aol.com"
+		},
+		"auth_rr2": {
+			"rr_type": "NS",
+			"rr_data": "dns-06.ns.aol.com"
+		},
+		"auth_rr3": {
+			"rr_type": "NS",
+			"rr_data": "dns-07.ns.aol.com"
+		},
+		"addt_rr0": {
+			"rr_type": "A",
+			"rr_data": "64.236.1.107"
+		},
+		"addt_rr1": {
+			"rr_type": "A",
+			"rr_data": "207.200.73.80"
+		},
+		"addt_rr2": {
+			"rr_type": "A",
+			"rr_data": "64.12.51.132"
+		},
+		"addt_rr3": {
+			"rr_type": "A",
+			"rr_data": "205.188.157.232"
+		},
 		"name": "DNS_DECODER_RESULT_4"
 	}
 ]

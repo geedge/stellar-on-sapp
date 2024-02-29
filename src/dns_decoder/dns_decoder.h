@@ -80,7 +80,7 @@ struct dns_flag {
 };
 
 struct dns_query_question {
-	uint16_t qtype;
+	enum dns_rr_type qtype;
 	uint16_t qclass;
 	uint8_t qname[DNS_NAME_MAX];
 };
@@ -199,7 +199,7 @@ struct rdata_nsec3param {
 /* rr is short for resource record */
 struct dns_rr {
     uint8_t name[DNS_NAME_MAX];
-	uint16_t type;
+	enum dns_rr_type type;
 	uint16_t rr_class;
 	uint32_t ttl;		/* 1byte: extended RCODE; 1byte: version; 2bytes: Z(upper bit) if type is OPT */
 	uint16_t rdlength;

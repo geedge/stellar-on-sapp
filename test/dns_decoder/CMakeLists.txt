@@ -39,6 +39,10 @@ add_test(NAME DNS_UDP_SIMPLE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DI
 add_test(NAME DNS_TCP_SIMPLE_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/dns_tcp_simple.json
          -f "find ${CMAKE_CURRENT_SOURCE_DIR}/dns_pcap/ -name dns_tcp_simple.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
 
+add_test(NAME DNS_UDP_MIX_TEST COMMAND ${TEST_MAIN} ${CMAKE_CURRENT_SOURCE_DIR}/test_result_json/dns_udp_mix.json
+         -f "find ${CMAKE_CURRENT_SOURCE_DIR}/dns_pcap/ -name dns_udp_mix.pcap|sort -V" WORKING_DIRECTORY ${TEST_RUN_DIR})
+
 set_tests_properties(DNS_UDP_SIMPLE_TEST
                      DNS_TCP_SIMPLE_TEST
+                     DNS_UDP_MIX_TEST
                      PROPERTIES FIXTURES_REQUIRED TestFixture)

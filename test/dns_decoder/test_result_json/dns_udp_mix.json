@@ -1,0 +1,99 @@
+[
+    {
+        "Tuple4": "192.168.40.133.6748>192.168.40.134.53",
+        "transaction_id": "cdab",
+        "dns_type": "query",
+        "qname": "test.com",
+        "qtype": "ANY",
+        "flag_qr": "0",
+        "flag_opcode": "0",
+        "flag_rd": "1",
+        "name": "DNS_DECODER_RESULT_1"
+    },
+    {
+        "Tuple4": "192.168.40.133.6748>192.168.40.134.53",
+        "dns_type": "response",
+        "qname": "test.com",
+        "qtype": "ANY",
+        "flag_qr": "1",
+        "flag_opcode": "0",
+        "flag_rd": "1",
+        "ans_rr0": {
+            "rr_type": "SOA",
+            "rr_data": "dns1.test.com hostmaster.test.com 2001062501 21600 3600 604800 86400"
+        },
+        "ans_rr1": {
+            "rr_type": "NS",
+            "rr_data": "dns3.test.com"
+        },
+        "ans_rr2": {
+            "rr_type": "NS",
+            "rr_data": "dns1.test.com"
+        },
+        "ans_rr3": {
+            "rr_type": "NS",
+            "rr_data": "dns2.test.com"
+        },
+        "ans_rr4": {
+            "rr_type": "MX",
+            "rr_data": "30 mail3.test.com"
+        },
+        "ans_rr5": {
+            "rr_type": "MX",
+            "rr_data": "10 mail.test.com"
+        },
+        "ans_rr6": {
+            "rr_type": "MX",
+            "rr_data": "20 mail2.test.com"
+        },
+        "addt_rr0": {
+            "rr_type": "A",
+            "rr_data": "10.0.1.1"
+        },
+        "addt_rr1": {
+            "rr_type": "A",
+            "rr_data": "10.0.1.2"
+        },
+        "addt_rr2": {
+            "rr_type": "A",
+            "rr_data": "10.0.1.3"
+        },
+        "addt_rr3": {
+            "rr_type": "A",
+            "rr_data": "10.0.1.5"
+        },
+        "addt_rr4": {
+            "rr_type": "A",
+            "rr_data": "10.0.1.6"
+        },
+        "addt_rr5": {
+            "rr_type": "A",
+            "rr_data": "10.0.1.7"
+        },
+        "addt_rr6": {
+            "rr_type": "AAAA",
+            "rr_data": "aaaa:bbbb::1"
+        },
+        "addt_rr7": {
+            "rr_type": "AAAA",
+            "rr_data": "aaaa:bbbb::2"
+        },
+        "addt_rr8": {
+            "rr_type": "AAAA",
+            "rr_data": "aaaa:bbbb::3"
+        },
+        "addt_rr9": {
+            "rr_type": "AAAA",
+            "rr_data": "aaaa:bbbb::5"
+        },
+        "addt_rr10": {
+            "rr_type": "AAAA",
+            "rr_data": "aaaa:bbbb::6"
+        },
+        "addt_rr11": {
+            "rr_type": "AAAA",
+            "rr_data": "aaaa:bbbb::7"
+        },
+        "name": "DNS_DECODER_RESULT_2"
+    }
+]
