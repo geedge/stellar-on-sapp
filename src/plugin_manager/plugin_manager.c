@@ -9,6 +9,8 @@
 #include "uthash/utlist.h"
 #include "uthash/utarray.h"
 
+#include "bitmap/bitmap.h"
+
 struct plugin_manager_schema
 {
 	struct stellar *st;
@@ -81,7 +83,7 @@ struct plugin_manager_runtime
 	struct session *sess;
 	struct session_message *pending_mq;// message list
 	struct session_message *delivered_mq;// message list
-	char *session_mq_status; //N * M bits, N topic, M subscriber
+	struct bitmap *session_mq_status; //N * M bits, N topic, M subscriber
 	struct plugin_exdata *plugin_exdata_array;
 	struct session_plugin_ctx_runtime *plugin_ctx_array;//N plugins TODO: call alloc and free
 	int current_session_plugin_id;
@@ -491,7 +493,7 @@ static int session_mq_set_message_status(struct session *sess, int topic_id, int
 			struct session_mq_subscriber_info *session_plugin_sub_info = (struct session_mq_subscriber_info *)utarray_eltptr(session_plugin_schema->registed_session_mq_subscriber_info, i);
 			if(topic_id==session_plugin_sub_info->topic_id)
 			{
-				plug_mgr_rt->session_mq_status[topic_id+(session_plugin_sub_info->subscriber_idx)]=bit_value;
+				bitmap_set(plug_mgr_rt->session_mq_status, topic_id, session_plugin_sub_info->subscriber_idx, bit_value);
 			}
 		}
 		return 0;
@@ -577,7 +579,7 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
                 int cur_sub_idx = 0;
                 DL_FOREACH_SAFE(topic->subscribers, sub_elt, sub_tmp)
                 {
-                    if (plug_mgr_rt->session_mq_status[(mq_elt->topic_id) + cur_sub_idx] != 0)
+                    if (bitmap_get(plug_mgr_rt->session_mq_status, mq_elt->topic_id, cur_sub_idx) != 0)
                     {
 						plugin_ctx_rt=(plug_mgr_rt->plugin_ctx_array+sub_elt->session_plugin_id);
 						session_plugin_schema = (struct registered_session_plugin_schema *)utarray_eltptr(plug_mgr_rt->plug_mgr->registered_session_plugin_array, (unsigned int)sub_elt->session_plugin_id);
@@ -589,7 +591,7 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
 								plugin_ctx_rt->state=ACTIVE;
 							}
 						}
-                        sub_elt->msg_cb(sess, mq_elt->topic_id, mq_elt->msg_data, plugin_ctx_rt->plugin_ctx,
+						if(sub_elt->msg_cb)sub_elt->msg_cb(sess, mq_elt->topic_id, mq_elt->msg_data, plugin_ctx_rt->plugin_ctx,
                                         session_plugin_schema->plugin_env); 
                     }
                     cur_sub_idx++;
@@ -648,8 +650,7 @@ struct plugin_manager_runtime *plugin_manager_session_runtime_new(struct plugin_
 	rt->sess = sess;
 	rt->pending_mq = NULL;
 	rt->delivered_mq = NULL;
-	rt->session_mq_status=CALLOC(char, plug_mgr->topic_num*plug_mgr->subscriber_num);
-	memset(rt->session_mq_status, 1, plug_mgr->topic_num*plug_mgr->subscriber_num);
+	rt->session_mq_status=bitmap_new(plug_mgr->topic_num, plug_mgr->subscriber_num, 1);
 	rt->plugin_exdata_array = (struct plugin_exdata *)session_exdata_runtime_new(plug_mgr);
 	rt->plugin_ctx_array = CALLOC(struct session_plugin_ctx_runtime, utarray_len(plug_mgr->registered_session_plugin_array));
 	return rt;
@@ -671,21 +672,22 @@ void plugin_manager_session_runtime_free(struct plugin_manager_runtime *rt)
 	}	
 	if(rt->session_mq_status != NULL)
 	{
-		FREE(rt->session_mq_status);
+		bitmap_free(rt->session_mq_status);
 	}
-	session_exdata_runtime_free(rt->plug_mgr, rt->sess, rt->plugin_exdata_array);
-	FREE(rt->plugin_exdata_array);
 	unsigned int len = utarray_len(rt->plug_mgr->registered_session_plugin_array);
 	for(unsigned int i = 0; i < len; i++)
 	{
 		struct session_plugin_ctx_runtime *plugin_ctx_rt=(rt->plugin_ctx_array+i);
 		struct registered_session_plugin_schema *session_plugin_schema = (struct registered_session_plugin_schema *)utarray_eltptr(rt->plug_mgr->registered_session_plugin_array, i);
-		if(session_plugin_schema->on_ctx_free && plugin_ctx_rt->state!=EXIT)
+		if(session_plugin_schema->on_ctx_free && plugin_ctx_rt->state==ACTIVE)
 		{
 			session_plugin_schema->on_ctx_free(rt->sess, plugin_ctx_rt->plugin_ctx, session_plugin_schema->plugin_env);
 		}
 	}
 	FREE(rt->plugin_ctx_array);
+
+	session_exdata_runtime_free(rt->plug_mgr, rt->sess, rt->plugin_exdata_array);
+	FREE(rt->plugin_exdata_array);
 	FREE(rt);
 }
 
@@ -751,18 +753,22 @@ int stellar_polling_plugin_register(struct stellar *st, plugin_on_polling_func o
 }
 
 // FIXME: scheduler with return value
-void plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr)
+int plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr)
 {
-	if(plug_mgr->registered_polling_plugin_array == NULL)return;
+	if(plug_mgr->registered_polling_plugin_array == NULL)return 0;
 	struct registered_polling_plugin_schema *p=NULL;
+	int polling_state=0;
 	while ((p = (struct registered_polling_plugin_schema *)utarray_next(plug_mgr->registered_polling_plugin_array, p)))
 	{
 		if(p->on_polling)
 		{
-			p->on_polling(p->plugin_env);
+			if(p->on_polling(p->plugin_env)==1)
+			{
+				polling_state=1;
+			}
 		}
 	}
-	return;
+	return polling_state;
 }
 
 /*********************************************
@@ -816,6 +822,7 @@ void plugin_manager_on_session_ingress(struct session *sess,const struct packet 
 	default:
 		break;
 	}
+	//TODO: check TCP topic active subscirber num, if 0, return APP_STATE_DROPME, to reduce tcp reassemble overhead
 	session_mq_publish_message(sess, topic_id ,(void *)pkt);
 	plugin_manager_session_message_dispatch(sess);
     return;
@@ -845,7 +852,7 @@ void stellar_session_plugin_dettach_current_session(struct session *sess)
 		for(unsigned int i=0; i < plugin_subscriber_num; i++)
 		{
 			struct session_mq_subscriber_info *session_plugin_sub_info = (struct session_mq_subscriber_info *)utarray_eltptr(session_plugin_schema->registed_session_mq_subscriber_info, i);
-				plug_mgr_rt->session_mq_status[session_plugin_sub_info->topic_id+session_plugin_sub_info->subscriber_idx]=0;//clear related session_mq_status
+				bitmap_set(plug_mgr_rt->session_mq_status, session_plugin_sub_info->topic_id, session_plugin_sub_info->subscriber_idx, 0);
 		}
 	}	
 

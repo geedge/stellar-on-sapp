@@ -127,7 +127,7 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, struct ses
 {
 	if(sess && a_packet)
 	{
-		sess->state=SESSION_STATE_ACTIVE;
+		sess->state=(stream->pktstate == OP_STATE_PENDING) ? SESSION_STATE_OPENING : SESSION_STATE_ACTIVE;;
 		struct packet *pkt = sess->cur_pkt;
 		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 		pkt->type=type;
@@ -179,9 +179,9 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	plugin_manager_on_packet(st->plug_mgr, &pkt);
 }
 
-void polling_on_sapp(struct stellar *st)
+inline int polling_on_sapp(struct stellar *st)
 {
-	plugin_manager_on_polling(st->plug_mgr);
+	return plugin_manager_on_polling(st->plug_mgr);
 }
 
 /*********************************************

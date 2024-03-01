@@ -76,6 +76,7 @@ include_directories(${CMAKE_SOURCE_DIR}/include)
 
 add_subdirectory(vendor)
 add_subdirectory(deps/toml)
+add_subdirectory(deps/bitmap)
 add_subdirectory(src/plugin_manager)
 add_subdirectory(src/stellar_on_sapp)
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "stellar_internal.h"
-#include "stellar/session.h"
 
 struct streaminfo;
 
@@ -18,4 +17,5 @@ void session_poll_on_sapp(struct session *sess);
 
 void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void *a_packet, enum packet_type type);
 
-void polling_on_sapp(struct stellar *st);
+//return polling work state, 0: idle, 1: working
+int polling_on_sapp(struct stellar *st);

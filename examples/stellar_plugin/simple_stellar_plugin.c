@@ -150,11 +150,11 @@ void simple_stellar_event_on_packet_func(struct packet *pkt,  unsigned char ip_p
 	return;
 }
 
-void simple_stellar_plugin_on_polling_func(void *plugin_env)
+int simple_stellar_plugin_on_polling_func(void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
 	env->polling_times++;
-	return;
+	return 0;
 }
 
 void *simple_stellar_event_plugin_init(struct stellar *st)

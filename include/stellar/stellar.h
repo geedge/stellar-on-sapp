@@ -33,7 +33,9 @@ typedef void plugin_on_packet_func(struct packet *pkt,  unsigned char ip_protoco
 //return packet plugin_id
 int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol, plugin_on_packet_func on_packet, void *plugin_env);
 
-typedef void plugin_on_polling_func(void *plugin_env);
+
+//return polling work result, 0: no work, 1: work
+typedef int plugin_on_polling_func(void *plugin_env);
 
 //return polling plugin_id
 int stellar_polling_plugin_register(struct stellar *st,  plugin_on_polling_func on_polling, void *plugin_env);

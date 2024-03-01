@@ -32,25 +32,19 @@ struct stellar *g_stellar=NULL;
 int g_session_bridge_id=-1;
 int g_streaminfo_exdata_id=-1;
 
-static int is_l7_type_tunnels(struct streaminfo *a_stream)
+
+static int stream_is_inner_most(struct streaminfo *a_stream)
 {
-	const struct streaminfo *pfather=NULL, *ptmp=a_stream;
-	while(ptmp)
-	{
-		pfather = ptmp->pfather;
-		switch(ptmp->type)
-		{
-			case	STREAM_TYPE_SOCKS4:
-			case	STREAM_TYPE_SOCKS5:
-			case	STREAM_TYPE_HTTP_PROXY:
-				return 1;
-			default:
-				break;
-		}
-		ptmp = pfather;
-	}
-	return 0;
+	unsigned short tunnel_type=0;
+	int tunnel_type_len=sizeof(unsigned short);
+	MESA_get_stream_opt(a_stream, MSO_STREAM_UP_LAYER_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
+    if (tunnel_type&STREAM_TUNNEL_GPRS_TUNNEL) // tunnel_type set STREAM_TUNNEL_GPRS_TUNNEL means it is a outer of GTP tunnel
+    {
+        return 0;
+    }
+	return 1;
 }
+
 
 static void stellar_on_sapp_bridge_free(const struct streaminfo *stream, int bridge_id, void *data)
 {
@@ -83,7 +77,7 @@ int STELLAR_DEFER_LOADER_INIT()
 
 char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
-	if(pstream->pktstate==OP_STATE_PENDING && is_l7_type_tunnels(pstream)==1)
+	if(pstream->pktstate==OP_STATE_PENDING && stream_is_inner_most(pstream)==0)
 	{
 		return APP_STATE_DROPME;
 	}
@@ -108,33 +102,16 @@ void  STELLAR_DEFER_LOADER_EXIT(void)
 
 static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet, enum entry_type type)
 {
-	struct simple_stream_ctx *ctx=(struct simple_stream_ctx *)*pme;
 	struct tcpdetail *pdetail=(struct tcpdetail *)pstream->pdetail;
 	int is_ctrl_pkt=0;
 	const void *raw_pkt=NULL;
 	unsigned char entry_ret=APP_STATE_GIVEME;
-	if(state == OP_STATE_PENDING && (is_l7_type_tunnels(pstream)==1)) 
+	if(state == OP_STATE_PENDING && (stream_is_inner_most(pstream)==0)) 
 	{
 		return APP_STATE_DROPME;
 	}
 
-	if(*pme==NULL)
-	{
-		*pme=CALLOC(struct simple_stream_ctx,1);
-		ctx=(struct simple_stream_ctx *)*pme;
-	}
-
-	if(a_packet!=NULL)
-	{
-		if(DIR_C2S == pstream->curdir){
-			ctx->c2s_bytes += pdetail->datalen;
-			ctx->c2s_pkts++;
-		}else{
-			ctx->s2c_bytes += pdetail->datalen;
-			ctx->s2c_pkts++;
-		}  		
-	}
-
+	struct session *sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
 	//entry_type convert to packet_type
 	enum packet_type pkt_type=UNKNOWN;
 	switch (type)
@@ -155,29 +132,25 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 	switch (state)
 	{
 	case OP_STATE_PENDING:
-        if (type == ENTRY_TYPE_TCPALL || type == ENTRY_TYPE_UDP)
-        {
-            ctx->sess = session_new_on_sapp(g_stellar, pstream);
-            session_exdata_set(ctx->sess, g_streaminfo_exdata_id, pstream);
-            stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
-        }
-        else
-        {
-            ctx->sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
-        }
-        entry_ret = session_state_update_on_sapp(pstream, ctx->sess, a_packet, pkt_type);
+		if(!sess)
+		{
+            sess = session_new_on_sapp(g_stellar, pstream);
+            session_exdata_set(sess, g_streaminfo_exdata_id, pstream);
+            stream_bridge_async_data_put(pstream, g_session_bridge_id, sess);
+		}
+        entry_ret = session_state_update_on_sapp(pstream, sess, a_packet, pkt_type);
         break;
 	case OP_STATE_DATA:
 		raw_pkt = get_current_rawpkt_from_streaminfo(pstream);
 		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
 		if(is_ctrl_pkt==1)
 		{
-			entry_ret=session_state_update_on_sapp(pstream, ctx->sess, a_packet, CONTROL);
+			entry_ret=session_state_update_on_sapp(pstream, sess, a_packet, CONTROL);
 			entry_ret = entry_ret|APP_STATE_DROPPKT;
 		}
 		else
 		{
-			entry_ret=session_state_update_on_sapp(pstream, ctx->sess, a_packet, pkt_type);
+			entry_ret=session_state_update_on_sapp(pstream, sess, a_packet, pkt_type);
 		}
 		break;
 	case OP_STATE_CLOSE:
@@ -185,7 +158,7 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 		// for TCP stream, only trigger update when packet payload > 0
 		if(a_packet && pstream->ptcpdetail->datalen > 0)
 		{
-			entry_ret=session_state_update_on_sapp(pstream, ctx->sess, a_packet, pkt_type);
+			entry_ret=session_state_update_on_sapp(pstream, sess, a_packet, pkt_type);
 		}
 		FREE(*pme);
 		break;
@@ -225,6 +198,13 @@ char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedi
 
 char stellar_on_sapp_polling_entry(struct streaminfo *stream,  void **pme, int thread_seq,void *a_packet)
 {
-	polling_on_sapp(g_stellar);
-	return APP_STATE_GIVEME;
+	int ret = polling_on_sapp(g_stellar);
+	switch (ret)
+	{
+	case 1:
+		return POLLING_STATE_WORK;	
+	default:
+		break;
+	}
+	return POLLING_STATE_IDLE;
 }
