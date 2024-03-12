@@ -26,9 +26,17 @@ struct stellar *g_stellar=NULL;
 int g_session_bridge_id=-1;
 int g_streaminfo_exdata_id=-1;
 
-static int is_l7_type_tunnels(struct streaminfo *a_stream)
+static int stream_is_inner_most(struct streaminfo *a_stream)
 {
 	const struct streaminfo *pfather=NULL, *ptmp=a_stream;
+	unsigned short tunnel_type=0;
+	int tunnel_type_len=sizeof(unsigned short);
+	MESA_get_stream_opt(a_stream, MSO_STREAM_UP_LAYER_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
+    if (tunnel_type != STREAM_TUNNLE_NON) // tunnel_type != STREAM_TUNNLE_NON means it is a outer of tunnel
+    {
+        return 0;
+    }
+
 	while(ptmp)
 	{
 		pfather = ptmp->pfather;
@@ -37,13 +45,13 @@ static int is_l7_type_tunnels(struct streaminfo *a_stream)
 			case	STREAM_TYPE_SOCKS4:
 			case	STREAM_TYPE_SOCKS5:
 			case	STREAM_TYPE_HTTP_PROXY:
-				return 1;
+				return 0;
 			default:
 				break;
 		}
 		ptmp = pfather;
 	}
-	return 0;
+	return 1;
 }
 
 static void stellar_on_sapp_bridge_free(const struct streaminfo *stream, int bridge_id, void *data)
@@ -78,7 +86,7 @@ int STELLAR_DEFER_LOADER_INIT()
 
 char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
 {
-	if(pstream->pktstate==OP_STATE_PENDING && is_l7_type_tunnels(pstream)==1)
+	if(pstream->pktstate==OP_STATE_PENDING && stream_is_inner_most(pstream)==0)
 	{
 		return APP_STATE_DROPME;
 	}
@@ -106,7 +114,7 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 	int is_ctrl_pkt=0;
 	const void *raw_pkt=NULL;
 	unsigned char entry_ret=APP_STATE_GIVEME;
-	if(state == OP_STATE_PENDING && (is_l7_type_tunnels(pstream)==1)) 
+	if(state == OP_STATE_PENDING && (stream_is_inner_most(pstream)==0)) 
 	{
 		return APP_STATE_DROPME;
 	}

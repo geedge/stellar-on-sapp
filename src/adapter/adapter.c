@@ -47,6 +47,7 @@ static struct plugin_specific *load_plugin_specs(const char *toml_conf_path, int
 {
 	*spec_num = 0;
     FILE* fp = fopen(toml_conf_path, "r");
+	if(fp==NULL)return NULL;
     char errbuf[256];
     toml_table_t* conf = toml_parse_file(fp, errbuf, sizeof(errbuf));
     fclose(fp);	
