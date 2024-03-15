@@ -440,11 +440,10 @@ int session_set_session_id(struct session *sess, uint64_t session_id)
 
 int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, size_t sid_num)
 {
-	struct segment_id_list sid_list;
+	struct segment_id_list sid_list={};
 	sid_list.sz_sidlist=sid_num;
-	memcpy(sid_list.sid_list, sid, sid_num*sizeof(uint16_t));
+	if(sid)memcpy(sid_list.sid_list, sid, sid_num*sizeof(uint16_t));
 	return MESA_set_stream_opt(sess->cur_pkt->a_stream, MSO_STREAM_PREPLEND_SEGMENT_ID_LIST, (void *)&sid_list, sizeof(struct segment_id_list));
-
 }
 
 #if 0
