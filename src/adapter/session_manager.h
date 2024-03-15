@@ -24,7 +24,6 @@ struct session
 	struct session_mq *mq;
 	char *mq_sub_status;
 	struct session_event *ev_list;
-	uint64_t set_detach_others;
 };
 
 struct session *session_new(struct stellar *st, enum session_type type, int thread_id);

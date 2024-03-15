@@ -354,23 +354,6 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 	return;
 }
 
-void session_plugin_detach_others(struct session *sess, int plugin_id)
-{
-	struct session_event  *intrinsic_events = sess->intrinsic_events;
-	if(sess->st->plugin_specs_array == NULL)return;
-	if(sess->st->intrinsic_session_event_schema_array == NULL)return;
-	unsigned int len = utarray_len(sess->st->intrinsic_session_event_schema_array);
-	for(unsigned int i = 0; i < len; i++)
-	{
-		if((int)i!=plugin_id)
-		{
-			(intrinsic_events+i)->events = 0;
-		}
-	}
-	sess->set_detach_others=1;
-	return;
-}
-
 static struct session_event* session_intrinsic_events_init(struct stellar *st, struct session *sess)
 {
 	if(st->intrinsic_session_event_schema_array == NULL)return NULL;

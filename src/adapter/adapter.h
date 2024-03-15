@@ -13,6 +13,5 @@ struct session *adapter_session_new(struct stellar *st, struct streaminfo *strea
 void adapter_session_free(struct session *sess);
 
 unsigned char adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state);
-int adapter_session_get_detach_others(struct session *sess);
 
 void adapter_session_poll(struct session *sess);

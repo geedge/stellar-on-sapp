@@ -8,7 +8,6 @@
 	STELLAR_DEFER_LOADER_INIT;
 	STELLAR_DEFER_LOADER_EXIT;
 	stellar_on_sapp_defer_entry;
-	stellar_on_sapp_detach_check_entry;
 
 	stellar_get_worker_thread_num;
 	stellar_get_current_thread_id;
@@ -25,7 +24,6 @@
 	session_get*;
 	session_set_*;
 	session_event_*;
-	session_plugin_detach_others;
 
   local:
     *;  /* Hide all other symbols */
