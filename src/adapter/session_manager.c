@@ -510,6 +510,10 @@ struct session_event *session_get_intrinsic_event(struct session *sess, int plug
 	return (struct session_event *)(intrinsic_events+plugin_id);
 }
 
+
+
+
+
 void session_defer_loop(struct session *sess)
 {
 

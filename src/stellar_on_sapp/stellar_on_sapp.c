@@ -183,3 +183,21 @@ unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, i
 {
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet);
 }
+
+char stellar_on_sapp_ip4_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
+{
+	adapter_on_packet_update(g_stellar, pstream, a_packet, IPv4);
+	return APP_STATE_GIVEME;
+}
+
+char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
+{
+	adapter_on_packet_update(g_stellar, pstream, a_packet, IPv6);
+	return APP_STATE_GIVEME;
+}
+
+char stellar_on_sapp_polling_entry(struct streaminfo *stream,  void **pme, int thread_seq,void *a_packet)
+{
+	adapter_on_polling(g_stellar);
+	return APP_STATE_GIVEME;
+}

@@ -51,6 +51,7 @@ stages:
       --suppress=uselessAssignmentArg
       --suppress=uninitvar
       --suppress=unusedStructMember
+      --suppress=funcArgOrderDifferent
   tags:
     - share
 

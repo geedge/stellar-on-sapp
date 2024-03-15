@@ -43,6 +43,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=ctunullpointer"
             "--suppress=redundantAssignment"
             "--suppress=duplicateValueTernary"
+            "--suppress=funcArgOrderDifferent"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()

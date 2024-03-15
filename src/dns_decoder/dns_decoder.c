@@ -1040,8 +1040,8 @@ udp_dns_decoder_entry(struct session *sess, int events, const struct packet *pkt
 {
     size_t udp_payload_len = 0;
 
-    const uint8_t *udp_payload =
-		session_get0_current_payload(sess, &udp_payload_len);
+    uint8_t *udp_payload =
+		(uint8_t *)session_get0_current_payload(sess, &udp_payload_len);
     if (udp_payload_len < DNS_HEADER_SIZE) {
         //Non dns packet
         return 0;
@@ -1115,8 +1115,8 @@ tcp_dns_decoder_entry(struct session *sess, int events, const struct packet *pkt
 	}
 
 	size_t tcp_payload_len = 0;
-	const uint8_t *tcp_payload =
-		session_get0_current_payload(sess, &tcp_payload_len);
+	uint8_t *tcp_payload =
+		(uint8_t *)session_get0_current_payload(sess, &tcp_payload_len);
 	if (0 == tcp_payload_len) {
 		return 0;
 	}

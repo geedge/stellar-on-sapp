@@ -120,8 +120,11 @@ int packet_get_direction(const struct packet *pkt);
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len);
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
 
+unsigned char packet_get_ip_protocol(struct packet *pkt);
 
-
+typedef void plugin_on_packet_func(struct packet *pkt,  unsigned char ip_protocol, void *cb_arg);
+//return packet plugin_id
+int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol, plugin_on_packet_func on_packet, void *cb_arg);
 
 #define SESS_EV_OPENING 1<<1
 #define SESS_EV_PACKET 1<<2
@@ -147,3 +150,6 @@ int session_event_add(struct session_event *ev, const struct timeval *timeout);
 int session_event_del(struct session_event *ev);
 int session_event_assign(struct session_event *ev, struct stellar *st, struct session *sess, int events, session_event_cb_func *cb, void *cb_arg);
 void session_event_free(struct session_event *ev);
+
+
+

@@ -145,19 +145,131 @@ void stellar_exit(struct stellar *st)
     if(st->session_mq_schema_array)utarray_free(st->session_mq_schema_array);
 	if(st->session_exdata_schema_array)utarray_free(st->session_exdata_schema_array);
 	if(st->intrinsic_session_event_schema_array)utarray_free(st->intrinsic_session_event_schema_array);
+	if(st->registered_packet_plugin_array)utarray_free(st->registered_packet_plugin_array);
+	if(st->registered_polling_plugin_array)utarray_free(st->registered_polling_plugin_array);
+
 	FREE(st);
 	return;	
 };
-
-struct streaminfo;
-//streaminfo open
-
 
 struct packet
 {
 	void *raw_pkt;
 	struct streaminfo *a_stream;
+	enum packet_type type;
+	unsigned char ip_proto;
+	unsigned char pad[3];
 };
+
+
+#define PACKET_PULGIN_ID_BASE 0x10000
+#define POLLING_PULGIN_ID_BASE 0x20000
+
+struct registered_packet_plugin_schema
+{
+	char ip_protocol;
+	plugin_on_packet_func *on_packet;
+	void *plugin_env;
+};
+
+UT_icd registered_packet_plugin_array_icd = {sizeof(struct registered_packet_plugin_schema), NULL, NULL, NULL};
+
+int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol, plugin_on_packet_func on_packet, void *plugin_env)
+{
+	if(st->registered_packet_plugin_array == NULL)
+	{
+		utarray_new(st->registered_packet_plugin_array, &registered_packet_plugin_array_icd);
+	}
+	struct registered_packet_plugin_schema packet_plugin_schema;
+	memset(&packet_plugin_schema, 0, sizeof(packet_plugin_schema));
+	packet_plugin_schema.ip_protocol = ip_protocol;
+	packet_plugin_schema.on_packet = on_packet;
+	packet_plugin_schema.plugin_env = plugin_env;
+	utarray_push_back(st->registered_packet_plugin_array, &packet_plugin_schema);
+	return (PACKET_PULGIN_ID_BASE+utarray_len(st->registered_packet_plugin_array));// return packet plugin_id
+}
+
+void adapter_on_packet_update(struct stellar *st, struct streaminfo *pstream, void *pkt_hdr, enum packet_type type)
+{
+	if(st->registered_packet_plugin_array == NULL || pkt_hdr == NULL)return;
+
+	struct packet pkt;
+	pkt.type=type;
+	pkt.a_stream=pstream;
+	pkt.raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
+
+	switch (type)
+	{
+	case IPv4:
+	{
+		struct iphdr *ip4_hdr=(struct iphdr *)pkt_hdr;
+		pkt.ip_proto=ip4_hdr->protocol;
+		break;
+	}
+	case IPv6:
+	{
+		struct ip6_hdr *ip6_hdr=(struct ip6_hdr *)pkt_hdr;
+		pkt.ip_proto=ip6_hdr->ip6_nxt;
+		break;	
+	}
+	default:
+		return;
+	}
+
+	struct registered_packet_plugin_schema *p=NULL;
+	while ((p = (struct registered_packet_plugin_schema *)utarray_next(st->registered_packet_plugin_array, p)))
+	{
+		if(p->ip_protocol == pkt.ip_proto && p->on_packet)
+		{
+			p->on_packet(&pkt, pkt.ip_proto, p->plugin_env);
+		}
+	}
+	return;
+}
+
+struct registered_polling_plugin_schema
+{
+	plugin_on_polling_func *on_polling;
+	void *plugin_env;
+};
+
+
+UT_icd registered_polling_plugin_array_icd = {sizeof(struct registered_polling_plugin_schema), NULL, NULL, NULL};
+
+int stellar_polling_plugin_register(struct stellar *st, plugin_on_polling_func on_polling, void *plugin_env)
+{
+	if(st->registered_polling_plugin_array == NULL)
+	{
+		utarray_new(st->registered_polling_plugin_array, &registered_polling_plugin_array_icd);
+	}
+	struct registered_polling_plugin_schema polling_plugin_schema;
+	memset(&polling_plugin_schema, 0, sizeof(polling_plugin_schema));
+	polling_plugin_schema.on_polling = on_polling;
+	polling_plugin_schema.plugin_env = plugin_env;
+	utarray_push_back(st->registered_polling_plugin_array, &polling_plugin_schema);
+	return (POLLING_PULGIN_ID_BASE+utarray_len(st->registered_polling_plugin_array));// return polling plugin_id
+}
+
+// FIXME: scheduler with return value
+void adapter_on_polling(struct stellar *st)
+{
+	if(st->registered_polling_plugin_array == NULL)return;
+	struct registered_polling_plugin_schema *p=NULL;
+	while ((p = (struct registered_polling_plugin_schema *)utarray_next(st->registered_polling_plugin_array, p)))
+	{
+		if(p->on_polling)
+		{
+			p->on_polling(p->plugin_env);
+		}
+	}
+	return;
+}
+
+
+struct streaminfo;
+//streaminfo open
+
+
 
 static void adapter_packet_free(struct session *sess, struct packet *pkt, void *arg)
 {
@@ -408,6 +520,13 @@ int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
 	return 0;
 }
+
+inline unsigned char packet_get_ip_protocol(struct packet *pkt)
+{
+	if(pkt == NULL || pkt->a_stream == NULL)return 0;
+	return pkt->ip_proto;
+}
+
 
 const char *session_get0_current_l3_header(struct session *sess)
 {
