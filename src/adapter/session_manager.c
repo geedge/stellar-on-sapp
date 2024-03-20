@@ -372,6 +372,7 @@ struct session *session_new(struct stellar *st, enum session_type type, int thre
 	sess->st = st;
 	sess->type = type;
 	sess->state = SESSION_STATE_OPENING;
+	sess->session_direction=-1;
 	sess->mq = NULL;
 	sess->mq_sub_status=CALLOC(char, st->topic_num*st->sub_num);
 	memset(sess->mq_sub_status, 1, st->topic_num*st->sub_num);

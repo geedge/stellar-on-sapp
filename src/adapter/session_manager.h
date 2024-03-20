@@ -15,6 +15,7 @@ struct session
 {
 	enum session_type type;
 	enum session_state state;
+	int session_direction;
 	struct packet *cur_pkt;
 	session_packet_free *cur_pkt_free_cb;
 	void *cur_pkt_free_arg;

@@ -303,6 +303,7 @@ const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 
 int  session_get_direction(struct session *sess)
 {
+	if(sess->session_direction>=0)return sess->session_direction;
 	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
 		//int c2s_router_dir=(sess->cur_pkt->a_stream->curdir==DIR_C2S)?(sess->cur_pkt->a_stream->routedir):((sess->cur_pkt->a_stream->routedir)^1);
@@ -312,14 +313,14 @@ int  session_get_direction(struct session *sess)
 		int dir=MESA_dir_link_to_human(c2s_router_dir);
 		if(dir == (int)'I')
 		{
-			return SESSION_DIRECTION_IN;
+			sess->session_direction=SESSION_DIRECTION_IN;
 		}
 		if(dir == (int)'E')
 		{
-			return SESSION_DIRECTION_OUT;
+			sess->session_direction=SESSION_DIRECTION_OUT;
 		}
 	}
-	return -1;
+	return sess->session_direction;
 } 
 
 int session_is_symmetric(struct session *sess, unsigned char *flag)
