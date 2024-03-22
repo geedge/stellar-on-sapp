@@ -8,11 +8,16 @@
 	STELLAR_DEFER_LOADER_INIT;
 	STELLAR_DEFER_LOADER_EXIT;
 	stellar_on_sapp_defer_entry;
+	stellar_on_sapp_ip4_entry;
+	stellar_on_sapp_ip6_entry;
+	stellar_on_sapp_polling_entry;
 
 	stellar_get_worker_thread_num;
 	stellar_get_current_thread_id;
 	stellar_session_get_ex_new_index;
 	stellar_plugin_register;
+	stellar_polling_plugin_register;
+	stellar_packet_plugin_register;
 
 	session_is_inner_most;
 	session_is_outer_tunnel;

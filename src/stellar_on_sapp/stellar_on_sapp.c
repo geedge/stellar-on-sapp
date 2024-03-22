@@ -198,6 +198,7 @@ char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedi
 
 char stellar_on_sapp_polling_entry(struct streaminfo *stream,  void **pme, int thread_seq,void *a_packet)
 {
-	adapter_on_polling(g_stellar);
-	return APP_STATE_GIVEME;
+	int is_working=adapter_on_polling(g_stellar);
+	if(is_working==1)return POLLING_STATE_WORK;
+	return POLLING_STATE_IDLE;
 }

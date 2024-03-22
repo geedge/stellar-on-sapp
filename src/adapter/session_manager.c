@@ -129,8 +129,16 @@ static void session_mq_topic_schema_dtor(void *_elt)
 {
     struct session_mq_topic_schema *elt = (struct session_mq_topic_schema *)_elt;
     if (elt->topic_name)
+    {
         FREE(elt->topic_name);
-    // FREE(elt); // free the item
+    }
+    // free the item
+    struct session_mq_subscriber *sub_elt, *sub_tmp;
+    DL_FOREACH_SAFE(elt->subscribers, sub_elt, sub_tmp)
+    {
+        DL_DELETE(elt->subscribers, sub_elt);
+        free(sub_elt);
+    }
 }
 
 UT_icd session_mq_topic_schema_icd = {sizeof(struct session_mq_topic_schema), NULL, session_mq_topic_schema_copy, session_mq_topic_schema_dtor};

@@ -8,3 +8,8 @@ exit = "simple_stellar_event_plugin_exit"
 path = "./stellar_plugin/simple_stellar_plugin.so"
 init = "simple_stellar_mq_plugin_init"
 exit = "simple_stellar_mq_plugin_exit"
+
+[[plugin]]
+path = "./stellar_plugin/simple_stellar_plugin.so"
+init = "simple_stellar_pp_plugin_init"
+exit = "simple_stellar_pp_plugin_exit"

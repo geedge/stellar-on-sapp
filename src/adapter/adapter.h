@@ -28,4 +28,4 @@ enum packet_type
 };
 
 void adapter_on_packet_update(struct stellar *st, struct streaminfo *pstream, void *pkt_hdr, enum packet_type type);
-void adapter_on_polling(struct stellar *st);
+int adapter_on_polling(struct stellar *st);

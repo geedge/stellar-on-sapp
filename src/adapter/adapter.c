@@ -251,18 +251,22 @@ int stellar_polling_plugin_register(struct stellar *st, plugin_on_polling_func o
 }
 
 // FIXME: scheduler with return value
-void adapter_on_polling(struct stellar *st)
+int adapter_on_polling(struct stellar *st)
 {
-	if(st->registered_polling_plugin_array == NULL)return;
+	if(st->registered_polling_plugin_array == NULL)return 0;
 	struct registered_polling_plugin_schema *p=NULL;
+	int is_working=0;
 	while ((p = (struct registered_polling_plugin_schema *)utarray_next(st->registered_polling_plugin_array, p)))
 	{
 		if(p->on_polling)
 		{
-			p->on_polling(p->plugin_env);
+			if(p->on_polling(p->plugin_env)==1)
+			{
+				is_working=1;
+			}
 		}
 	}
-	return;
+	return is_working;
 }
 
 

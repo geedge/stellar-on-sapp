@@ -18,7 +18,7 @@ typedef int stellar_periodic_cb_func(struct stellar *st, void *cb_arg);
 
 int stellar_worker_thread_periodic_add(struct stellar *st, stellar_periodic_cb_func *periodic_cb, void *cb_arg, const struct timeval *interval);
 
-typedef void plugin_on_polling_func(void *cb_arg);
+typedef int plugin_on_polling_func(void *cb_arg);
 
 //return polling plugin_id
 int stellar_polling_plugin_register(struct stellar *st,  plugin_on_polling_func on_polling, void *cb_arg);
