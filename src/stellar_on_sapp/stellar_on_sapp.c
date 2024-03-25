@@ -28,29 +28,13 @@ int g_streaminfo_exdata_id=-1;
 
 static int stream_is_inner_most(struct streaminfo *a_stream)
 {
-	const struct streaminfo *pfather=NULL, *ptmp=a_stream;
 	unsigned short tunnel_type=0;
 	int tunnel_type_len=sizeof(unsigned short);
 	MESA_get_stream_opt(a_stream, MSO_STREAM_UP_LAYER_TUNNEL_TYPE, (void *)&tunnel_type, &tunnel_type_len);
-    if (tunnel_type != STREAM_TUNNLE_NON) // tunnel_type != STREAM_TUNNLE_NON means it is a outer of tunnel
+    if (tunnel_type&STREAM_TUNNEL_GPRS_TUNNEL) // tunnel_type set STREAM_TUNNEL_GPRS_TUNNEL means it is a outer of GTP tunnel
     {
         return 0;
     }
-
-	while(ptmp)
-	{
-		pfather = ptmp->pfather;
-		switch(ptmp->type)
-		{
-			case	STREAM_TYPE_SOCKS4:
-			case	STREAM_TYPE_SOCKS5:
-			case	STREAM_TYPE_HTTP_PROXY:
-				return 0;
-			default:
-				break;
-		}
-		ptmp = pfather;
-	}
 	return 1;
 }
 
