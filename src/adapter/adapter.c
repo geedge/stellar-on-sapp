@@ -317,10 +317,9 @@ void adapter_session_free(struct session *sess)
 unsigned char adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state)
 {
 	struct packet *pkt = NULL;
-	if(sess)
+	if(likely(sess!=NULL))
 	{
 		pkt=(struct packet *)session_get0_current_packet(sess);
-		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
 		session_dispatch( sess, state, pkt);
 		return APP_STATE_GIVEME;
 	}
@@ -378,10 +377,10 @@ const char *session_get0_current_payload(struct session *sess, size_t *payload_l
 }
 
 #include <assert.h>
-const struct packet *session_get0_current_packet(struct session *sess)
+inline const struct packet *session_get0_current_packet(struct session *sess)
 {
-	if(sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL)return NULL;
-	sess->cur_pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
+	if(unlikely(sess->cur_pkt == NULL) || unlikely(sess->cur_pkt->a_stream == NULL))return NULL;
+	if(unlikely(sess->cur_pkt->raw_pkt==NULL))sess->cur_pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
 	return sess->cur_pkt;
 }
 
