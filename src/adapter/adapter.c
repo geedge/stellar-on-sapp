@@ -15,6 +15,7 @@
 inline void adapter_session_poll(struct session *sess)
 {
 	session_defer_loop(sess);
+	//TODO: detach packet from session
 }
 
 #include <dlfcn.h>
@@ -193,6 +194,7 @@ void adapter_on_packet_update(struct stellar *st, struct streaminfo *pstream, vo
 {
 	if(st->registered_packet_plugin_array == NULL || pkt_hdr == NULL)return;
 
+	// TODO: thread local packet
 	struct packet pkt;
 	pkt.type=type;
 	pkt.a_stream=pstream;
@@ -302,6 +304,7 @@ struct session *adapter_session_new(struct stellar *st, struct streaminfo *strea
 	struct session *sess = session_new(st, type, stream->threadnum);
 	if(sess)
 	{
+		// TODO: thread local packet
     	struct packet *pkt = CALLOC(struct packet, 1);
     	session_set_current_packet(sess, pkt,adapter_packet_free, NULL);
     	pkt->a_stream = stream;
@@ -319,6 +322,7 @@ unsigned char adapter_session_state_update(struct streaminfo *stream, struct ses
 	struct packet *pkt = NULL;
 	if(likely(sess!=NULL))
 	{
+		// TODO: attach thread local packet to session
 		pkt=(struct packet *)session_get0_current_packet(sess);
 		session_dispatch( sess, state, pkt);
 		return APP_STATE_GIVEME;

@@ -93,8 +93,7 @@ void  STELLAR_DEFER_LOADER_EXIT(void)
 
 static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet)
 {
-	struct simple_stream_ctx *ctx=(struct simple_stream_ctx *)*pme;
-	struct tcpdetail *pdetail=(struct tcpdetail *)pstream->pdetail;
+	struct session *sess=(struct session *)*pme;
 	int is_ctrl_pkt=0;
 	const void *raw_pkt=NULL;
 	unsigned char entry_ret=APP_STATE_GIVEME;
@@ -103,49 +102,33 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 		return APP_STATE_DROPME;
 	}
 
-	if(*pme==NULL)
-	{
-		*pme=CALLOC(struct simple_stream_ctx,1);
-		ctx=(struct simple_stream_ctx *)*pme;
-	}
-
-	if(a_packet!=NULL)
-	{
-		if(DIR_C2S == pstream->curdir){
-			ctx->c2s_bytes += pdetail->datalen;
-			ctx->c2s_pkts++;
-		}else{
-			ctx->s2c_bytes += pdetail->datalen;
-			ctx->s2c_pkts++;
-		}  		
-	}
 	switch (state)
 	{
 	case OP_STATE_PENDING:
-		ctx->sess=adapter_session_new(g_stellar, pstream);
-		session_set_ex_data(ctx->sess, g_streaminfo_exdata_id, pstream);
-		stream_bridge_async_data_put(pstream, g_session_bridge_id, ctx->sess);
-		entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_OPENING);
+		sess=adapter_session_new(g_stellar, pstream);
+		session_set_ex_data(sess, g_streaminfo_exdata_id, pstream);
+		stream_bridge_async_data_put(pstream, g_session_bridge_id, sess);
+		entry_ret=adapter_session_state_update(pstream, sess, a_packet, SESSION_STATE_OPENING);
+		*pme=sess;
 		break;
 	case OP_STATE_DATA:
 		raw_pkt = get_current_rawpkt_from_streaminfo(pstream);
 		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
 		if(is_ctrl_pkt==1)
 		{
-			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_CONTROL);
+			entry_ret=adapter_session_state_update(pstream, sess, a_packet, SESSION_STATE_CONTROL);
 			entry_ret = entry_ret|APP_STATE_DROPPKT;
 		}
 		else
 		{
-			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+			entry_ret=adapter_session_state_update(pstream, sess, a_packet, SESSION_STATE_ACTIVE);
 		}
 		break;
 	case OP_STATE_CLOSE:
 		if(a_packet)
 		{
-			entry_ret=adapter_session_state_update(pstream, ctx->sess, a_packet, SESSION_STATE_ACTIVE);
+			entry_ret=adapter_session_state_update(pstream, sess, a_packet, SESSION_STATE_ACTIVE);
 		}
-		FREE(*pme);
 		break;
 	default:
 		break;
