@@ -190,28 +190,30 @@ int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol
 	return (PACKET_PULGIN_ID_BASE+utarray_len(st->registered_packet_plugin_array));// return packet plugin_id
 }
 
+#ifndef MAX_THREAD_NUM
+#define MAX_THREAD_NUM 256
+#endif
+__thread struct packet pkt[MAX_THREAD_NUM];
 void adapter_on_packet_update(struct stellar *st, struct streaminfo *pstream, void *pkt_hdr, enum packet_type type)
 {
 	if(st->registered_packet_plugin_array == NULL || pkt_hdr == NULL)return;
-
-	// TODO: thread local packet
-	struct packet pkt;
-	pkt.type=type;
-	pkt.a_stream=pstream;
-	pkt.raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
+	int tid=pstream->threadnum;
+	pkt[tid].type=type;
+	pkt[tid].a_stream=pstream;
+	pkt[tid].raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
 
 	switch (type)
 	{
 	case IPv4:
 	{
 		struct iphdr *ip4_hdr=(struct iphdr *)pkt_hdr;
-		pkt.ip_proto=ip4_hdr->protocol;
+		pkt[tid].ip_proto=ip4_hdr->protocol;
 		break;
 	}
 	case IPv6:
 	{
 		struct ip6_hdr *ip6_hdr=(struct ip6_hdr *)pkt_hdr;
-		pkt.ip_proto=ip6_hdr->ip6_nxt;
+		pkt[tid].ip_proto=ip6_hdr->ip6_nxt;
 		break;	
 	}
 	default:
@@ -221,9 +223,9 @@ void adapter_on_packet_update(struct stellar *st, struct streaminfo *pstream, vo
 	struct registered_packet_plugin_schema *p=NULL;
 	while ((p = (struct registered_packet_plugin_schema *)utarray_next(st->registered_packet_plugin_array, p)))
 	{
-		if(p->ip_protocol == pkt.ip_proto && p->on_packet)
+		if(p->ip_protocol == pkt[tid].ip_proto && p->on_packet)
 		{
-			p->on_packet(&pkt, pkt.ip_proto, p->plugin_env);
+			p->on_packet(&pkt[tid], pkt[tid].ip_proto, p->plugin_env);
 		}
 	}
 	return;
@@ -305,9 +307,9 @@ struct session *adapter_session_new(struct stellar *st, struct streaminfo *strea
 	if(sess)
 	{
 		// TODO: thread local packet
-    	struct packet *pkt = CALLOC(struct packet, 1);
-    	session_set_current_packet(sess, pkt,adapter_packet_free, NULL);
-    	pkt->a_stream = stream;
+    	struct packet *pkt_on_session = CALLOC(struct packet, 1);
+    	session_set_current_packet(sess, pkt_on_session,adapter_packet_free, NULL);
+    	pkt_on_session->a_stream = stream;
 	}
 	return sess;
 }
@@ -319,11 +321,11 @@ void adapter_session_free(struct session *sess)
 
 unsigned char adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state)
 {
-	struct packet *pkt = NULL;
+	struct packet *pkt_on_session = NULL;
 	if(likely(sess!=NULL))
 	{
 		// TODO: attach thread local packet to session
-		pkt=(struct packet *)session_get0_current_packet(sess);
+		pkt_on_session=(struct packet *)session_get0_current_packet(sess);
 		session_dispatch( sess, state, pkt);
 		return APP_STATE_GIVEME;
 	}
