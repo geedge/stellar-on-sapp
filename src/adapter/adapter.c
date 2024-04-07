@@ -12,11 +12,6 @@
 #include <MESA/stream.h>
 
 
-inline void adapter_session_poll(struct session *sess)
-{
-	session_defer_loop(sess);
-	//TODO: detach packet from session
-}
 
 #include <dlfcn.h>
 #include "toml/toml.h"
@@ -162,6 +157,17 @@ struct packet
 	unsigned char pad[3];
 };
 
+#ifndef MAX_THREAD_NUM
+#define MAX_THREAD_NUM 256
+#endif
+__thread struct packet per_thread_pkt[MAX_THREAD_NUM];
+
+inline void adapter_session_poll(struct session *sess)
+{
+	session_defer_loop(sess);
+	//detach packet from session
+	sess->cur_pkt=NULL;
+}
 
 #define PACKET_PULGIN_ID_BASE 0x10000
 #define POLLING_PULGIN_ID_BASE 0x20000
@@ -190,30 +196,27 @@ int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol
 	return (PACKET_PULGIN_ID_BASE+utarray_len(st->registered_packet_plugin_array));// return packet plugin_id
 }
 
-#ifndef MAX_THREAD_NUM
-#define MAX_THREAD_NUM 256
-#endif
-__thread struct packet pkt[MAX_THREAD_NUM];
+
 void adapter_on_packet_update(struct stellar *st, struct streaminfo *pstream, void *pkt_hdr, enum packet_type type)
 {
 	if(st->registered_packet_plugin_array == NULL || pkt_hdr == NULL)return;
 	int tid=pstream->threadnum;
-	pkt[tid].type=type;
-	pkt[tid].a_stream=pstream;
-	pkt[tid].raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
+	per_thread_pkt[tid].type=type;
+	per_thread_pkt[tid].a_stream=pstream;
+	per_thread_pkt[tid].raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
 
 	switch (type)
 	{
 	case IPv4:
 	{
 		struct iphdr *ip4_hdr=(struct iphdr *)pkt_hdr;
-		pkt[tid].ip_proto=ip4_hdr->protocol;
+		per_thread_pkt[tid].ip_proto=ip4_hdr->protocol;
 		break;
 	}
 	case IPv6:
 	{
 		struct ip6_hdr *ip6_hdr=(struct ip6_hdr *)pkt_hdr;
-		pkt[tid].ip_proto=ip6_hdr->ip6_nxt;
+		per_thread_pkt[tid].ip_proto=ip6_hdr->ip6_nxt;
 		break;	
 	}
 	default:
@@ -223,9 +226,9 @@ void adapter_on_packet_update(struct stellar *st, struct streaminfo *pstream, vo
 	struct registered_packet_plugin_schema *p=NULL;
 	while ((p = (struct registered_packet_plugin_schema *)utarray_next(st->registered_packet_plugin_array, p)))
 	{
-		if(p->ip_protocol == pkt[tid].ip_proto && p->on_packet)
+		if(p->ip_protocol == per_thread_pkt[tid].ip_proto && p->on_packet)
 		{
-			p->on_packet(&pkt[tid], pkt[tid].ip_proto, p->plugin_env);
+			p->on_packet(&per_thread_pkt[tid], per_thread_pkt[tid].ip_proto, p->plugin_env);
 		}
 	}
 	return;
@@ -254,7 +257,6 @@ int stellar_polling_plugin_register(struct stellar *st, plugin_on_polling_func o
 	return (POLLING_PULGIN_ID_BASE+utarray_len(st->registered_polling_plugin_array));// return polling plugin_id
 }
 
-// FIXME: scheduler with return value
 int adapter_on_polling(struct stellar *st)
 {
 	if(st->registered_polling_plugin_array == NULL)return 0;
@@ -304,13 +306,6 @@ struct session *adapter_session_new(struct stellar *st, struct streaminfo *strea
 		return NULL;
 	}
 	struct session *sess = session_new(st, type, stream->threadnum);
-	if(sess)
-	{
-		// TODO: thread local packet
-    	struct packet *pkt_on_session = CALLOC(struct packet, 1);
-    	session_set_current_packet(sess, pkt_on_session,adapter_packet_free, NULL);
-    	pkt_on_session->a_stream = stream;
-	}
 	return sess;
 }
 
@@ -321,12 +316,14 @@ void adapter_session_free(struct session *sess)
 
 unsigned char adapter_session_state_update(struct streaminfo *stream, struct session *sess, void *a_packet, enum session_state state)
 {
-	struct packet *pkt_on_session = NULL;
 	if(likely(sess!=NULL))
 	{
-		// TODO: attach thread local packet to session
-		pkt_on_session=(struct packet *)session_get0_current_packet(sess);
-		session_dispatch( sess, state, pkt);
+		int tid=stream->threadnum;
+		per_thread_pkt[tid].type=stream->type==STREAM_TYPE_TCP?TCP:UDP;
+		per_thread_pkt[tid].a_stream=stream;
+		if(a_packet)per_thread_pkt[tid].raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
+		sess->cur_pkt=&per_thread_pkt[tid];
+		session_dispatch( sess, state, &per_thread_pkt[tid]);
 		return APP_STATE_GIVEME;
 	}
 	else
