@@ -1,4 +1,3 @@
-#include "stellar/utils.h"
 #include "stellar/session_exdata.h"
 
 #include "adapter/adapter.h"
@@ -6,21 +5,11 @@
 #include <MESA/stream.h>
 #include <stream_inc/stream_base.h>
 
-#include <assert.h>
-
-struct simple_stream_ctx
-{
-	uint32_t c2s_pkts;
-	uint32_t c2s_bytes;
-	uint32_t  s2c_pkts;
-	uint32_t  s2c_bytes;
-	struct session *sess;
-};
-
 #define STELLAR_PLUGIN_PATH "./stellar_plugin/spec.toml"
 #define STELLAR_BRIDEGE_NAME "STELLAR_SESSION"
 #define STELLAR_EXDATA_NAME "SAPP_STREAMINFO"
 
+#include <assert.h>
 
 struct stellar *g_stellar=NULL;
 int g_session_bridge_id=-1;
@@ -48,12 +37,12 @@ static void stellar_on_sapp_bridge_free(const struct streaminfo *stream, int bri
 int STELLAR_START_LOADER_INIT()
 {
 	g_stellar = stellar_init(STELLAR_PLUGIN_PATH);
-	if(g_stellar==NULL)return -1;
+	assert(g_stellar!=NULL);
 	g_session_bridge_id=stream_bridge_build(STELLAR_BRIDEGE_NAME, "w");
-	if(g_session_bridge_id < 0)return -1;
+	assert(g_session_bridge_id >= 0);
 	stream_bridge_register_data_free_cb(g_session_bridge_id, stellar_on_sapp_bridge_free);
 	g_streaminfo_exdata_id=stellar_session_get_ex_new_index(g_stellar, STELLAR_EXDATA_NAME, NULL, NULL); 
-	if(g_streaminfo_exdata_id < 0)return -1;
+	assert(g_streaminfo_exdata_id >= 0);
 	return 0;
 }
 
@@ -75,15 +64,9 @@ char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thre
 		return APP_STATE_DROPME;
 	}
 	struct session *sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
-	if(sess)
-	{
-		adapter_session_poll(sess);
-		return APP_STATE_GIVEME;
-	}
-	else
-	{
-		return APP_STATE_DROPME;
-	}
+	assert(sess!=NULL);
+	adapter_session_poll(sess);
+	return APP_STATE_GIVEME;
 }
 
 void  STELLAR_DEFER_LOADER_EXIT(void)

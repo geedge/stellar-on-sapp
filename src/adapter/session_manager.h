@@ -17,8 +17,7 @@ struct session
 	enum session_state state;
 	int session_direction;
 	struct packet *cur_pkt;
-	session_packet_free *cur_pkt_free_cb;
-	void *cur_pkt_free_arg;
+	void *extra_info;
 	struct stellar *st;
 	struct session_event  *intrinsic_events;
 	struct session_exdata_runtime *ex_data_rt;

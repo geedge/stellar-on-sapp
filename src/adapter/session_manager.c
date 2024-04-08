@@ -399,8 +399,6 @@ inline struct packet *session_get_current_packet(struct session *sess)
 inline void session_set_current_packet(struct session *sess, struct packet *pkt, session_packet_free *free_cb, void *arg)
 {
 	sess->cur_pkt = pkt;
-	sess->cur_pkt_free_arg = arg;
-	sess->cur_pkt_free_cb = free_cb;
 }
 
 void session_free(struct session *sess)
@@ -415,13 +413,6 @@ void session_free(struct session *sess)
 		FREE(sess->mq_sub_status);
 	}
 	session_free_exdata_runtime(sess, sess->ex_data_rt);
-	if(sess->cur_pkt)
-	{
-		if(sess->cur_pkt_free_cb)
-		{
-			sess->cur_pkt_free_cb(sess, sess->cur_pkt, sess->cur_pkt_free_arg);
-		}
-	}
 	FREE(sess->ex_data_rt);
 	if(sess->intrinsic_events)
 	{
