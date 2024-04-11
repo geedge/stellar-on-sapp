@@ -347,12 +347,13 @@ void session_dispatch(struct session *sess, enum session_state state,  struct pa
 	if(sess->st->intrinsic_session_event_schema_array == NULL)return;
 	unsigned int len = utarray_len(sess->st->intrinsic_session_event_schema_array);
 	sess->state = state;
-	// TODO: improve state to events logic 
 	int events=(1<<state|(sess->type==SESSION_TYPE_TCP?SESS_EV_TCP:SESS_EV_UDP));
+	if(state==SESSION_STATE_CONTROL)events=SESS_EV_CONTROL;
+	
 	for(unsigned i = 0; i < len; i++)
 	{
 		p = (intrinsic_events+i);
-		if(p->session_event_cb != NULL && (p->events & events) && (p->is_delete == 0))
+		if(p->session_event_cb != NULL && ((events & p->events)!=0) && (p->is_delete == 0))
 		{
 			p->session_event_cb(sess, events, pkt, p->cb_arg);
 		}

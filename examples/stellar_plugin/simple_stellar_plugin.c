@@ -130,7 +130,7 @@ void *simple_stellar_event_plugin_init(struct stellar *st)
 	plugin_env->st = st;
 	plugin_env->exdata_idx = stellar_session_get_ex_new_index(st, "SIMPLE_EVENT_PLUGIN", simple_exdata_free, NULL);
 	if(plugin_env->exdata_idx < 0)exit(-1);
-	int plugin_id=stellar_plugin_register(st, (SESS_EV_TCP|SESS_EV_UDP|SESS_EV_OPENING|SESS_EV_PACKET|SESS_EV_CLOSING), simple_event_plugin_entry, plugin_env);
+	int plugin_id=stellar_plugin_register(st, (SESS_EV_TCP|SESS_EV_UDP|SESS_EV_OPENING|SESS_EV_PACKET|SESS_EV_CLOSING|SESS_EV_CONTROL), simple_event_plugin_entry, plugin_env);
 	if(plugin_id < 0)exit(-1);
 	plugin_env->plugin_id=plugin_id;
 
@@ -187,7 +187,7 @@ static int session_mq_plugin_sub_fn(struct session *sess, int topic_id, const vo
 	else
 	{
 		struct session_event *i_ev=session_get_intrinsic_event(sess, plugin_ctx->plugin_id);
-		session_event_assign(i_ev, plugin_ctx->st, sess, (SESS_EV_TCP|SESS_EV_UDP|SESS_EV_OPENING|SESS_EV_PACKET|SESS_EV_CLOSING), simple_mq_plugin_entry, plugin_ctx);
+		session_event_assign(i_ev, plugin_ctx->st, sess, (SESS_EV_TCP|SESS_EV_UDP|SESS_EV_OPENING|SESS_EV_CLOSING), simple_mq_plugin_entry, plugin_ctx);
 		printf("%s(plug:%d)session_event_assign-----------%20s\n", __FUNCTION__, plugin_ctx->plugin_id, session_get0_readable_addr(sess));
 	}
 
