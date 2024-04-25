@@ -456,18 +456,19 @@ int session_is_symmetric(struct session *sess, unsigned char *flag)
 	int is_symmetric=0;
 	struct streaminfo *pstream=session_get_streaminfo(sess);
 	assert(pstream);
-    if (pstream->dir == DIR_DOUBLE && flag)
+    if (pstream->dir == DIR_DOUBLE)
     {
-        *flag = (SESSION_SEEN_C2S_FLOW | SESSION_SEEN_S2C_FLOW);
+		if(flag)*flag = (SESSION_SEEN_C2S_FLOW | SESSION_SEEN_S2C_FLOW);
         is_symmetric = 1;
     }
-    else if (pstream->dir == DIR_C2S && flag)
+    else if (pstream->dir == DIR_C2S)
     {
-        *flag = SESSION_SEEN_C2S_FLOW;
+		if(flag)*flag = SESSION_SEEN_C2S_FLOW;
+		
     }
-    else if (pstream->dir == DIR_S2C && flag)
+    else if (pstream->dir == DIR_S2C)
     {
-        *flag = SESSION_SEEN_S2C_FLOW;
+		if(flag)*flag = SESSION_SEEN_S2C_FLOW;
     }
     return is_symmetric;
 }	
