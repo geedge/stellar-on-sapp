@@ -666,3 +666,23 @@ int session_get_current_thread_id(struct session *sess)
 	thread_id = pstream->threadnum;
 	return thread_id;
 }
+
+long long session_get_client_isn(struct session *sess)
+{
+	struct streaminfo *pstream=session_get_streaminfo(sess);
+	assert(pstream);
+    uint32_t client_isn=0;
+    int client_isn_sz=sizeof(client_isn);
+    if(MESA_get_stream_opt(pstream, MSO_TCP_ISN_C2S, &(client_isn), &client_isn_sz)!=0)return -1;
+    return client_isn;
+}
+
+long long session_get_server_isn(struct session *sess)
+{
+	struct streaminfo *pstream=session_get_streaminfo(sess);
+	assert(pstream);
+    uint32_t server_isn=0;
+    int server_isn_sz=sizeof(server_isn);
+    if(MESA_get_stream_opt(pstream, MSO_TCP_ISN_S2C, &(server_isn), &server_isn_sz)!=0)return -1;
+    return server_isn;
+}

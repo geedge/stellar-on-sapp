@@ -33,6 +33,8 @@ enum session_type session_get_type(struct session *sess);
 int session_is_symmetric(struct session *sess, unsigned char *flag);
 
 
+long long session_get_client_isn(struct session *sess);
+long long session_get_server_isn(struct session *sess);
 
 #define SESSION_IS_TUNNLE_NON 	 (0) 	/* default is 0, not tunnel; */
 #define	SESSION_IS_TUNNLE_6OVER4 	 (1 << 0)
