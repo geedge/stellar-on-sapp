@@ -343,18 +343,18 @@ int session_is_symmetric(struct session *sess, unsigned char *flag)
 	int is_symmetric=0;
 	if(sess->cur_pkt && sess->cur_pkt->a_stream)
 	{
-		if(sess->cur_pkt->a_stream->dir==DIR_DOUBLE && flag)
+		if(sess->cur_pkt->a_stream->dir==DIR_DOUBLE)
 		{
-			*flag=(SESSION_SEEN_C2S_FLOW|SESSION_SEEN_S2C_FLOW);
+			if(flag)*flag=(SESSION_SEEN_C2S_FLOW|SESSION_SEEN_S2C_FLOW);
 			is_symmetric=1;
 		}
-		else if(sess->cur_pkt->a_stream->dir==DIR_C2S && flag)
+		else if(sess->cur_pkt->a_stream->dir==DIR_C2S)
 		{
-			*flag=SESSION_SEEN_C2S_FLOW;
+			if(flag)*flag=SESSION_SEEN_C2S_FLOW;
 		}
-		else if(sess->cur_pkt->a_stream->dir==DIR_S2C && flag)
+		else if(sess->cur_pkt->a_stream->dir==DIR_S2C)
 		{
-			*flag=SESSION_SEEN_S2C_FLOW;
+			if(flag)*flag=SESSION_SEEN_S2C_FLOW;
 		}
 	}
 	return is_symmetric;
@@ -510,7 +510,7 @@ int session_get_current_thread_id(struct session *sess)
 
 long long session_get_client_isn(struct session *sess)
 {
-	if(sess || sess->cur_pkt || sess->cur_pkt->a_stream)return -1;
+	if(sess==NULL || sess->cur_pkt==NULL || sess->cur_pkt->a_stream==NULL)return -1;
 	struct streaminfo *pstream=sess->cur_pkt->a_stream;
     uint32_t client_isn=0;
     int client_isn_sz=sizeof(client_isn);
@@ -520,7 +520,7 @@ long long session_get_client_isn(struct session *sess)
 
 long long session_get_server_isn(struct session *sess)
 {
-	if(sess || sess->cur_pkt || sess->cur_pkt->a_stream)return -1;
+	if(sess==NULL || sess->cur_pkt==NULL || sess->cur_pkt->a_stream==NULL)return -1;
 	struct streaminfo *pstream=sess->cur_pkt->a_stream;
     uint32_t server_isn=0;
     int server_isn_sz=sizeof(server_isn);
