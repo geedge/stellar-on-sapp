@@ -507,3 +507,23 @@ int session_get_current_thread_id(struct session *sess)
 	}
 	return thread_id;
 }
+
+long long session_get_client_isn(struct session *sess)
+{
+	if(sess || sess->cur_pkt || sess->cur_pkt->a_stream)return -1;
+	struct streaminfo *pstream=sess->cur_pkt->a_stream;
+    uint32_t client_isn=0;
+    int client_isn_sz=sizeof(client_isn);
+    if(MESA_get_stream_opt(pstream, MSO_TCP_ISN_C2S, &(client_isn), &client_isn_sz)!=0)return -1;
+    return client_isn;
+}
+
+long long session_get_server_isn(struct session *sess)
+{
+	if(sess || sess->cur_pkt || sess->cur_pkt->a_stream)return -1;
+	struct streaminfo *pstream=sess->cur_pkt->a_stream;
+    uint32_t server_isn=0;
+    int server_isn_sz=sizeof(server_isn);
+    if(MESA_get_stream_opt(pstream, MSO_TCP_ISN_S2C, &(server_isn), &server_isn_sz)!=0)return -1;
+    return server_isn;
+}
