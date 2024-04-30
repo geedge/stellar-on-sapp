@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(stellar-c)
+project(stellar-on-sapp)
 
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 

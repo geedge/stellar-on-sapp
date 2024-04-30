@@ -1,13 +1,13 @@
-# Stellar-C: c adapter for stellar
+# Stellar-on-sapp: c adapter for stellar
 ## Concepts
-The Stellar-C is a transition solution from Sapp to Stellar for fast DPI plugin development. The Stellar-C is built on the concepts of sessions and messages. A session is defined as a sequence of packets that share the same traffic attributes, such as TCP or UDP sessions. 
-* Each session has a message queue, which facilitates the exchange of messages among plugins. The message delivery is in the session scope. In Stellar-C, plugins are decoupled through the publish-subscribe mechanism.
+The Stellar-on-sapp is a transition solution from Sapp to Stellar for fast DPI plugin development. The Stellar-C is built on the concepts of sessions and messages. A session is defined as a sequence of packets that share the same traffic attributes, such as TCP or UDP sessions. 
+* Each session has a message queue, which facilitates the exchange of messages among plugins. The message delivery is in the session scope. In Stellar-on-sapp, plugins are decoupled through the publish-subscribe mechanism.
 * EXdata (Extra Data) is attached to a session for plugin context management.
 
 ![stellar-c-high-level-design](./docs/images/stellar-arch.jpg)
 
 ## Components
-The Stellar-C consists of the following components:
+The Stellar-on-sapp consists of the following components:
 * Sapp adaptor converts a Sapp stream to a Stellar session, and calls Stellar plugins to process the session.
 * Firewall is a Sapp plugins that interact with TCP/UDP and L7 decoders. It inherits all TSG firewall functions and publish messages to Stellar plugins.
 * Stellar plugins are DPI plugins that process the session, such as AppSketch, Session Flagging, Session Recorder.
