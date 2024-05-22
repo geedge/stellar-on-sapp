@@ -3,6 +3,9 @@
 struct session;
 struct stellar;
 
+int stellar_get_worker_thread_num(struct stellar *st);
+int stellar_get_current_thread_id(struct stellar *st);
+
 //return plugin_env
 typedef void *plugin_on_load_func(struct stellar *st);
 typedef void plugin_on_unload_func(void *plugin_env);
