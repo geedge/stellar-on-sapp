@@ -141,12 +141,14 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned c
 
 void session_poll_on_sapp(struct session *sess)
 {
-	if(sess && sess->state != SESSION_STATE_CONTROL)
+	if(sess==NULL)return;
+	if(sess->state != SESSION_STATE_CONTROL)
 	{
 		struct packet *pkt = &sess->cur_pkt;
 		if(unlikely(pkt->raw_pkt==NULL))pkt->raw_pkt=get_current_rawpkt_from_streaminfo(sess->pstream);
 		plugin_manager_on_session_egress(sess, pkt);
 	}
+	sess->cur_pkt.raw_pkt=NULL;//clear raw_pkt
 }
 
 /*********************************************
