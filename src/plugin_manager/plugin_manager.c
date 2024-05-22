@@ -752,7 +752,6 @@ int stellar_polling_plugin_register(struct stellar *st, plugin_on_polling_func o
 	return (POLLING_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_polling_plugin_array));// return polling plugin_id
 }
 
-// FIXME: scheduler with return value
 int plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr)
 {
 	if(plug_mgr->registered_polling_plugin_array == NULL)return 0;
@@ -804,7 +803,6 @@ void plugin_manager_on_session_ingress(struct session *sess,const struct packet 
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt==NULL)return;
 	int topic_id = -1;
-	// FIXME: update internal api in stellar
 	switch (packet_get_type(pkt))
 	{
 	case TCP:

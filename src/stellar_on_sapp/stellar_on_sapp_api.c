@@ -481,11 +481,14 @@ uint16_t *session_get0_segment_id_list(struct session *sess, int session_directi
 	struct streaminfo *pstream=sess->pstream;
 	assert(pstream);
 	struct segment_id_list *sids = NULL;
-	int ret = get_rawpkt_opt_from_streaminfo(pstream, RAW_PKT_GET_SID_LIST, &sids);//TODO: using stream_opt_get api
+	int len=sizeof(void*);
+	enum MESA_stream_opt opt=((session_direction==SESSION_DIRECTION_IN)?(MSO_STREAM_INBOND_SEGMENT_ID_LIST):(MSO_STREAM_OUTBOND_SEGMENT_ID_LIST));
+	int ret = MESA_get_stream_opt(pstream, opt, &sids, &len);
 	if (ret != sizeof(struct segment_id_list))return NULL;
 	*sid_num=sids->sz_sidlist;
 	return sids->sid_list;
 }
+
 const char *session_get0_route_ctx(struct session *sess, int session_direction, size_t *route_ctx_len)
 {
 	struct streaminfo *pstream=sess->pstream;
