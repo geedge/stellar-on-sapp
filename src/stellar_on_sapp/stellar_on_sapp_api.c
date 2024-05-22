@@ -10,16 +10,28 @@
 
 #include <MESA/stream.h>
 
+#include <assert.h>
+
 struct stellar
 {
 	struct plugin_manager_schema *plug_mgr;
+};
+
+struct packet
+{
+	enum packet_type type;
+	unsigned char ip_proto;
+	unsigned char pad[3];
+	const void *raw_pkt;
 };
 
 struct session
 {
 	enum session_type type;
 	enum session_state state;
-	struct packet *cur_pkt;
+	int session_direction;
+	struct streaminfo *pstream;
+	struct packet cur_pkt;
 	struct stellar *st;
 	struct plugin_manager_runtime *plug_mgr_rt;
 };
@@ -66,14 +78,6 @@ void stellar_exit_on_sapp(struct stellar *st)
 };
 
 
-struct packet
-{
-	enum packet_type type;
-	unsigned char ip_proto;
-	unsigned char pad[3];
-	void *raw_pkt;
-	struct streaminfo *a_stream;
-};
 
 /*********************************************
  * SESSION NEW & FREE ON SAPP *
@@ -98,9 +102,10 @@ struct session *session_new_on_sapp(struct stellar *st, struct streaminfo *strea
 	sess->st = st;
 	sess->type = type;
 	sess->state = SESSION_STATE_OPENING;
-    sess->cur_pkt = CALLOC(struct packet, 1);
+	sess->pstream=stream;
+	sess->session_direction=-1;
+    memset(&sess->cur_pkt, 0, sizeof(struct packet));
 	sess->plug_mgr_rt=plugin_manager_session_runtime_new(st->plug_mgr, sess);
-    sess->cur_pkt->a_stream = stream;
     return sess;
 }
 
@@ -111,10 +116,6 @@ void session_free_on_sapp(struct session *sess)
 	{
 		plugin_manager_session_runtime_free(sess->plug_mgr_rt);
 	}
-	if(sess->cur_pkt)
-	{
-		FREE(sess->cur_pkt);
-	}
 	FREE(sess);
 	return;
 }
@@ -123,13 +124,13 @@ void session_free_on_sapp(struct session *sess)
  * SESSION STATE UPDATE ON SAPP *
  *********************************************/
 
-unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned char stream_state, struct session *sess, void *a_packet, enum packet_type type)
+unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned char stream_state, struct session *sess, const void *raw_pkt, enum packet_type type)
 {
-	if(sess && a_packet)
+	if(sess && raw_pkt)
 	{
 		sess->state=(stream_state == OP_STATE_PENDING) ? SESSION_STATE_OPENING : SESSION_STATE_ACTIVE;
-		struct packet *pkt = sess->cur_pkt;
-		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(stream);
+		struct packet *pkt = &sess->cur_pkt;
+		pkt->raw_pkt=raw_pkt;
 		pkt->type=type;
 		plugin_manager_on_session_ingress(sess, pkt);
 		return APP_STATE_GIVEME;
@@ -142,8 +143,8 @@ void session_poll_on_sapp(struct session *sess)
 {
 	if(sess && sess->state != SESSION_STATE_CONTROL)
 	{
-		struct packet *pkt = sess->cur_pkt;
-		pkt->raw_pkt=(void *)get_current_rawpkt_from_streaminfo(sess->cur_pkt->a_stream);
+		struct packet *pkt = &sess->cur_pkt;
+		if(unlikely(pkt->raw_pkt==NULL))pkt->raw_pkt=get_current_rawpkt_from_streaminfo(sess->pstream);
 		plugin_manager_on_session_egress(sess, pkt);
 	}
 }
@@ -156,8 +157,7 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 {
 	struct packet pkt;
 	pkt.type=type;
-	pkt.a_stream=pstream;
-	pkt.raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
+	pkt.raw_pkt=get_current_rawpkt_from_streaminfo(pstream);
 
 	switch (type)
 	{
@@ -210,7 +210,9 @@ inline enum packet_type packet_get_type(const struct packet *pkt)
 
 int packet_get_direction(const struct packet *pkt)
 {
-	const struct streaminfo *pstream=pkt->a_stream;
+	struct session *sess = container_of(pkt, struct session, cur_pkt);
+	assert(sess);
+	const struct streaminfo *pstream=sess->pstream;
 	if(pstream->curdir==DIR_C2S)
 	{
 		return PACKET_DIRECTION_C2S;
@@ -243,7 +245,7 @@ const char *packet_get0_data(const struct packet *pkt, size_t *data_len)
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 {
 	if(pkt == NULL || ts == NULL)return -1;
-	if(pkt->raw_pkt == NULL || pkt->a_stream == NULL)return -1;
+	if(pkt->raw_pkt == NULL)return -1;
 
 	get_opt_from_rawpkt(pkt->raw_pkt , RAW_PKT_GET_TIMESTAMP, ts);
 	if(ts->tv_sec == 0 && ts->tv_usec == 0)return -1;
@@ -252,7 +254,7 @@ int packet_arrive_time(const struct packet *pkt, struct timeval *ts)
 
 inline unsigned char packet_get_ip_protocol(struct packet *pkt)
 {
-	if(pkt == NULL || pkt->a_stream == NULL)return 0;
+	if(pkt == NULL)return 0;
 	return pkt->ip_proto;
 }
 
@@ -262,113 +264,123 @@ inline unsigned char packet_get_ip_protocol(struct packet *pkt)
 
 inline struct packet *session_get_current_packet(struct session *sess)
 {
-	return sess->cur_pkt;
+	return &sess->cur_pkt;
 }
 
 const char* session_get0_readable_addr(struct session *sess)
 {
-	return printaddr(&sess->cur_pkt->a_stream->addr, sess->cur_pkt->a_stream->threadnum);
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+	return printaddr(&pstream->addr, pstream->threadnum);
 }
 
 struct session_addr *session_get0_addr(struct session *sess, enum session_addr_type *addr_type)
 {
-	struct session_addr *addr=NULL;
-	*addr_type=SESSION_ADDR_TYPE_UNKNOWN;
-	if(sess && sess->cur_pkt && sess->cur_pkt->a_stream)
-	{
-		struct streaminfo *pstream=sess->cur_pkt->a_stream;
-		if(pstream->addr.addrtype==ADDR_TYPE_IPV4)
-		{
-			if(pstream->type == STREAM_TYPE_TCP)
-			{
-				*addr_type=SESSION_ADDR_TYPE_IPV4_TCP;
-			}
-			else if(pstream->type == STREAM_TYPE_UDP)
-			{
-				*addr_type=SESSION_ADDR_TYPE_IPV4_UDP;
-			}
-			addr=(struct session_addr *)pstream->addr.tuple4_v4;
-		}
-		if(pstream->addr.addrtype==ADDR_TYPE_IPV6)
-		{
-			if(pstream->type == STREAM_TYPE_TCP)
-			{
-				*addr_type=SESSION_ADDR_TYPE_IPV6_TCP;
-			}
-			else if(pstream->type == STREAM_TYPE_UDP)
-			{
-				*addr_type=SESSION_ADDR_TYPE_IPV6_UDP;
-			}
-			addr=(struct session_addr *)pstream->addr.tuple4_v6;
-		}		
-	}
-	return addr;
+    struct session_addr *addr = NULL;
+    *addr_type = SESSION_ADDR_TYPE_UNKNOWN;
+    struct streaminfo *pstream = sess->pstream;
+    assert(pstream);
+    if (pstream->addr.addrtype == ADDR_TYPE_IPV4)
+    {
+        if (pstream->type == STREAM_TYPE_TCP)
+        {
+            *addr_type = SESSION_ADDR_TYPE_IPV4_TCP;
+        }
+        else if (pstream->type == STREAM_TYPE_UDP)
+        {
+            *addr_type = SESSION_ADDR_TYPE_IPV4_UDP;
+        }
+        addr = (struct session_addr *)pstream->addr.tuple4_v4;
+    }
+    if (pstream->addr.addrtype == ADDR_TYPE_IPV6)
+    {
+        if (pstream->type == STREAM_TYPE_TCP)
+        {
+            *addr_type = SESSION_ADDR_TYPE_IPV6_TCP;
+        }
+        else if (pstream->type == STREAM_TYPE_UDP)
+        {
+            *addr_type = SESSION_ADDR_TYPE_IPV6_UDP;
+        }
+        addr = (struct session_addr *)pstream->addr.tuple4_v6;
+    }
+    return addr;
 }
 
 const char *session_get0_current_payload(struct session *sess, size_t *payload_len)
 {
-	if(sess->cur_pkt->raw_pkt == NULL || sess->cur_pkt->a_stream == NULL || sess->cur_pkt->a_stream->ptcpdetail == NULL)return NULL;
-	*payload_len = (size_t)sess->cur_pkt->a_stream->ptcpdetail->datalen;
-	return (const char*)sess->cur_pkt->a_stream->ptcpdetail->pdata;
+    struct streaminfo *pstream = sess->pstream;
+    assert(pstream);
+	*payload_len = (size_t)pstream->ptcpdetail->datalen;
+	return (const char*)pstream->ptcpdetail->pdata;
 }
 
 inline const struct packet *session_get0_current_packet(struct session *sess)
 {
-	return sess->cur_pkt;
+	if(unlikely(sess->cur_pkt.raw_pkt == NULL))
+	{
+		struct streaminfo *pstream=sess->pstream;
+		assert(pstream);
+		//attach packet to session
+		sess->cur_pkt.raw_pkt=(void *)get_current_rawpkt_from_streaminfo(pstream);
+	}
+	
+	return &sess->cur_pkt;
+
 }
 
 int  session_get_direction(struct session *sess)
 {
-	if(sess->cur_pkt && sess->cur_pkt->a_stream)
-	{
-		//int c2s_router_dir=(sess->cur_pkt->a_stream->curdir==DIR_C2S)?(sess->cur_pkt->a_stream->routedir):((sess->cur_pkt->a_stream->routedir)^1);
-		u_int8_t c2s_router_dir=0;
-		int dir_len=sizeof(c2s_router_dir);
-		MESA_get_stream_opt(sess->cur_pkt->a_stream, MSO_STREAM_C2S_ROUTE_DIRECTION, (void *)&c2s_router_dir, &dir_len); 
-		int dir=MESA_dir_link_to_human(c2s_router_dir);
-		if(dir == (int)'I')
-		{
-			return SESSION_DIRECTION_IN;
-		}
-		if(dir == (int)'E')
-		{
-			return SESSION_DIRECTION_OUT;
-		}
-	}
-	return -1;
+	if(sess->session_direction>=0)return sess->session_direction;
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+    // int c2s_router_dir=(sess->cur_pkt->a_stream->curdir==DIR_C2S)?(sess->cur_pkt->a_stream->routedir):((sess->cur_pkt->a_stream->routedir)^1);
+    u_int8_t c2s_router_dir = 0;
+    int dir_len = sizeof(c2s_router_dir);
+    MESA_get_stream_opt(pstream, MSO_STREAM_C2S_ROUTE_DIRECTION, (void *)&c2s_router_dir, &dir_len);
+    int dir = MESA_dir_link_to_human(c2s_router_dir);
+    if (dir == (int)'I')
+    {
+        sess->session_direction = SESSION_DIRECTION_IN;
+    }
+    if (dir == (int)'E')
+    {
+        sess->session_direction = SESSION_DIRECTION_OUT;
+    }
+    return sess->session_direction;
+
 } 
 
 int session_is_symmetric(struct session *sess, unsigned char *flag)
 {
 	int is_symmetric=0;
-	if(sess->cur_pkt && sess->cur_pkt->a_stream)
-	{
-		if(sess->cur_pkt->a_stream->dir==DIR_DOUBLE)
-		{
-			if(flag)*flag=(SESSION_SEEN_C2S_FLOW|SESSION_SEEN_S2C_FLOW);
-			is_symmetric=1;
-		}
-		else if(sess->cur_pkt->a_stream->dir==DIR_C2S)
-		{
-			if(flag)*flag=SESSION_SEEN_C2S_FLOW;
-		}
-		else if(sess->cur_pkt->a_stream->dir==DIR_S2C)
-		{
-			if(flag)*flag=SESSION_SEEN_S2C_FLOW;
-		}
-	}
-	return is_symmetric;
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+    if (pstream->dir == DIR_DOUBLE)
+    {
+		if(flag)*flag = (SESSION_SEEN_C2S_FLOW | SESSION_SEEN_S2C_FLOW);
+        is_symmetric = 1;
+    }
+    else if (pstream->dir == DIR_C2S)
+    {
+		if(flag)*flag = SESSION_SEEN_C2S_FLOW;
+		
+    }
+    else if (pstream->dir == DIR_S2C)
+    {
+		if(flag)*flag = SESSION_SEEN_S2C_FLOW;
+    }
+    return is_symmetric;
+
 }	
 
 int session_is_outmost(struct session *sess, uint64_t *flag)
 {
-	if(sess==NULL||sess->cur_pkt==NULL||sess->cur_pkt->a_stream==NULL)
-	{
-		return 0;
-	}
-	struct streaminfo *t_stream = sess->cur_pkt->a_stream->pfather;
-	struct streaminfo *a_stream = sess->cur_pkt->a_stream;
+	struct streaminfo *a_stream=sess->pstream;
+	assert(a_stream);
+	struct streaminfo *t_stream = a_stream->pfather;
 	if(flag)*flag=SESSION_IS_TUNNLE_NON;
+
 
 	unsigned short tunnel_type=0;
 	int tunnel_type_len=sizeof(unsigned short);
@@ -406,27 +418,33 @@ int session_is_innermost(struct session *sess, uint64_t *flag)
 
 const char *session_get0_current_l3_header(struct session *sess)
 {
-	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL || sess->cur_pkt->raw_pkt == NULL) return NULL;
-	return (const char *)get_current_layer3_header(sess->cur_pkt->a_stream);
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+	return (const char *)get_current_layer3_header(pstream);
 }
 
 const char *session_get0_current_l4_header(struct session *sess)
 {
-	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL || sess->cur_pkt->raw_pkt == NULL) return NULL;
-	return (const char *)get_current_layer4_header(sess->cur_pkt->a_stream);
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+	return (const char *)get_current_layer4_header(pstream);
 }
 
 int session_set_session_id(struct session *sess, uint64_t session_id)
 {
-	return MESA_set_stream_opt(sess->cur_pkt->a_stream, MSO_STREAM_SET_DATAMETA_TRACE_ID, (void *)&session_id, sizeof(uint64_t));
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+	return MESA_set_stream_opt(pstream, MSO_STREAM_SET_DATAMETA_TRACE_ID, (void *)&session_id, sizeof(uint64_t));
 }
 
 int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, size_t sid_num)
 {
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
 	struct segment_id_list sid_list;
 	sid_list.sz_sidlist=sid_num;
 	memcpy(sid_list.sid_list, sid, sid_num*sizeof(uint16_t));
-	return MESA_set_stream_opt(sess->cur_pkt->a_stream, MSO_STREAM_PREPLEND_SEGMENT_ID_LIST, (void *)&sid_list, sizeof(struct segment_id_list));
+	return MESA_set_stream_opt(pstream, MSO_STREAM_PREPLEND_SEGMENT_ID_LIST, (void *)&sid_list, sizeof(struct segment_id_list));
 
 }
 
@@ -435,46 +453,49 @@ const char *session_get0_l2_l3_hdr(struct session *sess, int session_direction, 
 	int len = sizeof(int);
 	const char *l2_header = NULL;
 	*l2_l3_hdr_len = 0;
-	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
 	if(session_direction!=SESSION_DIRECTION_IN && session_direction!=SESSION_DIRECTION_OUT) return NULL;
+
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+
 	int c2s_sess_dir=session_get_direction(sess);
+	
 	enum MESA_stream_opt opt=(c2s_sess_dir==session_direction)?(MSO_STREAM_C2S_RAWPKT_HDR):(MSO_STREAM_S2C_RAWPKT_HDR);
-    if(MESA_get_stream_opt(sess->cur_pkt->a_stream, opt, (void *)&l2_header, &len) == -1) return NULL;
+    if(MESA_get_stream_opt(pstream, opt, (void *)&l2_header, &len) == -1) return NULL;
 	*l2_l3_hdr_len = len;
 	return l2_header;
 }
 
 
-static const void *session_get_rawpkt(struct session *sess, int session_direction)
+static const void *session_get_cached_rawpkt(struct session *sess, int session_direction)
 {
-	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
 	int route_direction=(session_direction==SESSION_DIRECTION_IN)?(DIR_ROUTE_UP):(DIR_ROUTE_DOWN);
-	return get_rawpkt_from_streaminfo(sess->cur_pkt->a_stream, route_direction);
+	return get_rawpkt_from_streaminfo(pstream, route_direction);
 }
 
 uint16_t *session_get0_segment_id_list(struct session *sess, int session_direction, size_t *sid_num)
 {
-	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
 	*sid_num=0;
-	const void *sapp_rawpkt=session_get_rawpkt(sess, session_direction);
-	if(sapp_rawpkt==NULL)return NULL;
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
 	struct segment_id_list *sids = NULL;
-	int ret = get_rawpkt_opt_from_streaminfo(sess->cur_pkt->a_stream, RAW_PKT_GET_SID_LIST, &sids);
+	int ret = get_rawpkt_opt_from_streaminfo(pstream, RAW_PKT_GET_SID_LIST, &sids);//TODO: using stream_opt_get api
 	if (ret != sizeof(struct segment_id_list))return NULL;
 	*sid_num=sids->sz_sidlist;
 	return sids->sid_list;
 }
 const char *session_get0_route_ctx(struct session *sess, int session_direction, size_t *route_ctx_len)
 {
-	if(sess == NULL || sess->cur_pkt == NULL || sess->cur_pkt->a_stream == NULL) return NULL;
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
 	if(session_direction!=SESSION_DIRECTION_IN && session_direction!=SESSION_DIRECTION_OUT) return NULL;
 	*route_ctx_len=0;
-	const void *sapp_rawpkt=session_get_rawpkt(sess, session_direction);
-	if(sapp_rawpkt==NULL)return NULL;
 	void *route_ctx = NULL;
 	int len=sizeof(route_ctx);
 	enum MESA_stream_opt opt=((session_direction==SESSION_DIRECTION_IN)?(MSO_STREAM_INBOND_ROUTE_CTX):(MSO_STREAM_OUTBOND_ROUTE_CTX));
-	int ret = MESA_get_stream_opt(sess->cur_pkt->a_stream, opt, &route_ctx, &len);
+	int ret = MESA_get_stream_opt(pstream, opt, &route_ctx, &len);
 	if (ret < 0)return NULL;
 	*route_ctx_len=len;
 	return (const char *)route_ctx;
@@ -498,20 +519,16 @@ inline enum session_type session_get_type(struct session *sess)
 int session_get_current_thread_id(struct session *sess)
 {
 	int thread_id = -1;
-	if(sess)
-	{
-		if(sess->cur_pkt && sess->cur_pkt->a_stream)
-		{
-			thread_id = sess->cur_pkt->a_stream->threadnum;
-		}
-	}
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
+	thread_id = pstream->threadnum;
 	return thread_id;
 }
 
 long long session_get_client_isn(struct session *sess)
 {
-	if(sess==NULL || sess->cur_pkt==NULL || sess->cur_pkt->a_stream==NULL)return -1;
-	struct streaminfo *pstream=sess->cur_pkt->a_stream;
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
     uint32_t client_isn=0;
     int client_isn_sz=sizeof(client_isn);
     if(MESA_get_stream_opt(pstream, MSO_TCP_ISN_C2S, &(client_isn), &client_isn_sz)!=0)return -1;
@@ -520,8 +537,8 @@ long long session_get_client_isn(struct session *sess)
 
 long long session_get_server_isn(struct session *sess)
 {
-	if(sess==NULL || sess->cur_pkt==NULL || sess->cur_pkt->a_stream==NULL)return -1;
-	struct streaminfo *pstream=sess->cur_pkt->a_stream;
+	struct streaminfo *pstream=sess->pstream;
+	assert(pstream);
     uint32_t server_isn=0;
     int server_isn_sz=sizeof(server_isn);
     if(MESA_get_stream_opt(pstream, MSO_TCP_ISN_S2C, &(server_isn), &server_isn_sz)!=0)return -1;

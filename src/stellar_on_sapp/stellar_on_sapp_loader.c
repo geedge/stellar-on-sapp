@@ -1,12 +1,9 @@
 #include "stellar/stellar.h"
-#include "stellar/utils.h"
 #include "stellar/session_exdata.h"
 
 #include "stellar_on_sapp.h"
 
 #include <MESA/stream.h>
-
-#include <assert.h>
 
 struct simple_stream_ctx
 {
@@ -99,11 +96,18 @@ void  STELLAR_DEFER_LOADER_EXIT(void)
 }
 
 
+static int is_ctrl_packet(struct streaminfo *pstream, const void *raw_pkt)
+{
+	int is_ctrl_pkt=0;
+	if(raw_pkt)
+	{
+		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
+	}
+	return is_ctrl_pkt;
+}
 
 static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet, enum entry_type type)
 {
-	int is_ctrl_pkt=0;
-	const void *raw_pkt=NULL;
 	unsigned char entry_ret=APP_STATE_GIVEME;
 	if(state == OP_STATE_PENDING && (stream_is_inner_most(pstream)==0)) 
 	{
@@ -111,6 +115,7 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 	}
 
 	struct session *sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
+	const void *raw_pkt=get_current_rawpkt_from_streaminfo(pstream);
 	//entry_type convert to packet_type
 	enum packet_type pkt_type=UNKNOWN;
 	switch (type)
@@ -137,19 +142,17 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
             session_exdata_set(sess, g_streaminfo_exdata_id, pstream);
             stream_bridge_async_data_put(pstream, g_session_bridge_id, sess);
 		}
-        entry_ret = session_state_update_on_sapp(pstream, state, sess, a_packet, pkt_type);
+        entry_ret = session_state_update_on_sapp(pstream, state, sess, raw_pkt, pkt_type);
         break;
 	case OP_STATE_DATA:
-		raw_pkt = get_current_rawpkt_from_streaminfo(pstream);
-		get_opt_from_rawpkt(raw_pkt, RAW_PKT_GET_IS_CTRL_PKT, (void *)&is_ctrl_pkt);
-		if(is_ctrl_pkt==1)
+		if(is_ctrl_packet(pstream, raw_pkt)==1)
 		{
-			entry_ret=session_state_update_on_sapp(pstream, state, sess, a_packet, CONTROL);
+			entry_ret=session_state_update_on_sapp(pstream, state, sess, raw_pkt, CONTROL);
 			entry_ret = entry_ret|APP_STATE_DROPPKT;
 		}
 		else
 		{
-			entry_ret=session_state_update_on_sapp(pstream, state, sess, a_packet, pkt_type);
+			entry_ret=session_state_update_on_sapp(pstream, state, sess, raw_pkt, pkt_type);
 		}
 		break;
 	case OP_STATE_CLOSE:
@@ -157,7 +160,7 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 		// for TCP stream, only trigger update when packet payload > 0
 		if(a_packet && pstream->ptcpdetail->datalen > 0)
 		{
-			entry_ret=session_state_update_on_sapp(pstream, state, sess, a_packet, pkt_type);
+			entry_ret=session_state_update_on_sapp(pstream, state, sess, raw_pkt, pkt_type);
 		}
 		break;
 	default:
