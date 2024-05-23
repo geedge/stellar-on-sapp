@@ -369,13 +369,20 @@ static void session_mq_topic_schema_dtor(void *_elt)
 
 UT_icd session_mq_topic_schema_icd = {sizeof(struct session_mq_topic_schema), NULL, session_mq_topic_schema_copy, session_mq_topic_schema_dtor};
 
-void session_mq_free(struct session_message *head)
+void session_mq_free(struct session_message *head, UT_array *session_mq_schema_array)
 {
-	struct session_message *elt, *tmp;
-    DL_FOREACH_SAFE(head, elt, tmp)
+	struct session_message *mq_elt, *tmp;
+	struct session_mq_topic_schema *topic;
+    DL_FOREACH_SAFE(head, mq_elt, tmp)
     {
-        DL_DELETE(head, elt);
-        FREE(elt);
+		topic = (struct session_mq_topic_schema *)utarray_eltptr(session_mq_schema_array,
+                                                                    (unsigned int)(mq_elt->topic_id));
+        if (topic && topic->free_cb)
+        {
+            topic->free_cb(mq_elt->msg_data, topic->free_cb_arg);
+        }
+        DL_DELETE(head, mq_elt);
+        FREE(mq_elt);
     }
 	FREE(head);
 }
@@ -596,10 +603,6 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
                     }
                     cur_sub_idx++;
                 }
-                if (topic->free_cb)
-                {
-                    topic->free_cb(mq_elt->msg_data, topic->free_cb_arg);
-                }
             }
             DL_DELETE(plug_mgr_rt->pending_mq, mq_elt);
 			DL_APPEND(plug_mgr_rt->delivered_mq, mq_elt);// move to delivered message list
@@ -662,12 +665,12 @@ void plugin_manager_session_runtime_free(struct plugin_manager_runtime *rt)
 	if(rt==NULL)return;
 	if(rt->pending_mq != NULL)
 	{
-		session_mq_free(rt->pending_mq);
+		session_mq_free(rt->pending_mq, rt->plug_mgr->session_mq_schema_array);
 		rt->pending_mq=NULL;
 	}
 	if(rt->delivered_mq != NULL)
 	{
-		session_mq_free(rt->delivered_mq);
+		session_mq_free(rt->delivered_mq, rt->plug_mgr->session_mq_schema_array);
 		rt->delivered_mq=NULL;
 	}	
 	if(rt->session_mq_status != NULL)
@@ -832,7 +835,7 @@ void plugin_manager_on_session_egress(struct session *sess,const struct packet *
 	if(plug_mgr_rt==NULL)return;
 	session_mq_publish_message(sess, plug_mgr_rt->plug_mgr->egress_topic_id ,(void *)pkt);
 	plugin_manager_session_message_dispatch(sess);
-	session_mq_free(plug_mgr_rt->delivered_mq);
+	session_mq_free(plug_mgr_rt->delivered_mq, plug_mgr_rt->plug_mgr->session_mq_schema_array);
 	plug_mgr_rt->delivered_mq=NULL;
     return;
 }

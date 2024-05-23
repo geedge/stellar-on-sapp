@@ -146,7 +146,10 @@ void session_poll_on_sapp(struct session *sess)
 	{
 		struct packet *pkt = &sess->cur_pkt;
 		if(unlikely(pkt->raw_pkt==NULL))pkt->raw_pkt=get_current_rawpkt_from_streaminfo(sess->pstream);
-		plugin_manager_on_session_egress(sess, pkt);
+		if(pkt->raw_pkt)
+		{
+			plugin_manager_on_session_egress(sess, pkt);
+		}
 	}
 	sess->cur_pkt.raw_pkt=NULL;//clear raw_pkt
 }
