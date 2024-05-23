@@ -111,6 +111,7 @@ struct session *session_new_on_sapp(struct stellar *st, struct streaminfo *strea
 	sess->pstream=stream;
 	sess->session_direction=-1;
     memset(&sess->cur_pkt, 0, sizeof(struct packet));
+	sess->cur_pkt.st=st;
 	sess->plug_mgr_rt=plugin_manager_session_runtime_new(st->plug_mgr, sess);
     return sess;
 }

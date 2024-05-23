@@ -3,7 +3,7 @@
 #include "stellar.h"
 
 //session mq
-typedef void session_msg_free_cb_func(void *msg, void *msg_free_arg);
+typedef void session_msg_free_cb_func(struct session *sess, void *msg, void *msg_free_arg);
 typedef void on_session_msg_cb_func(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env);
 
 //return topic_id

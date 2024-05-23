@@ -3,11 +3,11 @@
 #include "stellar.h"
 
 //session mq
-typedef void packet_msg_free_cb_func(void *msg, void *msg_free_arg);
+typedef void packet_msg_free_cb_func(struct packet *pkt, void *msg, void *msg_free_arg);
 typedef void on_packet_msg_cb_func(struct packet *pkt, int topic_id, const void *msg, void *plugin_env);
 
 //return topic_id
-int stellar_pakcet_mq_create_topic(struct stellar *st, const char *topic_name, packet_msg_free_cb_func *msg_free_cb, void *msg_free_arg);
+int stellar_packet_mq_create_topic(struct stellar *st, const char *topic_name, packet_msg_free_cb_func *msg_free_cb, void *msg_free_arg);
 
 int stellar_packet_mq_get_topic_id(struct stellar *st, const char *topic_name);
 
