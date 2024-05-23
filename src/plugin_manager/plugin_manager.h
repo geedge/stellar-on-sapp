@@ -14,8 +14,8 @@ void plugin_manager_on_packet(struct plugin_manager_schema *plug_mgr, struct pac
 int plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr);
 
 //publish and dispatch session msg(msg, pkt) on session_mq
-void plugin_manager_on_session_ingress(struct session *sess,const struct packet *pkt);
-void plugin_manager_on_session_egress(struct session *sess,const struct packet *pkt);
+void plugin_manager_on_session_ingress(struct session *sess,struct packet *pkt);
+void plugin_manager_on_session_egress(struct session *sess,struct packet *pkt);
 
 struct plugin_manager_runtime *plugin_manager_session_runtime_new(struct plugin_manager_schema *plug_mgr, struct session *sess);
 void plugin_manager_session_runtime_free(struct plugin_manager_runtime *plug_mgr_rt);
