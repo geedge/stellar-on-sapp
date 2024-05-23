@@ -23,6 +23,7 @@ struct packet
 	unsigned char ip_proto;
 	unsigned char pad[3];
 	const void *raw_pkt;
+	struct stellar *st;
 };
 
 struct session
@@ -35,6 +36,11 @@ struct session
 	struct stellar *st;
 	struct plugin_manager_runtime *plug_mgr_rt;
 };
+
+inline struct stellar * packet_stellar_get(struct packet *pkt)
+{
+	return pkt->st;
+}
 
 inline struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct stellar *st)
 {

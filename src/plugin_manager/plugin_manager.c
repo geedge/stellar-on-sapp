@@ -1,19 +1,26 @@
 #include "plugin_manager.h"
+#include "stellar/stellar.h"
 #include "stellar_internal.h"
 
 #include "stellar/utils.h"
 #include "stellar/session.h"
 #include "stellar/session_exdata.h"
 #include "stellar/session_mq.h"
+#include "stellar/packet_exdata.h"
+#include "stellar/packet_mq.h"
 
 #include "uthash/utlist.h"
 #include "uthash/utarray.h"
 
 #include "bitmap/bitmap.h"
+#include <threads.h>
+
+
 
 struct plugin_manager_schema
 {
 	struct stellar *st;
+	UT_array *packet_exdata_schema_array;
 	UT_array *session_exdata_schema_array;
 	UT_array *plugin_load_specs_array;
 	UT_array *session_mq_schema_array;
@@ -29,37 +36,57 @@ struct plugin_manager_schema
 	int control_packet_topic_id;
 };
 
-struct session_exdata_schema
+
+
+struct stellar_exdata
+{
+	void *exdata;
+};
+
+struct stellar_exdata_schema
 {
 	char *name;
-	session_exdata_free *free_func;
+	union 
+	{
+		void *free_func;
+		session_exdata_free *sess_free_func;
+		packet_exdata_free *pkt_free_func;
+	};
+	
 	void *free_arg;
 	int idx;
 };
 
-struct session_message
+
+struct stellar_message
 {
 	int topic_id;
     void *msg_data;
-    struct session_message *next, *prev;
+    struct stellar_message *next, *prev;
 };
 
-typedef struct session_mq_subscriber 
+typedef struct stellar_mq_subscriber 
 {
 	int topic_subscriber_idx;
 	int session_plugin_id;
-    on_msg_cb_func *msg_cb;
-    struct session_mq_subscriber *next, *prev;
-}session_mq_subscribers;
+	union 
+	{
+    	on_session_msg_cb_func *sess_msg_cb;
+    	on_packet_msg_cb_func *pkt_msg_cb;
+	};
+    struct stellar_mq_subscriber *next, *prev;
+}stellar_mq_subscriber;
 
-struct session_mq_topic_schema
+typedef void stellar_msg_free_cb_func(void *msg, void *msg_free_arg);
+
+struct stellar_mq_topic_schema
 {
 	char *topic_name;
-	msg_free_cb_func *free_cb;
 	void *free_cb_arg;
 	int topic_id;
 	int subscriber_cnt;
-	struct session_mq_subscriber *subscribers; 
+	stellar_msg_free_cb_func *free_cb;
+	struct stellar_mq_subscriber *subscribers; 
 };
 
 enum plugin_ctx_state
@@ -72,19 +99,16 @@ struct session_plugin_ctx_runtime
 	void *plugin_ctx;
 };
 
-struct plugin_exdata
-{
-	void *exdata;
-};
+
 
 struct plugin_manager_runtime
 {
 	struct plugin_manager_schema *plug_mgr;
 	struct session *sess;
-	struct session_message *pending_mq;// message list
-	struct session_message *delivered_mq;// message list
+	struct stellar_message *pending_mq;// message list
+	struct stellar_message *delivered_mq;// message list
 	struct bitmap *session_mq_status; //N * M bits, N topic, M subscriber
-	struct plugin_exdata *plugin_exdata_array;
+	struct stellar_exdata *sess_exdata_array;
 	struct session_plugin_ctx_runtime *plugin_ctx_array;//N plugins TODO: call alloc and free
 	int current_session_plugin_id;
 };
@@ -102,7 +126,7 @@ struct registered_polling_plugin_schema
 	void *plugin_env;
 };
 
-struct session_mq_subscriber_info
+struct stellar_mq_subscriber_info
 {
 	int topic_id;
 	int subscriber_idx;
@@ -267,56 +291,115 @@ void plugin_manager_exit(struct plugin_manager_schema *plug_mgr)
 	return;
 }
 
-
 /*******************************
- * SESSION EXDATA *
+ * STELLAR EXDATA *
  *******************************/
 
-static void session_exdata_met_copy(void *_dst, const void *_src)
+static void stellar_exdata_met_copy(void *_dst, const void *_src)
 {
-    struct session_exdata_schema *dst = (struct session_exdata_schema *)_dst, *src = (struct session_exdata_schema *)_src;
-    dst->free_func = src->free_func;
+    struct stellar_exdata_schema *dst = (struct stellar_exdata_schema *)_dst, *src = (struct stellar_exdata_schema *)_src;
+    dst->sess_free_func = src->sess_free_func;
     dst->free_arg = src->free_arg;
     dst->idx = src->idx;
     dst->name = src->name ? strdup(src->name) : NULL;
 }
 
-static void session_exdata_met_dtor(void *_elt)
+static void stellar_exdata_met_dtor(void *_elt)
 {
-    struct session_exdata_schema *elt = (struct session_exdata_schema *)_elt;
+    struct stellar_exdata_schema *elt = (struct stellar_exdata_schema *)_elt;
     if (elt->name)
         FREE(elt->name);
 }
 
-UT_icd session_exdata_meta_icd = {sizeof(struct session_exdata_schema), NULL, session_exdata_met_copy, session_exdata_met_dtor};
+UT_icd stellar_exdata_meta_icd = {sizeof(struct stellar_exdata_schema), NULL, stellar_exdata_met_copy, stellar_exdata_met_dtor};
 
-
-int stellar_session_exdata_new_index(struct stellar *st, const char *name, session_exdata_free *free_func,void *free_arg) 
+int stellar_exdata_new_index(struct stellar *st, const char *name, UT_array **exdata_schema, void *free_func,void *free_arg) 
 {
-	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
-	if(plug_mgr->session_exdata_schema_array == NULL)
+	if(st==NULL || name==NULL || exdata_schema==NULL)return -1;
+	if(*exdata_schema == NULL)
 	{
-		utarray_new(plug_mgr->session_exdata_schema_array, &session_exdata_meta_icd);
+		utarray_new(*exdata_schema, &stellar_exdata_meta_icd);
 	}
-	if(plug_mgr->session_exdata_schema_array == NULL)return -1;
-	unsigned int len = utarray_len(plug_mgr->session_exdata_schema_array);
-	struct session_exdata_schema *t_schema;
+	if(*exdata_schema == NULL)return -1;
+	unsigned int len = utarray_len(*exdata_schema);
+	struct stellar_exdata_schema *t_schema;
 	for(unsigned int i = 0; i < len; i++)
 	{
-		t_schema = (struct session_exdata_schema *)utarray_eltptr(plug_mgr->session_exdata_schema_array, i);
+		t_schema = (struct stellar_exdata_schema *)utarray_eltptr(*exdata_schema, i);
 		if(strcmp(t_schema->name, name) == 0)
 		{
 			return t_schema->idx;
 		}
 	}
-	struct session_exdata_schema new_schema;
-	memset(&new_schema, 0, sizeof(struct session_exdata_schema));
+	struct stellar_exdata_schema new_schema;
+	memset(&new_schema, 0, sizeof(struct stellar_exdata_schema));
 	new_schema.free_func=free_func;
 	new_schema.name=(char *)name;
 	new_schema.idx=len;
 	new_schema.free_arg=free_arg;
-	utarray_push_back(plug_mgr->session_exdata_schema_array, &new_schema);
+	utarray_push_back(*exdata_schema, &new_schema);
 	return new_schema.idx;
+}
+
+void stellar_exdata_set(UT_array *exdata_schema, struct stellar_exdata *exdata_array, int idx, void *ex_ptr)
+{
+	if(exdata_schema == NULL|| exdata_array == NULL)return;
+	unsigned int len=utarray_len(exdata_schema);
+	if(len < (unsigned int)idx)return;
+	(exdata_array+idx)->exdata=ex_ptr;
+	return;
+}
+
+void *stellar_exdata_get(UT_array *exdata_schema, struct stellar_exdata *exdata_array, int idx)
+{
+	if(exdata_schema == NULL|| exdata_array == NULL)return NULL;
+	unsigned int len = utarray_len(exdata_schema);
+	if(len < (unsigned int)idx)return NULL;
+	return (exdata_array+idx)->exdata;
+}
+
+/*******************************
+ * PACKET EXDATA *
+ *******************************/
+__thread struct stellar_exdata *per_thread_pkt_exdata_arrary=NULL;
+
+int stellar_packet_exdata_new_index(struct stellar *st, const char *name, packet_exdata_free *free_func,void *free_arg) 
+{
+	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
+	assert(plug_mgr);
+	return stellar_exdata_new_index(st, name, &plug_mgr->packet_exdata_schema_array, (void*)free_func, free_arg);
+}
+
+int packet_exdata_set(struct packet *pkt, int idx, void *ex_ptr)
+{
+	if(pkt == NULL)return -1;
+	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(packet_stellar_get(pkt));
+	if(per_thread_pkt_exdata_arrary == NULL)
+	{
+		per_thread_pkt_exdata_arrary=CALLOC(struct stellar_exdata, utarray_len(plug_mgr->packet_exdata_schema_array));
+	}
+	stellar_exdata_set(plug_mgr->session_exdata_schema_array, per_thread_pkt_exdata_arrary, idx, ex_ptr);
+	return 0;
+}
+
+void *packet_exdata_get(struct packet *pkt, int idx)
+{
+	if(pkt == NULL)return NULL;
+	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(packet_stellar_get(pkt));
+	return stellar_exdata_get( plug_mgr->session_exdata_schema_array, per_thread_pkt_exdata_arrary, idx);
+}
+
+
+/*******************************
+ * SESSION EXDATA *
+ *******************************/
+
+//TODO: allow exdata new index in plugin init stage
+int stellar_session_exdata_new_index(struct stellar *st, const char *name, session_exdata_free *free_func,void *free_arg) 
+{
+	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
+	assert(plug_mgr);
+	return stellar_exdata_new_index(st, name, &plug_mgr->session_exdata_schema_array, (void*)free_func, free_arg);
 }
 
 int session_exdata_set(struct session *sess, int idx, void *ex_ptr)
@@ -324,10 +407,7 @@ int session_exdata_set(struct session *sess, int idx, void *ex_ptr)
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt == NULL)return -1;
 	if(plug_mgr_rt->plug_mgr->session_exdata_schema_array == NULL)return -1;
-	unsigned int len=utarray_len(plug_mgr_rt->plug_mgr->session_exdata_schema_array);
-	if(len < (unsigned int)idx)return -1;
-	if(plug_mgr_rt->plugin_exdata_array==NULL)return -1;
-	(plug_mgr_rt->plugin_exdata_array+idx)->exdata=ex_ptr;
+	stellar_exdata_set(plug_mgr_rt->plug_mgr->session_exdata_schema_array, plug_mgr_rt->sess_exdata_array, idx, ex_ptr);
 	return 0;
 }
 
@@ -336,21 +416,17 @@ void *session_exdata_get(struct session *sess, int idx)
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt == NULL)return NULL;
 	if(plug_mgr_rt->plug_mgr->session_exdata_schema_array==NULL)return NULL;
-	unsigned int len = utarray_len(plug_mgr_rt->plug_mgr->session_exdata_schema_array);
-	if(len < (unsigned int)idx)return NULL;
-	return (plug_mgr_rt->plugin_exdata_array+idx)->exdata;
+	return stellar_exdata_get(plug_mgr_rt->plug_mgr->session_exdata_schema_array, plug_mgr_rt->sess_exdata_array, idx);
 }
 
 /*******************************
- * SESSION MQ *
+ * STELLAR MQ *
  *******************************/
 
-
-
-static void session_mq_topic_schema_copy(void *_dst, const void *_src)
+static void stellar_mq_topic_schema_copy(void *_dst, const void *_src)
 {
-    struct session_mq_topic_schema *dst = (struct session_mq_topic_schema *)_dst,
-                                   *src = (struct session_mq_topic_schema *)_src;
+    struct stellar_mq_topic_schema *dst = (struct stellar_mq_topic_schema *)_dst,
+                                   *src = (struct stellar_mq_topic_schema *)_src;
     dst->subscribers = src->subscribers;
     dst->free_cb = src->free_cb;
     dst->free_cb_arg = src->free_cb_arg;
@@ -359,23 +435,23 @@ static void session_mq_topic_schema_copy(void *_dst, const void *_src)
     dst->topic_name = src->topic_name ? strdup(src->topic_name) : NULL;
 }
 
-static void session_mq_topic_schema_dtor(void *_elt)
+static void stellar_mq_topic_schema_dtor(void *_elt)
 {
-    struct session_mq_topic_schema *elt = (struct session_mq_topic_schema *)_elt;
+    struct stellar_mq_topic_schema *elt = (struct stellar_mq_topic_schema *)_elt;
     if (elt->topic_name)
         FREE(elt->topic_name);
     // FREE(elt); // free the item
 }
 
-UT_icd session_mq_topic_schema_icd = {sizeof(struct session_mq_topic_schema), NULL, session_mq_topic_schema_copy, session_mq_topic_schema_dtor};
+UT_icd session_mq_topic_schema_icd = {sizeof(struct stellar_mq_topic_schema), NULL, stellar_mq_topic_schema_copy, stellar_mq_topic_schema_dtor};
 
-void session_mq_free(struct session_message *head, UT_array *session_mq_schema_array)
+void session_mq_free(struct stellar_message *head, UT_array *mq_schema_array)
 {
-	struct session_message *mq_elt, *tmp;
-	struct session_mq_topic_schema *topic;
+	struct stellar_message *mq_elt, *tmp;
+	struct stellar_mq_topic_schema *topic;
     DL_FOREACH_SAFE(head, mq_elt, tmp)
     {
-		topic = (struct session_mq_topic_schema *)utarray_eltptr(session_mq_schema_array,
+		topic = (struct stellar_mq_topic_schema *)utarray_eltptr(mq_schema_array,
                                                                     (unsigned int)(mq_elt->topic_id));
         if (topic && topic->free_cb)
         {
@@ -392,10 +468,10 @@ int stellar_session_mq_get_topic_id(struct stellar *st, const char *topic_name)
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);;
 	if(topic_name == NULL || plug_mgr == NULL || plug_mgr->session_mq_schema_array == NULL)return -1;
 	unsigned int len = utarray_len(plug_mgr->session_mq_schema_array);
-	struct session_mq_topic_schema *t_schema;
+	struct stellar_mq_topic_schema *t_schema;
 	for(unsigned int i = 0; i < len; i++)
 	{
-		t_schema = (struct session_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, i);
+		t_schema = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, i);
 		if(strcmp(t_schema->topic_name, topic_name) == 0)
 		{
 			return i;
@@ -404,20 +480,20 @@ int stellar_session_mq_get_topic_id(struct stellar *st, const char *topic_name)
 	return -1;
 }
 
-int stellar_session_mq_update_topic(struct stellar *st, int topic_id, msg_free_cb_func *msg_free_cb, void *msg_free_arg)
+int stellar_session_mq_update_topic(struct stellar *st, int topic_id, session_msg_free_cb_func *msg_free_cb, void *msg_free_arg)
 {
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	if(plug_mgr->session_mq_schema_array == NULL)return -1;
 	unsigned int len = utarray_len(plug_mgr->session_mq_schema_array);
 	if(len < (unsigned int)topic_id)return -1;
-	struct session_mq_topic_schema *t_schema = (struct session_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
+	struct stellar_mq_topic_schema *t_schema = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
 	if(t_schema == NULL)return -1;
 	t_schema->free_cb=msg_free_cb;
 	t_schema->free_cb_arg=msg_free_arg;
 	return 0;
 }
 
-int stellar_session_mq_create_topic(struct stellar *st, const char *topic_name, msg_free_cb_func *msg_free_cb, void *msg_free_arg)
+int stellar_session_mq_create_topic(struct stellar *st, const char *topic_name, session_msg_free_cb_func *msg_free_cb, void *msg_free_arg)
 {
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	if(plug_mgr->session_mq_schema_array == NULL)
@@ -429,8 +505,8 @@ int stellar_session_mq_create_topic(struct stellar *st, const char *topic_name, 
 	{
 		return -1;
 	}
-	struct session_mq_topic_schema t_schema;
-	memset(&t_schema, 0, sizeof(struct session_mq_topic_schema));
+	struct stellar_mq_topic_schema t_schema;
+	memset(&t_schema, 0, sizeof(struct stellar_mq_topic_schema));
 	t_schema.free_cb=msg_free_cb;
 	t_schema.topic_name=(char *)topic_name;
 	t_schema.topic_id=len;//topid_id equals arrary index
@@ -449,9 +525,9 @@ int stellar_session_mq_destroy_topic(struct stellar *st, int topic_id)
     unsigned int len = utarray_len(plug_mgr->session_mq_schema_array);
     if (len <= (unsigned int)topic_id)
         return -1;
-    struct session_mq_topic_schema *topic =
-        (struct session_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
-    struct session_mq_subscriber *sub_elt, *sub_tmp;
+    struct stellar_mq_topic_schema *topic =
+        (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
+    struct stellar_mq_subscriber *sub_elt, *sub_tmp;
 
     if (topic)
     {
@@ -471,7 +547,7 @@ int session_mq_publish_message(struct session *sess, int topic_id, void *data)
 	if(plug_mgr_rt->plug_mgr->session_mq_schema_array==NULL)return -1;
     unsigned int len = utarray_len(plug_mgr_rt->plug_mgr->session_mq_schema_array);
     if (len <= (unsigned int)topic_id)return -1;
-	struct session_message *msg= CALLOC(struct session_message,1);
+	struct stellar_message *msg= CALLOC(struct stellar_message,1);
 	msg->topic_id = topic_id;
 	msg->msg_data = data;
 	DL_APPEND(plug_mgr_rt->pending_mq, msg);
@@ -486,7 +562,7 @@ static int session_mq_set_message_status(struct session *sess, int topic_id, int
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt==NULL)return -1;
 	if(topic_id >= plug_mgr_rt->plug_mgr->topic_num)return -1;// topic_id out of range
-	struct session_mq_topic_schema *topic = (struct session_mq_topic_schema *)utarray_eltptr(plug_mgr_rt->plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
+	struct stellar_mq_topic_schema *topic = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr_rt->plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
 	if(topic==NULL)return -1;
 
 	struct registered_session_plugin_schema *session_plugin_schema = (struct registered_session_plugin_schema *)utarray_eltptr(plug_mgr_rt->plug_mgr->registered_session_plugin_array, (unsigned int)plugin_id);
@@ -497,7 +573,7 @@ static int session_mq_set_message_status(struct session *sess, int topic_id, int
 	{
 		for(unsigned int i=0; i < plugin_subscriber_num; i++)
 		{
-			struct session_mq_subscriber_info *session_plugin_sub_info = (struct session_mq_subscriber_info *)utarray_eltptr(session_plugin_schema->registed_session_mq_subscriber_info, i);
+			struct stellar_mq_subscriber_info *session_plugin_sub_info = (struct stellar_mq_subscriber_info *)utarray_eltptr(session_plugin_schema->registed_session_mq_subscriber_info, i);
 			if(topic_id==session_plugin_sub_info->topic_id)
 			{
 				bitmap_set(plug_mgr_rt->session_mq_status, topic_id, session_plugin_sub_info->subscriber_idx, bit_value);
@@ -520,9 +596,9 @@ int session_mq_unignore_message(struct session *sess, int topic_id, int plugin_i
 	return session_mq_set_message_status(sess, topic_id, plugin_id, 1);
 }
 
-UT_icd session_mq_subscriber_info_icd = {sizeof(struct session_mq_subscriber_info), NULL, NULL, NULL};
+UT_icd session_mq_subscriber_info_icd = {sizeof(struct stellar_mq_subscriber_info), NULL, NULL, NULL};
 
-int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_msg_cb_func *plugin_on_msg_cb, int plugin_id)
+int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_session_msg_cb_func *plugin_on_msg_cb, int plugin_id)
 {
 	if(plugin_id >= PACKET_PULGIN_ID_BASE)return -1;// ignore packet plugin
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
@@ -533,7 +609,7 @@ int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_msg_cb_fun
 	struct registered_session_plugin_schema *session_plugin_schema = (struct registered_session_plugin_schema *)utarray_eltptr(plug_mgr->registered_session_plugin_array, (unsigned)plugin_id);
 	if(session_plugin_schema==NULL)return -1;
 
-    struct session_mq_topic_schema *topic = (struct session_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
+    struct stellar_mq_topic_schema *topic = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->session_mq_schema_array, (unsigned int)topic_id);
 	if(topic==NULL)return -1;
 
 	if(session_plugin_schema->registed_session_mq_subscriber_info==NULL)
@@ -542,21 +618,21 @@ int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_msg_cb_fun
 	}
 
 	// if plugin already subscribe current topic, return 0
-	struct session_mq_subscriber_info *p=NULL;
-  	while( (p=(struct session_mq_subscriber_info *)utarray_next(session_plugin_schema->registed_session_mq_subscriber_info,p))) 
+	struct stellar_mq_subscriber_info *p=NULL;
+  	while( (p=(struct stellar_mq_subscriber_info *)utarray_next(session_plugin_schema->registed_session_mq_subscriber_info,p))) 
 	{
 		if(p->topic_id==topic_id)
 		return 0;
 	};
 
-	struct session_mq_subscriber *new_subscriber = CALLOC(struct session_mq_subscriber,1);
+	struct stellar_mq_subscriber *new_subscriber = CALLOC(struct stellar_mq_subscriber,1);
 	new_subscriber->topic_subscriber_idx = topic->subscriber_cnt;
 	new_subscriber->session_plugin_id = plugin_id;
-    new_subscriber->msg_cb = plugin_on_msg_cb;
+    new_subscriber->sess_msg_cb = plugin_on_msg_cb;
 	DL_APPEND(topic->subscribers, new_subscriber);
 
-	struct session_mq_subscriber_info sub_info;
-	memset(&sub_info, 0, sizeof(struct session_mq_subscriber_info));
+	struct stellar_mq_subscriber_info sub_info;
+	memset(&sub_info, 0, sizeof(struct stellar_mq_subscriber_info));
 	sub_info.topic_id=topic_id;
 	sub_info.subscriber_idx=topic->subscriber_cnt;	
 	utarray_push_back(session_plugin_schema->registed_session_mq_subscriber_info, &sub_info);
@@ -570,16 +646,16 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt==NULL)return;
 
-	struct session_message *mq_elt=NULL, *mq_tmp=NULL;
-	struct session_mq_subscriber *sub_elt, *sub_tmp;
-	struct session_mq_topic_schema *topic;
+	struct stellar_message *mq_elt=NULL, *mq_tmp=NULL;
+	struct stellar_mq_subscriber *sub_elt, *sub_tmp;
+	struct stellar_mq_topic_schema *topic;
 	struct registered_session_plugin_schema *session_plugin_schema;
 	struct session_plugin_ctx_runtime *plugin_ctx_rt;
     while (plug_mgr_rt->pending_mq != NULL)
     {
         DL_FOREACH_SAFE(plug_mgr_rt->pending_mq, mq_elt, mq_tmp)
         {
-            topic = (struct session_mq_topic_schema *)utarray_eltptr(plug_mgr_rt->plug_mgr->session_mq_schema_array,
+            topic = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr_rt->plug_mgr->session_mq_schema_array,
                                                                     (unsigned int)(mq_elt->topic_id));
             if (topic)
             {
@@ -598,7 +674,7 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
 								plugin_ctx_rt->state=ACTIVE;
 							}
 						}
-						if(sub_elt->msg_cb)sub_elt->msg_cb(sess, mq_elt->topic_id, mq_elt->msg_data, plugin_ctx_rt->plugin_ctx,
+						if(sub_elt->sess_msg_cb)sub_elt->sess_msg_cb(sess, mq_elt->topic_id, mq_elt->msg_data, plugin_ctx_rt->plugin_ctx,
                                         session_plugin_schema->plugin_env); 
                     }
                     cur_sub_idx++;
@@ -615,19 +691,19 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
  * PLUGIN MANAGER SESSION RUNTIME *
  *******************************/
 
-static struct plugin_exdata *session_exdata_runtime_new(struct plugin_manager_schema *plug_mgr)
+static struct stellar_exdata *session_exdata_runtime_new(struct plugin_manager_schema *plug_mgr)
 {
-	struct plugin_exdata *exdata_rt = NULL;
+	struct stellar_exdata *exdata_rt = NULL;
 	if(plug_mgr->session_exdata_schema_array==NULL)return NULL;
 	unsigned int len = utarray_len(plug_mgr->session_exdata_schema_array);
 	if(len > 0)
 	{
-		exdata_rt=CALLOC(struct plugin_exdata, len);
+		exdata_rt=CALLOC(struct stellar_exdata, len);
 	}
 	return exdata_rt;
 }
 
-static void session_exdata_runtime_free(struct plugin_manager_schema *plug_mgr, struct session *sess, struct plugin_exdata *exdata_rt)
+static void session_exdata_runtime_free(struct plugin_manager_schema *plug_mgr, struct session *sess, struct stellar_exdata *exdata_rt)
 {
 	if(exdata_rt==NULL)return;
 	if(plug_mgr->session_exdata_schema_array==NULL)return;
@@ -635,12 +711,12 @@ static void session_exdata_runtime_free(struct plugin_manager_schema *plug_mgr, 
 	for (unsigned int i = 0; i < len; i++)
 	{
 		void *exdata = (exdata_rt + i)->exdata;
-		struct session_exdata_schema *schema = (struct session_exdata_schema *)utarray_eltptr(plug_mgr->session_exdata_schema_array, i);
+		struct stellar_exdata_schema *schema = (struct stellar_exdata_schema *)utarray_eltptr(plug_mgr->session_exdata_schema_array, i);
 		if (exdata)
 		{
-			if (schema->free_func)
+			if (schema->sess_free_func)
 			{
-				schema->free_func(sess, i, exdata, schema->free_arg);
+				schema->sess_free_func(sess, i, exdata, schema->free_arg);
 			}
 		}
 	}
@@ -654,7 +730,7 @@ struct plugin_manager_runtime *plugin_manager_session_runtime_new(struct plugin_
 	rt->pending_mq = NULL;
 	rt->delivered_mq = NULL;
 	rt->session_mq_status=bitmap_new(plug_mgr->topic_num, plug_mgr->subscriber_num, 1);
-	rt->plugin_exdata_array = (struct plugin_exdata *)session_exdata_runtime_new(plug_mgr);
+	rt->sess_exdata_array = (struct stellar_exdata *)session_exdata_runtime_new(plug_mgr);
 	rt->plugin_ctx_array = CALLOC(struct session_plugin_ctx_runtime, utarray_len(plug_mgr->registered_session_plugin_array));
 	return rt;
 
@@ -689,8 +765,8 @@ void plugin_manager_session_runtime_free(struct plugin_manager_runtime *rt)
 	}
 	FREE(rt->plugin_ctx_array);
 
-	session_exdata_runtime_free(rt->plug_mgr, rt->sess, rt->plugin_exdata_array);
-	FREE(rt->plugin_exdata_array);
+	session_exdata_runtime_free(rt->plug_mgr, rt->sess, rt->sess_exdata_array);
+	FREE(rt->sess_exdata_array);
 	FREE(rt);
 }
 
@@ -852,7 +928,7 @@ void stellar_session_plugin_dettach_current_session(struct session *sess)
 	{
 		for(unsigned int i=0; i < plugin_subscriber_num; i++)
 		{
-			struct session_mq_subscriber_info *session_plugin_sub_info = (struct session_mq_subscriber_info *)utarray_eltptr(session_plugin_schema->registed_session_mq_subscriber_info, i);
+			struct stellar_mq_subscriber_info *session_plugin_sub_info = (struct stellar_mq_subscriber_info *)utarray_eltptr(session_plugin_schema->registed_session_mq_subscriber_info, i);
 				bitmap_set(plug_mgr_rt->session_mq_status, session_plugin_sub_info->topic_id, session_plugin_sub_info->subscriber_idx, 0);
 		}
 	}	
