@@ -1,10 +1,10 @@
 # config.toml
 [[plugin]]
 path = "./stellar_plugin/simple_stellar_plugin.so"
-init = "simple_stellar_event_plugin_init"
-exit = "simple_stellar_event_plugin_exit"
+init = "simple_session_packet_plugin_init"
+exit = "simple_session_packet_plugin_exit"
 
 [[plugin]]
 path = "./stellar_plugin/simple_stellar_plugin.so"
-init = "simple_stellar_mq_plugin_init"
-exit = "simple_stellar_mq_plugin_exit"
+init = "simple_plugin_sub_session_stat_init"
+exit = "simple_plugin_sub_session_stat_exit"
