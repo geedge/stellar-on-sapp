@@ -170,7 +170,7 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	struct packet pkt;
 	pkt.type=type;
 	pkt.raw_pkt=get_current_rawpkt_from_streaminfo(pstream);
-
+	pkt.st=st;
 	switch (type)
 	{
 	case IPv4:

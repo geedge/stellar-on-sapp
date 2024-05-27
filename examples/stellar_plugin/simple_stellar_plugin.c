@@ -17,6 +17,7 @@ struct simple_stellar_plugin_env
     int session_plugin_id;
     int session_exdata_idx;
     int packet_exdata_idx;
+	int packet_topic_id;
 	int stat_topic_id;
 	int egress_topic_id;
 	int tcp_topic_id;
@@ -134,6 +135,7 @@ void simple_plugin_on_packet(struct packet *pkt,  unsigned char ip_protocol, voi
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
 	packet_exdata_set(pkt, env->packet_exdata_idx, env);
+	packet_mq_publish_message(pkt, env->packet_topic_id, env);
 	switch (ip_protocol)
 	{
 	case IPPROTO_TCP:
@@ -179,6 +181,22 @@ static void simple_plugin_packet_exdata_free(struct packet *pkt, int idx, void *
 	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);
 }
 
+static void simple_plugin_packet_msg_free(struct packet *pkt, void *msg, void *msg_free_arg)
+{
+	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)msg_free_arg;	
+	assert(env);
+	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)msg;		
+	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);	
+}
+
+static void simple_plugin_on_packet_msg_cb(struct packet *pkt, int topic_id, const void *msg, void *plugin_env)
+{
+	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;	
+	assert(env);
+	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)msg;		
+	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);
+}
+
 void *simple_session_packet_plugin_init(struct stellar *st)
 {
 	struct simple_stellar_plugin_env *env = CALLOC(struct simple_stellar_plugin_env, 1);
@@ -199,6 +217,12 @@ void *simple_session_packet_plugin_init(struct stellar *st)
 		exit(-1);
 	}
 
+	env->packet_topic_id=stellar_packet_mq_get_topic_id(st, "TOPIC_PACKET_ENV");
+	if(env->packet_topic_id < 0)
+	{
+		env->packet_topic_id=stellar_packet_mq_create_topic(st, "TOPIC_PACKET_ENV", simple_plugin_packet_msg_free, env);
+	}
+
 	tcp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_TCP, simple_plugin_packet_get_exdata, env);	
 	udp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_UDP, simple_plugin_packet_get_exdata, env);	
 	icmp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMP, simple_plugin_packet_get_exdata, env);	
@@ -206,11 +230,16 @@ void *simple_session_packet_plugin_init(struct stellar *st)
 
 	if(tcp_plugin_id < 0 || udp_plugin_id < 0 || icmp_plugin_id < 0 || icmp6_plugin_id < 0)
 	{
-		perror("register packet plugin return invalid plugin id\n");
+		perror("register packet plugin get exdata return invalid plugin id\n");
 		exit(-1);
 	}
 
-	env->packet_exdata_idx=stellar_packet_exdata_new_index(st, "EXDATA_PACKET_STAT", simple_plugin_packet_exdata_free, env);
+	stellar_packet_mq_subscribe(st, env->packet_topic_id, simple_plugin_on_packet_msg_cb, tcp_plugin_id);
+	stellar_packet_mq_subscribe(st, env->packet_topic_id, simple_plugin_on_packet_msg_cb, udp_plugin_id);
+	stellar_packet_mq_subscribe(st, env->packet_topic_id, simple_plugin_on_packet_msg_cb, icmp_plugin_id);
+	stellar_packet_mq_subscribe(st, env->packet_topic_id, simple_plugin_on_packet_msg_cb, icmp6_plugin_id);
+
+	env->packet_exdata_idx=stellar_packet_exdata_new_index(st, "EXDATA_PACKET_ENV", simple_plugin_packet_exdata_free, env);
 
 	int polling_plugin_id=stellar_polling_plugin_register(st, simple_plugin_on_polling, env);
 	if(polling_plugin_id < 0)
