@@ -1,192 +1,13 @@
-#include "plugin_manager.h"
-#include "stellar/stellar.h"
+#include "plugin_manager_interna.h"
+
 #include "stellar_internal.h"
 
-#include "stellar/utils.h"
 #include "stellar/session.h"
-#include "stellar/session_exdata.h"
-#include "stellar/session_mq.h"
-#include "stellar/packet_exdata.h"
-#include "stellar/packet_mq.h"
 
-#include "uthash/utlist.h"
-#include "uthash/utarray.h"
-
-#include "bitmap/bitmap.h"
-#include <threads.h>
-
-
-
-struct per_thread_exdata_array
-{
-	struct stellar_exdata *exdata_array;
-};
-
-struct stellar_message;
-struct per_thread_mq_array
-{
-	struct stellar_message *mq;
-};
-
-struct plugin_manger_per_thread_data
-{
-	struct per_thread_exdata_array per_thread_pkt_exdata_array;
-	struct per_thread_mq_array per_thread_pkt_mq_array;
-};
-
-struct plugin_manager_schema
-{
-	struct stellar *st;
-	UT_array *packet_exdata_schema_array;
-	UT_array *packet_mq_schema_array;
-	UT_array *session_exdata_schema_array;
-	UT_array *plugin_load_specs_array;
-	UT_array *session_mq_schema_array;
-	UT_array *registered_session_plugin_array;
-	UT_array *registered_packet_plugin_array;
-	UT_array *registered_polling_plugin_array;
-	int packet_mq_topic_num;
-	int session_mq_topic_num;
-	int packet_topic_subscriber_num;
-	int session_topic_subscriber_num;
-	int tcp_topic_id;
-	int udp_topic_id;
-	int tcp_stream_topic_id;
-	int egress_topic_id;
-	int control_packet_topic_id;
-	struct plugin_manger_per_thread_data *per_thread_data;
-};
-
-
-
-
-struct stellar_exdata
-{
-	void *exdata;
-};
-
-
-
-struct stellar_exdata_schema
-{
-	char *name;
-	union 
-	{
-		void *free_func;
-		session_exdata_free *sess_free_func;
-		packet_exdata_free *pkt_free_func;
-	};
-	
-	void *free_arg;
-	int idx;
-};
-
-
-struct stellar_message
-{
-	int topic_id;
-    void *msg_data;
-    struct stellar_message *next, *prev;
-};
-
-typedef struct stellar_mq_subscriber 
-{
-	int topic_subscriber_idx;
-	int plugin_idx;
-	union 
-	{
-    	on_session_msg_cb_func *sess_msg_cb;
-    	on_packet_msg_cb_func *pkt_msg_cb;
-	};
-    struct stellar_mq_subscriber *next, *prev;
-}stellar_mq_subscriber;
-
-
-struct stellar_mq_topic_schema
-{
-	char *topic_name;
-	void *free_cb_arg;
-	int topic_id;
-	int subscriber_cnt;
-	union
-	{
-		void *free_cb;
-		session_msg_free_cb_func *sess_msg_free_cb;
-		packet_msg_free_cb_func *pkt_msg_free_cb;
-	};
-	struct stellar_mq_subscriber *subscribers; 
-};
-
-enum plugin_ctx_state
-{ INIT, ACTIVE, EXIT };
-
-struct session_plugin_ctx_runtime
-{
-	enum plugin_ctx_state state;
-	int session_plugin_id;
-	void *plugin_ctx;
-};
-
-
-
-struct plugin_manager_runtime
-{
-	struct plugin_manager_schema *plug_mgr;
-	struct session *sess;
-	struct stellar_message *pending_mq;// message list
-	struct stellar_message *delivered_mq;// message list
-	struct bitmap *session_mq_status; //N * M bits, N topic, M subscriber
-	struct stellar_exdata *sess_exdata_array;
-	struct session_plugin_ctx_runtime *plugin_ctx_array;//N plugins TODO: call alloc and free
-	int current_session_plugin_id;
-	int enable_session_mq;
-};
-
-struct registered_packet_plugin_schema
-{
-	char ip_protocol;
-	plugin_on_packet_func *on_packet;
-	void *plugin_env;
-	UT_array *registed_packet_mq_subscriber_info;
-};
-
-struct registered_polling_plugin_schema
-{
-	plugin_on_polling_func *on_polling;
-	void *plugin_env;
-};
-
-struct stellar_mq_subscriber_info
-{
-	int topic_id;
-	int subscriber_idx;
-};
-
-struct registered_session_plugin_schema
-{
-	session_ctx_new_func *on_ctx_new;
-	session_ctx_free_func *on_ctx_free;
-	void *plugin_env;
-	UT_array *registed_session_mq_subscriber_info;
-};
-
-#define PACKET_PULGIN_ID_BASE 0x10000
-#define POLLING_PULGIN_ID_BASE 0x20000
-
-/*******************************
- * PLUGIN MANAGER INIT & EXIT *
- *******************************/
-
-#include <dlfcn.h>
+#include "stellar/utils.h"
 #include "toml/toml.h"
+#include "uthash/utlist.h"
 
-struct plugin_specific
-{
-	char plugin_name[256];
-	plugin_on_load_func *load_cb;
-	plugin_on_unload_func *unload_cb;
-	void *plugin_ctx;
-};
 
 UT_icd plugin_specs_icd = {sizeof(struct plugin_specific), NULL, NULL, NULL};
 
@@ -419,13 +240,13 @@ int stellar_exdata_new_index(struct stellar *st, const char *name, UT_array **ex
 	return new_schema.idx;
 }
 
-void stellar_exdata_set(UT_array *exdata_schema, struct stellar_exdata *exdata_array, int idx, void *ex_ptr)
+int stellar_exdata_set(UT_array *exdata_schema, struct stellar_exdata *exdata_array, int idx, void *ex_ptr)
 {
-	if(exdata_schema == NULL|| exdata_array == NULL)return;
+	if(exdata_schema == NULL|| exdata_array == NULL)return -1;
 	unsigned int len=utarray_len(exdata_schema);
-	if(len < (unsigned int)idx)return;
+	if(len < (unsigned int)idx)return -1;
 	(exdata_array+idx)->exdata=ex_ptr;
-	return;
+	return 0;
 }
 
 void *stellar_exdata_get(UT_array *exdata_schema, struct stellar_exdata *exdata_array, int idx)
@@ -445,12 +266,12 @@ static struct stellar_exdata *per_thread_packet_exdata_arrary_get(struct plugin_
 {
 	if(plug_mgr==NULL || plug_mgr->packet_exdata_schema_array == NULL)return NULL;
 	int tid=stellar_get_current_thread_id(plug_mgr->st);
-	if((plug_mgr->per_thread_data+tid)->per_thread_pkt_exdata_array.exdata_array == NULL)
+	if(plug_mgr->per_thread_data[tid].per_thread_pkt_exdata_array.exdata_array == NULL)
 	{
 		unsigned int len = utarray_len(plug_mgr->packet_exdata_schema_array);
-		(plug_mgr->per_thread_data+tid)->per_thread_pkt_exdata_array.exdata_array = CALLOC(struct stellar_exdata, len);
+		plug_mgr->per_thread_data[tid].per_thread_pkt_exdata_array.exdata_array = CALLOC(struct stellar_exdata, len);
 	}
-	return (plug_mgr->per_thread_data+tid)->per_thread_pkt_exdata_array.exdata_array;	
+	return plug_mgr->per_thread_data[tid].per_thread_pkt_exdata_array.exdata_array;	
 }
 
 static void per_thread_packet_exdata_arrary_clean(struct plugin_manager_schema *plug_mgr, struct packet *pkt)
@@ -485,15 +306,14 @@ int packet_exdata_set(struct packet *pkt, int idx, void *ex_ptr)
 {
 	if(pkt == NULL)return -1;
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(packet_stellar_get(pkt));
-	stellar_exdata_set(plug_mgr->session_exdata_schema_array, per_thread_packet_exdata_arrary_get(plug_mgr), idx, ex_ptr);
-	return 0;
+	return stellar_exdata_set(plug_mgr->packet_exdata_schema_array, per_thread_packet_exdata_arrary_get(plug_mgr), idx, ex_ptr);
 }
 
 void *packet_exdata_get(struct packet *pkt, int idx)
 {
 	if(pkt == NULL)return NULL;
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(packet_stellar_get(pkt));
-	return stellar_exdata_get( plug_mgr->session_exdata_schema_array, per_thread_packet_exdata_arrary_get(plug_mgr), idx);
+	return stellar_exdata_get( plug_mgr->packet_exdata_schema_array, per_thread_packet_exdata_arrary_get(plug_mgr), idx);
 }
 
 
@@ -514,8 +334,7 @@ int session_exdata_set(struct session *sess, int idx, void *ex_ptr)
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt == NULL)return -1;
 	if(plug_mgr_rt->plug_mgr->session_exdata_schema_array == NULL)return -1;
-	stellar_exdata_set(plug_mgr_rt->plug_mgr->session_exdata_schema_array, plug_mgr_rt->sess_exdata_array, idx, ex_ptr);
-	return 0;
+	return stellar_exdata_set(plug_mgr_rt->plug_mgr->session_exdata_schema_array, plug_mgr_rt->sess_exdata_array, idx, ex_ptr);
 }
 
 void *session_exdata_get(struct session *sess, int idx)
@@ -648,7 +467,7 @@ int stellar_packet_mq_create_topic(struct stellar *st, const char *topic_name, p
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	assert(plug_mgr);
 	int topic_id=stellar_mq_create_topic(st, topic_name, (void *)msg_free_cb, msg_free_arg, &plug_mgr->packet_mq_schema_array);
-	if(topic_id>0)plug_mgr->packet_mq_topic_num+=1;
+	if(topic_id>=0)plug_mgr->packet_mq_topic_num+=1;
 	return topic_id;
 }
 
@@ -725,7 +544,7 @@ int packet_mq_publish_message(struct packet *pkt, int topic_id, void *msg)
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	assert(plug_mgr);
 	int tid = stellar_get_current_thread_id(st);
-	return stellar_mq_publish_message(topic_id, msg, plug_mgr->packet_mq_schema_array, &((plug_mgr->per_thread_data+tid)->per_thread_pkt_mq_array.mq));
+	return stellar_mq_publish_message(topic_id, msg, plug_mgr->packet_mq_schema_array, &(plug_mgr->per_thread_data[tid].per_thread_pkt_mq_array.mq));
 }
 
 static void plugin_manager_packet_message_dispatch(struct packet *pkt)
@@ -740,7 +559,7 @@ static void plugin_manager_packet_message_dispatch(struct packet *pkt)
 
 	int tid = stellar_get_current_thread_id(st);
 
-	struct stellar_message **mq= &((plug_mgr->per_thread_data+tid)->per_thread_pkt_mq_array.mq);
+	struct stellar_message **mq= &(plug_mgr->per_thread_data[tid].per_thread_pkt_mq_array.mq);
 
 	struct stellar_message *mq_elt=NULL, *mq_tmp=NULL;
 	struct stellar_mq_subscriber *sub_elt, *sub_tmp;
@@ -815,7 +634,7 @@ int stellar_session_mq_create_topic(struct stellar *st, const char *topic_name, 
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	assert(plug_mgr);
 	int topic_id=stellar_mq_create_topic(st, topic_name, (void *)msg_free_cb, msg_free_arg, &plug_mgr->session_mq_schema_array);
-	if(topic_id>0)plug_mgr->session_mq_topic_num+=1;
+	if(topic_id>=0)plug_mgr->session_mq_topic_num+=1;
 	return topic_id;	
 }
 
@@ -1060,7 +879,7 @@ void plugin_manager_session_runtime_free(struct plugin_manager_runtime *rt)
 
 UT_icd registered_packet_plugin_array_icd = {sizeof(struct registered_packet_plugin_schema), NULL, NULL, NULL};
 
-int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol, plugin_on_packet_func on_packet, void *plugin_env)
+int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_proto, plugin_on_packet_func on_packet_cb, void *plugin_env)
 {
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	if(plug_mgr->registered_packet_plugin_array == NULL)
@@ -1069,14 +888,14 @@ int stellar_packet_plugin_register(struct stellar *st, unsigned char ip_protocol
 	}
 	struct registered_packet_plugin_schema packet_plugin_schema;
 	memset(&packet_plugin_schema, 0, sizeof(packet_plugin_schema));
-	packet_plugin_schema.ip_protocol = ip_protocol;
-	packet_plugin_schema.on_packet = on_packet;
+	packet_plugin_schema.ip_protocol = ip_proto;
+	packet_plugin_schema.on_packet = on_packet_cb;
 	packet_plugin_schema.plugin_env = plugin_env;
 	utarray_push_back(plug_mgr->registered_packet_plugin_array, &packet_plugin_schema);
-	return (PACKET_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_packet_plugin_array));// return packet plugin_id
+	return (PACKET_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_packet_plugin_array)-1);// return packet plugin_id, equals to packet plugin arrary index + PACKET_PULGIN_ID_BASE
 }
 
-void plugin_manager_on_packet(struct plugin_manager_schema *plug_mgr, struct packet *pkt)
+void plugin_manager_on_packet_ingress(struct plugin_manager_schema *plug_mgr, struct packet *pkt)
 {
 	if(plug_mgr->registered_packet_plugin_array == NULL || pkt == NULL)return;
 	struct registered_packet_plugin_schema *p=NULL;
@@ -1090,6 +909,13 @@ void plugin_manager_on_packet(struct plugin_manager_schema *plug_mgr, struct pac
 	}
 	plugin_manager_packet_message_dispatch(pkt);
 	return;
+}
+
+void plugin_manager_on_packet_egress(struct plugin_manager_schema *plug_mgr, struct packet *pkt)
+{
+	if(plug_mgr->registered_packet_plugin_array == NULL || pkt == NULL)return;
+	plugin_manager_packet_message_dispatch(pkt);
+	per_thread_packet_exdata_arrary_clean(plug_mgr, pkt);
 }
 
 /*********************************************
@@ -1111,7 +937,7 @@ int stellar_polling_plugin_register(struct stellar *st, plugin_on_polling_func o
 	polling_plugin_schema.on_polling = on_polling;
 	polling_plugin_schema.plugin_env = plugin_env;
 	utarray_push_back(plug_mgr->registered_polling_plugin_array, &polling_plugin_schema);
-	return (POLLING_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_polling_plugin_array));// return polling plugin_id
+	return (POLLING_PULGIN_ID_BASE+utarray_len(plug_mgr->registered_polling_plugin_array)-1);// return polling plugin_id, equals to polling plugin arrary index + POLLING_PULGIN_ID_BASE
 }
 
 int plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr)
@@ -1200,8 +1026,6 @@ void plugin_manager_on_session_egress(struct session *sess, struct packet *pkt)
 	session_mq_free(plug_mgr_rt->sess,plug_mgr_rt->delivered_mq, plug_mgr_rt->plug_mgr->session_mq_schema_array);
 	plug_mgr_rt->delivered_mq=NULL;
 	plug_mgr_rt->enable_session_mq=0;
-	plugin_manager_packet_message_dispatch(pkt);
-	per_thread_packet_exdata_arrary_clean(plug_mgr_rt->plug_mgr, pkt);
     return;
 }
 

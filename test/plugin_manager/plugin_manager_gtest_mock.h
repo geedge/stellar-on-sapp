@@ -3,8 +3,10 @@ extern "C"
 {
 #endif
 
-#include "plugin_manager/plugin_manager.h"
+#include "plugin_manager/plugin_manager_interna.h"
 #include "stellar_on_sapp/stellar_internal.h"
+
+
 
 //mock stellar
 struct stellar
@@ -37,7 +39,7 @@ int stellar_plugin_manager_schema_set(struct stellar *st, struct plugin_manager_
 
 int stellar_get_worker_thread_num(struct stellar *st)
 {
-	return 1;
+	return 16;
 }
 
 int stellar_get_current_thread_id(struct stellar *st)
@@ -57,7 +59,6 @@ struct plugin_manager_runtime * session_plugin_manager_runtime_get(struct sessio
 
 unsigned char packet_get_ip_protocol(struct packet *pkt)
 {
-	if(pkt == NULL)return 0;
 	return pkt->ip_proto;
 }
 
@@ -66,6 +67,7 @@ enum packet_type packet_get_type(const struct packet *pkt)
 {
 	return pkt->type;
 }
+
 
 #ifdef __cplusplus
 }

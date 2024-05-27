@@ -10,6 +10,7 @@ target_link_libraries(
   dl
   "-rdynamic"
   gtest
+  gmock
 )
 
 include(GoogleTest)

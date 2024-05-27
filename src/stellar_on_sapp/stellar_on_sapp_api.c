@@ -187,7 +187,7 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	default:
 		return;
 	}
-	plugin_manager_on_packet(st->plug_mgr, &pkt);
+	plugin_manager_on_packet_ingress(st->plug_mgr, &pkt);
 }
 
 inline int polling_on_sapp(struct stellar *st)
