@@ -3,15 +3,20 @@
 #include "stellar/utils.h"
 #include "stellar/session_exdata.h"
 #include "stellar/session_mq.h"
+#include "stellar/packet_exdata.h"
+#include "stellar/packet_mq.h"
 
 #include <stdio.h>
 #include <string.h>
+
+#include <assert.h>
 
 struct simple_stellar_plugin_env
 {
 	struct stellar *st;
     int session_plugin_id;
-    int exdata_idx;
+    int session_exdata_idx;
+    int packet_exdata_idx;
 	int stat_topic_id;
 	int egress_topic_id;
 	int tcp_topic_id;
@@ -63,7 +68,7 @@ static void *simple_plugin_session_ctx_new(struct session *sess, void *plugin_en
 {
 	struct mq_message_stat * stat= CALLOC(struct mq_message_stat, 1);
 	struct simple_stellar_plugin_env *env=(struct simple_stellar_plugin_env *)plugin_env;
-	session_exdata_set(sess, env->exdata_idx, stat);
+	session_exdata_set(sess, env->session_exdata_idx, stat);
 	return stat;
 }
 
@@ -72,12 +77,12 @@ static void simple_plugin_session_ctx_free(struct session *sess, void *session_c
 	struct simple_stellar_plugin_env *env=(struct simple_stellar_plugin_env *)plugin_env;
 	struct mq_message_stat *stat = (struct mq_message_stat *)session_ctx;
 	print_session_stat(sess, stat, env->session_plugin_id, __FUNCTION__);
-	session_exdata_set(sess, env->exdata_idx, NULL);
+	session_exdata_set(sess, env->session_exdata_idx, NULL);
 	if(session_ctx)FREE(session_ctx);
 	return;
 }
 
-static void simple_plugin_on_session_func(struct session *sess, int topic_id, const void *data, void *plugin_ctx, void *plugin_env)
+static void simple_plugin_on_session_msg(struct session *sess, int topic_id, const void *data, void *plugin_ctx, void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
 	struct mq_message_stat *stat = (struct mq_message_stat *)plugin_ctx;
@@ -125,9 +130,10 @@ static void simple_plugin_on_session_func(struct session *sess, int topic_id, co
     return;
 }
 
-void simple_plugin_on_packet_func(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env)
+void simple_plugin_on_packet(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
+	packet_exdata_set(pkt, env->packet_exdata_idx, env);
 	switch (ip_protocol)
 	{
 	case IPPROTO_TCP:
@@ -150,35 +156,64 @@ void simple_plugin_on_packet_func(struct packet *pkt,  unsigned char ip_protocol
 	return;
 }
 
-int simple_plugin_on_polling_func(void *plugin_env)
+void simple_plugin_packet_get_exdata(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env)
+{
+	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
+	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)packet_exdata_get(pkt, env->packet_exdata_idx);
+	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);
+	return;
+}
+
+int simple_plugin_on_polling(void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
 	env->polling_times++;
 	return 0;
 }
 
+static void simple_plugin_packet_exdata_free(struct packet *pkt, int idx, void *ex_ptr, void *arg)
+{
+	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)arg;	
+	assert(env);
+	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)ex_ptr;		
+	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);
+}
+
 void *simple_session_packet_plugin_init(struct stellar *st)
 {
 	struct simple_stellar_plugin_env *env = CALLOC(struct simple_stellar_plugin_env, 1);
 	env->st = st;
-	env->exdata_idx = stellar_session_exdata_new_index(st, "EXDATA_SESSION_STAT", NULL, NULL);
+	env->session_exdata_idx = stellar_session_exdata_new_index(st, "EXDATA_SESSION_STAT", NULL, NULL);
 	env->session_plugin_id = stellar_session_plugin_register(st, 
 									simple_plugin_session_ctx_new, 
 									simple_plugin_session_ctx_free, 
 									env);
-	int tcp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_TCP, simple_plugin_on_packet_func, env);	
-	int udp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_UDP, simple_plugin_on_packet_func, env);	
-	int icmp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMP, simple_plugin_on_packet_func, env);	
-	int icmp6_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMPV6, simple_plugin_on_packet_func, env);	
+	int tcp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_TCP, simple_plugin_on_packet, env);	
+	int udp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_UDP, simple_plugin_on_packet, env);	
+	int icmp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMP, simple_plugin_on_packet, env);	
+	int icmp6_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMPV6, simple_plugin_on_packet, env);	
 
-	if(tcp_plugin_id <= 0x10000 || udp_plugin_id <= 0x10000 || icmp_plugin_id <= 0x10000 || icmp6_plugin_id <= 0x10000)
+	if(tcp_plugin_id < 0 || udp_plugin_id < 0 || icmp_plugin_id < 0 || icmp6_plugin_id < 0)
 	{
 		perror("register packet plugin return invalid plugin id\n");
 		exit(-1);
 	}
 
-	int polling_plugin_id=stellar_polling_plugin_register(st, simple_plugin_on_polling_func, env);
-	if(polling_plugin_id <= 0x20000)
+	tcp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_TCP, simple_plugin_packet_get_exdata, env);	
+	udp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_UDP, simple_plugin_packet_get_exdata, env);	
+	icmp_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMP, simple_plugin_packet_get_exdata, env);	
+	icmp6_plugin_id=stellar_packet_plugin_register(st, IPPROTO_ICMPV6, simple_plugin_packet_get_exdata, env);	
+
+	if(tcp_plugin_id < 0 || udp_plugin_id < 0 || icmp_plugin_id < 0 || icmp6_plugin_id < 0)
+	{
+		perror("register packet plugin return invalid plugin id\n");
+		exit(-1);
+	}
+
+	env->packet_exdata_idx=stellar_packet_exdata_new_index(st, "EXDATA_PACKET_STAT", simple_plugin_packet_exdata_free, env);
+
+	int polling_plugin_id=stellar_polling_plugin_register(st, simple_plugin_on_polling, env);
+	if(polling_plugin_id < 0)
 	{
 		perror("register polling plugin return invalid plugin id \n");
 		exit(-1);
@@ -193,9 +228,9 @@ void *simple_session_packet_plugin_init(struct stellar *st)
 		exit(-1);
 	}
 
-	stellar_session_mq_subscribe(st, env->tcp_stream_topic_id, simple_plugin_on_session_func, env->session_plugin_id);
-	stellar_session_mq_subscribe(st, env->tcp_topic_id, simple_plugin_on_session_func, env->session_plugin_id);
-	stellar_session_mq_subscribe(st, env->udp_topic_id, simple_plugin_on_session_func, env->session_plugin_id);
+	stellar_session_mq_subscribe(st, env->tcp_stream_topic_id, simple_plugin_on_session_msg, env->session_plugin_id);
+	stellar_session_mq_subscribe(st, env->tcp_topic_id, simple_plugin_on_session_msg, env->session_plugin_id);
+	stellar_session_mq_subscribe(st, env->udp_topic_id, simple_plugin_on_session_msg, env->session_plugin_id);
 
 	int stat_topic_id=stellar_session_mq_get_topic_id(st, "TOPIC_SESSION_STAT");
 	if(stat_topic_id < 0)
@@ -232,7 +267,7 @@ static void simple_plugin_sub_session_stat_on_msg(struct session *sess, int topi
     if (topic_id == env->stat_topic_id)
     {
         struct mq_message_stat *stat = (struct mq_message_stat *)data;
-        struct mq_message_stat *exdata_stat = (struct mq_message_stat *)session_exdata_get(sess, env->exdata_idx);
+        struct mq_message_stat *exdata_stat = (struct mq_message_stat *)session_exdata_get(sess, env->session_exdata_idx);
         if (memcmp(exdata_stat, stat, sizeof(struct mq_message_stat)) != 0)
         {
             perror("exdata and mq data not equal\n");
@@ -248,7 +283,7 @@ void *simple_plugin_sub_session_stat_init(struct stellar *st)
 {
 	struct simple_stellar_plugin_env *env = CALLOC(struct simple_stellar_plugin_env, 1);
 	env->st = st;
-	env->exdata_idx = stellar_session_exdata_new_index(st, "EXDATA_SESSION_STAT", NULL, NULL);
+	env->session_exdata_idx = stellar_session_exdata_new_index(st, "EXDATA_SESSION_STAT", NULL, NULL);
 	int topic_id=stellar_session_mq_get_topic_id(st, "TOPIC_SESSION_STAT");
 	if(topic_id < 0)
 	{
