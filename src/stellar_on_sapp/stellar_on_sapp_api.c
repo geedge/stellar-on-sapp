@@ -49,7 +49,6 @@ inline struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct s
 
 inline int stellar_plugin_manager_schema_set(struct stellar *st, struct plugin_manager_schema *pm)
 {
-	if(st->plug_mgr)return -1;
 	st->plug_mgr=pm;
 	return 0;
 }

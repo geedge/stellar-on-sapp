@@ -1,0 +1,72 @@
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
+#include "plugin_manager/plugin_manager.h"
+#include "stellar_on_sapp/stellar_internal.h"
+
+//mock stellar
+struct stellar
+{
+	struct plugin_manager_schema *plug_mgr;
+};
+
+struct packet
+{
+	struct stellar *st;
+	enum packet_type type;
+	unsigned char ip_proto;
+};
+
+struct session
+{
+	struct plugin_manager_runtime *plug_mgr_rt;
+};
+
+struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct stellar *st)
+{
+	return st->plug_mgr;
+}
+
+int stellar_plugin_manager_schema_set(struct stellar *st, struct plugin_manager_schema *pm)
+{
+	st->plug_mgr=pm;
+	return 0;
+}
+
+int stellar_get_worker_thread_num(struct stellar *st)
+{
+	return 1;
+}
+
+int stellar_get_current_thread_id(struct stellar *st)
+{
+	return 0;
+}
+
+struct stellar * packet_stellar_get(struct packet *pkt)
+{
+	return pkt->st;
+}
+
+struct plugin_manager_runtime * session_plugin_manager_runtime_get(struct session *sess)
+{
+	return sess->plug_mgr_rt;
+}
+
+unsigned char packet_get_ip_protocol(struct packet *pkt)
+{
+	if(pkt == NULL)return 0;
+	return pkt->ip_proto;
+}
+
+
+enum packet_type packet_get_type(const struct packet *pkt)
+{
+	return pkt->type;
+}
+
+#ifdef __cplusplus
+}
+#endif

@@ -21,16 +21,3 @@ add_library(gmock STATIC IMPORTED GLOBAL)
 add_dependencies(gmock googletest)
 set_property(TARGET gmock PROPERTY IMPORTED_LOCATION ${INSTALL_DIR}/lib/libgmock.a)
 set_property(TARGET gmock PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${INSTALL_DIR}/include)
-
-#llhttp-9.1.2
-ExternalProject_Add(llhttp PREFIX llhttp
-                    URL ${CMAKE_CURRENT_SOURCE_DIR}/llhttp-release-v9.1.3.tar.gz
-		    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${VENDOR_BUILD} -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DCMAKE_C_FLAGS="-fPIC")
-
-file(MAKE_DIRECTORY ${VENDOR_BUILD}/include)
-
-add_library(llhttp-static STATIC IMPORTED GLOBAL)
-add_dependencies(llhttp-static llhttp)
-
-set_property(TARGET llhttp-static  PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${VENDOR_BUILD}/include)
-set_property(TARGET llhttp-static  PROPERTY IMPORTED_LOCATION ${VENDOR_BUILD}/lib64/libllhttp.a)

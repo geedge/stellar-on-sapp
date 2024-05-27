@@ -16,13 +16,22 @@
 #include <threads.h>
 
 
-struct per_thread_exdata_array;
-struct per_thread_mq_array;
+
+struct per_thread_exdata_array
+{
+	struct stellar_exdata *exdata_array;
+};
+
+struct stellar_message;
+struct per_thread_mq_array
+{
+	struct stellar_message *mq;
+};
 
 struct plugin_manger_per_thread_data
 {
-	struct per_thread_exdata_array *per_thread_pkt_exdata_array;
-	struct per_thread_mq_array *per_thread_pkt_mq_array;
+	struct per_thread_exdata_array per_thread_pkt_exdata_array;
+	struct per_thread_mq_array per_thread_pkt_mq_array;
 };
 
 struct plugin_manager_schema
@@ -48,11 +57,7 @@ struct plugin_manager_schema
 	struct plugin_manger_per_thread_data *per_thread_data;
 };
 
-struct stellar_message;
-struct per_thread_mq_array
-{
-	struct stellar_message *mq;
-};
+
 
 
 struct stellar_exdata
@@ -60,10 +65,6 @@ struct stellar_exdata
 	void *exdata;
 };
 
-struct per_thread_exdata_array
-{
-	struct stellar_exdata *exdata_array;
-};
 
 
 struct stellar_exdata_schema
@@ -248,17 +249,31 @@ PLUGIN_SPEC_LOAD_ERROR:
 	return NULL;	
 }
 
-static struct per_thread_exdata_array *per_thread_packet_exdata_arrary_new(struct stellar *st, struct plugin_manager_schema *plug_mgr);
-static struct per_thread_mq_array *per_thread_mq_arrary_new(struct stellar *st);
 
-static struct plugin_manger_per_thread_data *plugin_manager_per_thread_data_new(struct stellar *st, struct plugin_manager_schema *plug_mgr)
+static struct plugin_manger_per_thread_data *plugin_manager_per_thread_data_new(struct stellar *st)
 {
-	if(st == NULL || plug_mgr == NULL)return NULL;
-	struct plugin_manger_per_thread_data *per_thread_data = CALLOC(struct plugin_manger_per_thread_data, 1);
-	per_thread_data->per_thread_pkt_exdata_array = per_thread_packet_exdata_arrary_new(st, plug_mgr);
-	per_thread_data->per_thread_pkt_mq_array = per_thread_mq_arrary_new(st);
+	if(st == NULL)return NULL;
+	int thread_num=stellar_get_worker_thread_num(st);
+	struct plugin_manger_per_thread_data *per_thread_data = CALLOC(struct plugin_manger_per_thread_data, thread_num);
 	return per_thread_data;
 }
+
+
+static void plugin_manager_per_thread_data_free(struct plugin_manger_per_thread_data *per_thread_data, struct stellar *st)
+{
+	if(per_thread_data == NULL || st == NULL)return;
+	int thread_num=stellar_get_worker_thread_num(st);
+	struct plugin_manger_per_thread_data *p_data;
+	for (int i = 0; i < thread_num; i++)
+	{
+		p_data=per_thread_data+i;
+		if(p_data->per_thread_pkt_exdata_array.exdata_array)FREE(p_data->per_thread_pkt_exdata_array.exdata_array);
+		if(p_data->per_thread_pkt_mq_array.mq)FREE(p_data->per_thread_pkt_mq_array.mq);
+	}
+	FREE(per_thread_data);
+	return;
+}
+
 
 struct plugin_manager_schema *plugin_manager_init(struct stellar *st, const char *plugin_spec_file_path)
 {
@@ -294,21 +309,10 @@ struct plugin_manager_schema *plugin_manager_init(struct stellar *st, const char
 		}
 	}
 	FREE(specs);
-	plug_mgr->per_thread_data = plugin_manager_per_thread_data_new(st, plug_mgr);
+	plug_mgr->per_thread_data = plugin_manager_per_thread_data_new(st);
 	return plug_mgr;
 }
 
-static void per_thread_packet_exdata_arrary_free(struct stellar *st, struct per_thread_exdata_array *exdata_array);
-static void per_thread_mq_arrary_free(struct per_thread_mq_array *mq_array);
-
-static void plugin_manager_per_thread_data_free(struct plugin_manger_per_thread_data *per_thread_data, struct stellar *st)
-{
-	if(per_thread_data == NULL || st == NULL)return;
-	per_thread_packet_exdata_arrary_free(st, per_thread_data->per_thread_pkt_exdata_array);
-	per_thread_mq_arrary_free(per_thread_data->per_thread_pkt_mq_array);
-	FREE(per_thread_data);
-	return;
-}
 
 void plugin_manager_exit(struct plugin_manager_schema *plug_mgr)
 {
@@ -436,43 +440,25 @@ void *stellar_exdata_get(UT_array *exdata_schema, struct stellar_exdata *exdata_
  * PACKET EXDATA *
  *******************************/
 
-static struct per_thread_exdata_array *per_thread_packet_exdata_arrary_new(struct stellar *st, struct plugin_manager_schema *plug_mgr)
-{
-	if(st == NULL || plug_mgr == NULL || plug_mgr->packet_exdata_schema_array == NULL )return NULL;
-	int thread_num=stellar_get_worker_thread_num(st);
-	struct per_thread_exdata_array *per_thread_pkt_exdata_array = CALLOC(struct per_thread_exdata_array, thread_num);
-	unsigned int len=utarray_len(plug_mgr->packet_exdata_schema_array);
-	for (int i = 0; i < thread_num; i++)
-	{
-		(per_thread_pkt_exdata_array+i)->exdata_array = CALLOC(struct stellar_exdata, len);
-	}
-	return per_thread_pkt_exdata_array;
-}
-
-static void per_thread_packet_exdata_arrary_free(struct stellar *st, struct per_thread_exdata_array *exdata_array)
-{
-	if(st == NULL || exdata_array == NULL)return;
-	int thread_num=stellar_get_worker_thread_num(st);
-	for (int i = 0; i < thread_num; i++)
-	{
-		FREE((exdata_array+i)->exdata_array);
-	}
-	FREE(exdata_array);
-	return;
-}
 
 static struct stellar_exdata *per_thread_packet_exdata_arrary_get(struct plugin_manager_schema *plug_mgr)
 {
 	if(plug_mgr==NULL || plug_mgr->packet_exdata_schema_array == NULL)return NULL;
 	int tid=stellar_get_current_thread_id(plug_mgr->st);
-	return (plug_mgr->per_thread_data->per_thread_pkt_exdata_array+tid)->exdata_array;	
+	if((plug_mgr->per_thread_data+tid)->per_thread_pkt_exdata_array.exdata_array == NULL)
+	{
+		unsigned int len = utarray_len(plug_mgr->packet_exdata_schema_array);
+		(plug_mgr->per_thread_data+tid)->per_thread_pkt_exdata_array.exdata_array = CALLOC(struct stellar_exdata, len);
+	}
+	return (plug_mgr->per_thread_data+tid)->per_thread_pkt_exdata_array.exdata_array;	
 }
 
 static void per_thread_packet_exdata_arrary_clean(struct plugin_manager_schema *plug_mgr, struct packet *pkt)
 {
-	if(plug_mgr==NULL || plug_mgr->packet_exdata_schema_array == NULL || plug_mgr->per_thread_data->per_thread_pkt_exdata_array == NULL)return;
+	if(plug_mgr==NULL || plug_mgr->packet_exdata_schema_array == NULL)return;
 	unsigned int len=utarray_len(plug_mgr->packet_exdata_schema_array);
 	struct stellar_exdata *per_thread_pkt_exdata_arrary = per_thread_packet_exdata_arrary_get(plug_mgr);
+	if(per_thread_pkt_exdata_arrary == NULL)return;
 	for (unsigned int i = 0; i < len; i++)
 	{
 		void *exdata = (per_thread_pkt_exdata_arrary + i)->exdata;
@@ -656,20 +642,6 @@ UT_icd stellar_mq_subscriber_info_icd = {sizeof(struct stellar_mq_subscriber_inf
  * PACKET MQ *
  *******************************/
 
-static struct per_thread_mq_array *per_thread_mq_arrary_new(struct stellar *st)
-{
-	if(st == NULL)return NULL;
-	int thread_num=stellar_get_worker_thread_num(st);
-	struct per_thread_mq_array *per_thread_pkt_mq_array = CALLOC(struct per_thread_mq_array, thread_num);
-	return per_thread_pkt_mq_array;	
-}
-
-static void per_thread_mq_arrary_free(struct per_thread_mq_array *mq_array)
-{
-	if(mq_array == NULL)return;
-	FREE(mq_array);
-	return;
-}
 
 int stellar_packet_mq_create_topic(struct stellar *st, const char *topic_name, packet_msg_free_cb_func *msg_free_cb, void *msg_free_arg)
 {
@@ -753,7 +725,7 @@ int packet_mq_publish_message(struct packet *pkt, int topic_id, void *msg)
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	assert(plug_mgr);
 	int tid = stellar_get_current_thread_id(st);
-	return stellar_mq_publish_message(topic_id, msg, plug_mgr->packet_mq_schema_array, &(plug_mgr->per_thread_data->per_thread_pkt_mq_array+tid)->mq);
+	return stellar_mq_publish_message(topic_id, msg, plug_mgr->packet_mq_schema_array, &((plug_mgr->per_thread_data+tid)->per_thread_pkt_mq_array.mq));
 }
 
 static void plugin_manager_packet_message_dispatch(struct packet *pkt)
@@ -768,7 +740,7 @@ static void plugin_manager_packet_message_dispatch(struct packet *pkt)
 
 	int tid = stellar_get_current_thread_id(st);
 
-	struct stellar_message **mq= &(plug_mgr->per_thread_data->per_thread_pkt_mq_array+tid)->mq;
+	struct stellar_message **mq= &((plug_mgr->per_thread_data+tid)->per_thread_pkt_mq_array.mq);
 
 	struct stellar_message *mq_elt=NULL, *mq_tmp=NULL;
 	struct stellar_mq_subscriber *sub_elt, *sub_tmp;

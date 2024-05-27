@@ -80,9 +80,6 @@ add_subdirectory(deps/bitmap)
 add_subdirectory(src/plugin_manager)
 add_subdirectory(src/stellar_on_sapp)
 
-#add_subdirectory(src/http_decoder)
-
-#add_subdirectory(examples/sapp_plugin)
 add_subdirectory(examples/stellar_plugin)
 
 enable_testing()

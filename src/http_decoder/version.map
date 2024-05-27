@@ -1,7 +1,0 @@
-VERS_3.0{
-global:
-	extern "C" {
-        http_message_*;
-	};
-local: *;
-};

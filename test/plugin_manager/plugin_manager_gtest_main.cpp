@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
+#include "plugin_manager_mock.h"
 
-TEST(EQ_Test, Always_True) {
-  EXPECT_EQ(1, 1);
+TEST(plugin_manager_init, init_none_toml) {
+
+	struct stellar st={0};
+	struct plugin_manager_schema *pm = plugin_manager_init(&st, NULL);
+	ASSERT_TRUE(pm!=NULL);
+	plugin_manager_exit(pm);
 }
+
 
 int main(int argc, char ** argv)
 {
