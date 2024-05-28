@@ -3,8 +3,10 @@
 #include "plugin_manager_gtest_mock.h"
 #include "stellar/utils.h"
 
-void test_init_plugin_manager_intrisic_metadata(struct stellar *st, struct plugin_manager_schema *plug_mgr)
+void whitebox_test_plugin_manager_intrisic_metadata(struct stellar *st, struct plugin_manager_schema *plug_mgr)
 {
+	SCOPED_TRACE("whitebox test intrisic metadata"); 
+
 	EXPECT_TRUE(plug_mgr!=NULL);
 
 	EXPECT_EQ(plug_mgr->st, st);
@@ -56,11 +58,16 @@ void test_init_plugin_manager_intrisic_metadata(struct stellar *st, struct plugi
 	}
 }
 
+
+/***********************************
+ * TEST PLUGIN MANAGER INIT & EXIT *
+ ***********************************/
+
 TEST(plugin_manager_init, init_without_toml) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
-	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
 	plugin_manager_exit(plug_mgr);
 }
 
@@ -74,10 +81,11 @@ static void test_mock_overwrite_exdata_free(struct packet *pkt, int idx, void *e
 	return;
 }
 
+
 TEST(plugin_manager_init, packet_exdata_new_index_overwrite) {
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
-	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
 
 	const char *exdata_name="PACKET_EXDATA";
 	int exdata_idx=stellar_packet_exdata_new_index(&st,exdata_name, test_mock_exdata_free, &st);
@@ -92,7 +100,8 @@ TEST(plugin_manager_init, packet_exdata_new_index_overwrite) {
     EXPECT_EQ(exdata_schema->idx, exdata_idx);
     EXPECT_STREQ(exdata_schema->name, exdata_name);
 
-    int exdata_num=utarray_len(plug_mgr->packet_exdata_schema_array);
+
+	int exdata_num=utarray_len(plug_mgr->packet_exdata_schema_array);
 	EXPECT_EQ(exdata_num, 1);
 
 	plugin_manager_exit(plug_mgr);
@@ -107,14 +116,10 @@ void test_mock_overwrite_packet_msg_free(struct packet *pkt, void *msg, void *ms
 	return;
 }
 
-
-
 TEST(plugin_manager_init, packet_mq_topic_create_and_update) {
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
-	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
-
-
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
 
 	const char *topic_name="PACKET_TOPIC";
 
@@ -171,6 +176,43 @@ void test_mock_overwrite_on_packet_msg(struct packet *pkt, int topic_id, const v
 	return;
 }
 
+TEST(plugin_manager_init, packet_mq_subscribe) {
+
+	struct stellar st={0};
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+
+	const char *topic_name="PACKET_TOPIC";
+
+	int topic_id=stellar_packet_mq_create_topic(&st, topic_name, test_mock_packet_msg_free, &st);
+	EXPECT_GE(topic_id, 0);
+
+	EXPECT_EQ(stellar_packet_mq_subscribe(&st, topic_id, test_mock_on_packet_msg, 10+PACKET_PULGIN_ID_BASE),-1);//illgeal plugin_id
+	EXPECT_EQ(stellar_packet_mq_subscribe(&st, 10, test_mock_on_packet_msg, 10+PACKET_PULGIN_ID_BASE),-1);//illgeal topic_id & plugin_id
+
+	int plugin_id=stellar_packet_plugin_register(&st, 6, NULL, &st);
+	EXPECT_GE(plugin_id, PACKET_PULGIN_ID_BASE);
+
+	EXPECT_EQ(stellar_packet_mq_subscribe(&st, topic_id, test_mock_on_packet_msg, plugin_id),0);
+	EXPECT_EQ(stellar_packet_mq_subscribe(&st, topic_id, test_mock_overwrite_on_packet_msg, plugin_id),0);//duplicate subscribe, return 0, won't overwrite 
+
+	struct stellar_mq_topic_schema *topic_schema = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->packet_mq_schema_array,(unsigned int)topic_id);
+    EXPECT_EQ(topic_schema->free_cb, (void *)test_mock_packet_msg_free);
+    EXPECT_EQ(topic_schema->free_cb_arg, &st);
+    EXPECT_EQ(topic_schema->topic_id, topic_id);
+    EXPECT_STREQ(topic_schema->topic_name, topic_name);
+
+	EXPECT_EQ(topic_schema->subscriber_cnt, 1);
+	EXPECT_EQ(topic_schema->subscribers->pkt_msg_cb, (void *)test_mock_overwrite_on_packet_msg);
+
+	plugin_manager_exit(plug_mgr);
+}
+
+/***********************************
+ * TEST PLUGIN MANAGER ON PACKET *
+ ***********************************/
+
 #define PACKET_PROTO_PLUGIN_NUM 128
 #define PACKET_EXDATA_NUM 2
 #define PACKET_TOPIC_NUM 2
@@ -208,7 +250,7 @@ TEST(plugin_manager, basic_packet_plugin) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
-	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
 
 	unsigned char ip_proto=6;
 	struct basic_plugin_env env;
@@ -245,7 +287,7 @@ TEST(plugin_manager, packet_plugin_proto_filter) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
-	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
 
 	struct basic_plugin_env env;
 	memset(&env, 0, sizeof(struct basic_plugin_env));
@@ -337,7 +379,7 @@ TEST(plugin_manager, packet_exdata) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
-	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
 
 	unsigned char ip_proto=6;
 	struct basic_plugin_env env;
@@ -426,7 +468,7 @@ TEST(plugin_manager, packet_mq) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
-	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
 
 	unsigned char ip_proto=6;
 	struct basic_plugin_env env;
@@ -484,6 +526,14 @@ TEST(plugin_manager, packet_mq) {
 	EXPECT_EQ(env.msg_sub_cnt, env.msg_pub_cnt*topic_sub_num);
 }
 
+/***********************************
+ * TEST PLUGIN MANAGER ON SESSION *
+ ***********************************/
+
+
+/***********************************
+ * TEST PLUGIN MANAGER ON POLLING *
+ ***********************************/
 
 
 int main(int argc, char ** argv)

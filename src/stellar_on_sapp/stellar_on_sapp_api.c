@@ -21,10 +21,9 @@ struct packet
 {
 	enum packet_type type;
 	unsigned char ip_proto;
-	unsigned char pad[3];
 	const void *raw_pkt;
 	struct stellar *st;
-};
+}__attribute__((aligned(sizeof(void*)))) ;
 
 struct session
 {
@@ -35,7 +34,7 @@ struct session
 	struct packet cur_pkt;
 	struct stellar *st;
 	struct plugin_manager_runtime *plug_mgr_rt;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 inline struct stellar * packet_stellar_get(struct packet *pkt)
 {
@@ -145,7 +144,7 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned c
 		return APP_STATE_DROPME;
 }
 
-void session_poll_on_sapp(struct session *sess)
+void session_defer_on_sapp(struct session *sess)
 {
 	if(sess==NULL)return;
 	if(sess->state != SESSION_STATE_CONTROL)
@@ -155,6 +154,7 @@ void session_poll_on_sapp(struct session *sess)
 		if(pkt->raw_pkt)
 		{
 			plugin_manager_on_session_egress(sess, pkt);
+			plugin_manager_on_packet_egress(sess->st->plug_mgr, pkt);
 		}
 	}
 	sess->cur_pkt.raw_pkt=NULL;//clear raw_pkt
@@ -187,7 +187,12 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	default:
 		return;
 	}
+	//TODO: exclude non innermost packet
 	plugin_manager_on_packet_ingress(st->plug_mgr, &pkt);
+	if(pkt.ip_proto!=IPPROTO_TCP && pkt.ip_proto!=IPPROTO_UDP)
+	{
+		plugin_manager_on_packet_egress(st->plug_mgr, &pkt);
+	}
 }
 
 inline int polling_on_sapp(struct stellar *st)

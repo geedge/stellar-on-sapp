@@ -48,7 +48,7 @@ struct plugin_manager_schema
 	int egress_topic_id;
 	int control_packet_topic_id;
 	struct plugin_manger_per_thread_data *per_thread_data;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 
 
@@ -72,7 +72,7 @@ struct stellar_exdata_schema
 	
 	void *free_arg;
 	int idx;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 
 struct stellar_message
@@ -80,7 +80,7 @@ struct stellar_message
 	int topic_id;
     void *msg_data;
     struct stellar_message *next, *prev;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 typedef struct stellar_mq_subscriber 
 {
@@ -92,7 +92,7 @@ typedef struct stellar_mq_subscriber
     	on_packet_msg_cb_func *pkt_msg_cb;
 	};
     struct stellar_mq_subscriber *next, *prev;
-}stellar_mq_subscriber;
+}stellar_mq_subscriber __attribute__((aligned(sizeof(void*))));
 
 
 struct stellar_mq_topic_schema
@@ -109,7 +109,7 @@ struct stellar_mq_topic_schema
 		packet_msg_free_cb_func *pkt_msg_free_cb;
 	};
 	struct stellar_mq_subscriber *subscribers; 
-};
+}__attribute__((aligned(sizeof(void*))));
 
 enum plugin_ctx_state
 { INIT, ACTIVE, EXIT };
@@ -119,7 +119,7 @@ struct session_plugin_ctx_runtime
 	enum plugin_ctx_state state;
 	int session_plugin_id;
 	void *plugin_ctx;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 
 
@@ -134,7 +134,7 @@ struct plugin_manager_runtime
 	struct session_plugin_ctx_runtime *plugin_ctx_array;//N plugins TODO: call alloc and free
 	int current_session_plugin_id;
 	int enable_session_mq;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 struct registered_packet_plugin_schema
 {
@@ -142,19 +142,19 @@ struct registered_packet_plugin_schema
 	plugin_on_packet_func *on_packet;
 	void *plugin_env;
 	UT_array *registed_packet_mq_subscriber_info;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 struct registered_polling_plugin_schema
 {
 	plugin_on_polling_func *on_polling;
 	void *plugin_env;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 struct stellar_mq_subscriber_info
 {
 	int topic_id;
 	int subscriber_idx;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 struct registered_session_plugin_schema
 {
@@ -162,7 +162,7 @@ struct registered_session_plugin_schema
 	session_ctx_free_func *on_ctx_free;
 	void *plugin_env;
 	UT_array *registed_session_mq_subscriber_info;
-};
+}__attribute__((aligned(sizeof(void*))));
 
 #define PACKET_PULGIN_ID_BASE 0x10000
 #define POLLING_PULGIN_ID_BASE 0x20000
@@ -179,4 +179,4 @@ struct plugin_specific
 	plugin_on_load_func *load_cb;
 	plugin_on_unload_func *unload_cb;
 	void *plugin_ctx;
-};
+}__attribute__((aligned(sizeof(void*))));

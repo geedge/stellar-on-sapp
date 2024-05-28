@@ -502,10 +502,10 @@ int stellar_packet_mq_subscribe(struct stellar *st, int topic_id, on_packet_msg_
 	if(plugin_id < PACKET_PULGIN_ID_BASE || plugin_id >= POLLING_PULGIN_ID_BASE)return -1;// ignore session or polling  plugin
 	int plugin_idx=plugin_id-PACKET_PULGIN_ID_BASE;
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
-	if(plug_mgr->packet_mq_schema_array==NULL)return -1;
+	if(plug_mgr == NULL || plug_mgr->packet_mq_schema_array==NULL || plug_mgr->registered_packet_plugin_array == NULL)return -1;
+	
     unsigned int len = utarray_len(plug_mgr->packet_mq_schema_array);
     if (len <= (unsigned int)topic_id)return -1;
-
 	struct registered_packet_plugin_schema *packet_plugin_schema = (struct registered_packet_plugin_schema *)utarray_eltptr(plug_mgr->registered_packet_plugin_array, (unsigned)plugin_idx);
 	if(packet_plugin_schema==NULL)return -1;
 
@@ -522,7 +522,21 @@ int stellar_packet_mq_subscribe(struct stellar *st, int topic_id, on_packet_msg_
   	while( (p=(struct stellar_mq_subscriber_info *)utarray_next(packet_plugin_schema->registed_packet_mq_subscriber_info,p))) 
 	{
 		if(p->topic_id==topic_id)
-		return 0;
+		{
+			struct stellar_mq_subscriber *tmp_subscriber=topic->subscribers;
+			int cnt=0;
+			while(tmp_subscriber)
+			{
+				if(cnt==p->subscriber_idx)
+				{
+					tmp_subscriber->pkt_msg_cb=plugin_on_msg_cb;
+					return 0;
+				}
+				cnt++;
+				tmp_subscriber=tmp_subscriber->next;
+			}
+			return -1;
+		}
 	};
 
 	struct stellar_mq_subscriber *new_subscriber = CALLOC(struct stellar_mq_subscriber,1);

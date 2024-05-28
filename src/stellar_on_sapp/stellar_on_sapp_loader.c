@@ -5,14 +5,6 @@
 
 #include <MESA/stream.h>
 
-struct simple_stream_ctx
-{
-	uint32_t c2s_pkts;
-	uint32_t c2s_bytes;
-	uint32_t  s2c_pkts;
-	uint32_t  s2c_bytes;
-	struct session *sess;
-};
 
 #define STELLAR_PLUGIN_PATH "./stellar_plugin/spec.toml"
 #define STELLAR_BRIDEGE_NAME "STELLAR_SESSION"
@@ -81,7 +73,7 @@ char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thre
 	struct session *sess = (struct session *)stream_bridge_async_data_get(pstream, g_session_bridge_id);
 	if(sess)
 	{
-		session_poll_on_sapp(sess);
+		session_defer_on_sapp(sess);
 		return APP_STATE_GIVEME;
 	}
 	else
@@ -187,13 +179,13 @@ unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, i
 
 char stellar_on_sapp_ip4_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
 {
-	packet_update_on_sapp(g_stellar, pstream, a_packet, IPv4);
+	if(stream_is_inner_most(pstream)==1)packet_update_on_sapp(g_stellar, pstream, a_packet, IPv4);
 	return APP_STATE_GIVEME;
 }
 
 char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
 {
-	packet_update_on_sapp(g_stellar, pstream, a_packet, IPv6);
+	if(stream_is_inner_most(pstream)==1)packet_update_on_sapp(g_stellar, pstream, a_packet, IPv6);
 	return APP_STATE_GIVEME;
 }
 
