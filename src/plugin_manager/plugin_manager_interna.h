@@ -164,6 +164,7 @@ struct registered_session_plugin_schema
 	UT_array *registed_session_mq_subscriber_info;
 }__attribute__((aligned(sizeof(void*))));
 
+#define SESSION_PULGIN_ID_BASE 0x00000
 #define PACKET_PULGIN_ID_BASE 0x10000
 #define POLLING_PULGIN_ID_BASE 0x20000
 

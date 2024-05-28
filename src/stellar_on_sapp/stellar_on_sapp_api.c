@@ -22,6 +22,7 @@ struct packet
 	enum packet_type type;
 	unsigned char ip_proto;
 	const void *raw_pkt;
+	struct session *sess;
 	struct stellar *st;
 }__attribute__((aligned(sizeof(void*)))) ;
 
@@ -110,6 +111,7 @@ struct session *session_new_on_sapp(struct stellar *st, struct streaminfo *strea
 	sess->session_direction=-1;
     memset(&sess->cur_pkt, 0, sizeof(struct packet));
 	sess->cur_pkt.st=st;
+	sess->cur_pkt.sess=sess;
 	sess->plug_mgr_rt=plugin_manager_session_runtime_new(st->plug_mgr, sess);
     return sess;
 }
@@ -170,6 +172,7 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	pkt.type=type;
 	pkt.raw_pkt=get_current_rawpkt_from_streaminfo(pstream);
 	pkt.st=st;
+	pkt.sess=NULL;
 	switch (type)
 	{
 	case IPv4:
@@ -187,7 +190,7 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	default:
 		return;
 	}
-	//TODO: exclude non innermost packet
+	//FIXME: defer TCP/UDP packet on session update
 	plugin_manager_on_packet_ingress(st->plug_mgr, &pkt);
 	if(pkt.ip_proto!=IPPROTO_TCP && pkt.ip_proto!=IPPROTO_UDP)
 	{
@@ -226,8 +229,9 @@ inline enum packet_type packet_get_type(const struct packet *pkt)
 
 int packet_get_direction(const struct packet *pkt)
 {
-	struct session *sess = container_of(pkt, struct session, cur_pkt);
-	assert(sess);
+	struct session *sess = pkt->sess;
+	if(sess==NULL)return PACKET_DIRECTION_UNKNOWN;
+
 	const struct streaminfo *pstream=sess->pstream;
 	if(pstream->curdir==DIR_C2S)
 	{

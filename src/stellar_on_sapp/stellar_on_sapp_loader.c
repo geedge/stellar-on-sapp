@@ -74,12 +74,8 @@ char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thre
 	if(sess)
 	{
 		session_defer_on_sapp(sess);
-		return APP_STATE_GIVEME;
 	}
-	else
-	{
-		return APP_STATE_DROPME;
-	}
+	return APP_STATE_GIVEME;
 }
 
 void  STELLAR_DEFER_LOADER_EXIT(void)
