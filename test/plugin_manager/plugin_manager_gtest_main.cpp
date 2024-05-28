@@ -114,7 +114,12 @@ TEST(plugin_manager_init, packet_mq_topic_create_and_update) {
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
 	test_init_plugin_manager_intrisic_metadata(&st, plug_mgr);
 
+
+
 	const char *topic_name="PACKET_TOPIC";
+
+	EXPECT_EQ(stellar_packet_mq_get_topic_id(&st, topic_name), -1);// illegal topic_name
+
 	int topic_id=stellar_packet_mq_create_topic(&st, topic_name, test_mock_packet_msg_free, &st);
 	EXPECT_GE(topic_id, 0);
 
@@ -128,15 +133,30 @@ TEST(plugin_manager_init, packet_mq_topic_create_and_update) {
 	EXPECT_EQ(stellar_packet_mq_get_topic_id(&st, topic_name), topic_id);
 	EXPECT_EQ(stellar_packet_mq_create_topic(&st, topic_name, test_mock_overwrite_packet_msg_free, plug_mgr), -1); // duplicate create, return error
 
-	topic_schema = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->packet_mq_schema_array,topic_id);
+	topic_schema = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->packet_mq_schema_array,(unsigned int)topic_id);
     EXPECT_EQ(topic_schema->free_cb, (void *)test_mock_packet_msg_free);
     EXPECT_EQ(topic_schema->free_cb_arg, &st);
     EXPECT_EQ(topic_schema->topic_id, topic_id);
     EXPECT_STREQ(topic_schema->topic_name, topic_name);
 
+	EXPECT_EQ(stellar_packet_mq_update_topic(&st, topic_id, test_mock_overwrite_packet_msg_free, plug_mgr), 0);
 
-    int exdata_num=utarray_len(plug_mgr->packet_mq_schema_array);
-	EXPECT_EQ(exdata_num, 1);
+	topic_schema = (struct stellar_mq_topic_schema *)utarray_eltptr(plug_mgr->packet_mq_schema_array,(unsigned int)topic_id);
+    EXPECT_EQ(topic_schema->free_cb, (void *)test_mock_overwrite_packet_msg_free);
+    EXPECT_EQ(topic_schema->free_cb_arg, plug_mgr);
+    EXPECT_EQ(topic_schema->topic_id, topic_id);
+    EXPECT_STREQ(topic_schema->topic_name, topic_name);
+
+	EXPECT_EQ(utarray_len(plug_mgr->packet_mq_schema_array), 1);
+
+	EXPECT_EQ(stellar_packet_mq_destroy_topic(&st, 10), -1);// illgeal topic_id
+
+	EXPECT_EQ(stellar_packet_mq_destroy_topic(&st, topic_id), 1);
+	EXPECT_EQ(stellar_packet_mq_destroy_topic(&st, topic_id), 0);//duplicate destroy, return -1;
+
+	
+	EXPECT_EQ(utarray_len(plug_mgr->packet_mq_schema_array), 1);//destory won't delete the topic schema
+	EXPECT_EQ(plug_mgr->packet_mq_topic_num, 0);
 
 	plugin_manager_exit(plug_mgr);
 }

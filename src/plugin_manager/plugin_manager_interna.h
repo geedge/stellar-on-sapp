@@ -101,6 +101,7 @@ struct stellar_mq_topic_schema
 	void *free_cb_arg;
 	int topic_id;
 	int subscriber_cnt;
+	int is_destroyed;
 	union
 	{
 		void *free_cb;
