@@ -24,6 +24,7 @@ struct packet
 struct session
 {
 	struct plugin_manager_runtime *plug_mgr_rt;
+	int sess_pkt_cnt;
 };
 
 struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct stellar *st)

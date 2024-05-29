@@ -990,6 +990,7 @@ static void test_dettach_session_ctx_free(struct session *sess, void *session_ct
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	env->basic_ctx_free_called+=1;
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)session_ctx;
+	EXPECT_EQ(sess->sess_pkt_cnt, 1);// first packet ingress, call ctx_free immediately
 	EXPECT_EQ(ctx->called, 1);
 	FREE(ctx);
 }
@@ -1025,6 +1026,7 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
 
 
 	struct session sess[env.N_session];
+	memset(&sess, 0, sizeof(sess));
 
 	for(int i=0; i < env.N_session; i++)
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
@@ -1036,6 +1038,7 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
 
         for (int i = 0; i < env.N_session; i++)
         {
+			sess[i].sess_pkt_cnt+=1;
             plugin_manager_on_session_ingress(&sess[i], &pkt);
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
