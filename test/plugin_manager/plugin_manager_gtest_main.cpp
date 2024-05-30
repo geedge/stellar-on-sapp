@@ -1067,7 +1067,7 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
 
 	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
 	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
-	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_dettach_on_session, env.test_mq_pub_plugin_id), 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_dettach_on_session, plugin_id), 0);
 
 	struct packet pkt={&st, TCP, ip_proto};
 
@@ -1088,7 +1088,7 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
             plugin_manager_on_session_ingress(&sess[i], &pkt);
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
-		
+
         plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
@@ -1100,10 +1100,36 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
 	EXPECT_EQ(env.basic_ctx_free_called,env.N_session);
 }
 
-// TODO: test case, session_plugin_ctx_free_send_msg
-TEST(plugin_manager, session_plugin_ctx_free_send_msg) {
+
+
+static void *test_invalid_send_msg_session_ctx_new(struct session *sess, void *plugin_env)
+{
+	struct test_basic_ctx *ctx=CALLOC(struct test_basic_ctx, 1);
+	return ctx;
+}
+
+static void test_invalid_send_msg_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+	env->basic_ctx_free_called+=1;
+	struct test_basic_ctx *ctx=(struct test_basic_ctx *)session_ctx;
+	EXPECT_EQ(ctx->called,env->N_per_session_pkt_cnt);
+
+	EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, ctx), -1);// illegal publish when session closing
+
+	FREE(ctx);
+}
+
+static void test_invalid_send_msg_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
+	ctx->called+=1;
+}
+
+TEST(plugin_manager, session_plugin_invalid_send_msg) {
 
 	struct stellar st={0};
+	struct session_plugin_env env;
 
 // pesudo init stage
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -1111,9 +1137,18 @@ TEST(plugin_manager, session_plugin_ctx_free_send_msg) {
 
 // plugin manager register plugin
 
+	int plugin_id=stellar_session_plugin_register(&st, test_invalid_send_msg_session_ctx_new, test_invalid_send_msg_session_ctx_free, &env);
+	EXPECT_GE(plugin_id,0);
+
+	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
+	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_invalid_send_msg_on_session, plugin_id), 0);
+
+	env.test_mq_topic_id=stellar_session_mq_create_topic(&st, "SESSION_MQ_TOPIC", NULL, &env);
+	EXPECT_GE(env.test_mq_topic_id, 0);
+
 // pesudo packet and session
 
-	struct session_plugin_env env;
 	memset(&env, 0, sizeof(struct session_plugin_env));
 	env.plug_mgr=plug_mgr;
 	env.N_per_session_pkt_cnt=10;
