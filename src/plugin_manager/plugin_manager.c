@@ -872,7 +872,8 @@ struct plugin_manager_runtime *plugin_manager_session_runtime_new(struct plugin_
 	rt->delivered_mq = NULL;
 	rt->session_mq_status=bitmap_new(plug_mgr->session_mq_topic_num, plug_mgr->session_topic_subscriber_num, 1);
 	rt->sess_exdata_array = (struct stellar_exdata *)session_exdata_runtime_new(plug_mgr);
-	rt->plugin_ctx_array = CALLOC(struct session_plugin_ctx_runtime, utarray_len(plug_mgr->registered_session_plugin_array));
+	if(plug_mgr->registered_session_plugin_array)
+		rt->plugin_ctx_array = CALLOC(struct session_plugin_ctx_runtime, utarray_len(plug_mgr->registered_session_plugin_array));
 	return rt;
 
 }
@@ -894,19 +895,23 @@ void plugin_manager_session_runtime_free(struct plugin_manager_runtime *rt)
 	{
 		bitmap_free(rt->session_mq_status);
 	}
-	unsigned int len = utarray_len(rt->plug_mgr->registered_session_plugin_array);
-	for(unsigned int i = 0; i < len; i++)
-	{
-		struct session_plugin_ctx_runtime *plugin_ctx_rt=(rt->plugin_ctx_array+i);
-		struct registered_session_plugin_schema *session_plugin_schema = (struct registered_session_plugin_schema *)utarray_eltptr(rt->plug_mgr->registered_session_plugin_array, i);
-		if(session_plugin_schema->on_ctx_free && plugin_ctx_rt->state==ACTIVE)
-		{
-			session_plugin_schema->on_ctx_free(rt->sess, plugin_ctx_rt->plugin_ctx, session_plugin_schema->plugin_env);
-		}
-	}
-	FREE(rt->plugin_ctx_array);
-
-	session_exdata_runtime_free(rt->plug_mgr, rt->sess, rt->sess_exdata_array);
+    if (rt->plug_mgr->registered_session_plugin_array)
+    {
+        unsigned int len = utarray_len(rt->plug_mgr->registered_session_plugin_array);
+        for (unsigned int i = 0; i < len; i++)
+        {
+            struct session_plugin_ctx_runtime *plugin_ctx_rt = (rt->plugin_ctx_array + i);
+            struct registered_session_plugin_schema *session_plugin_schema =
+                (struct registered_session_plugin_schema *)utarray_eltptr(rt->plug_mgr->registered_session_plugin_array, i);
+            if (session_plugin_schema->on_ctx_free && plugin_ctx_rt->state == ACTIVE)
+            {
+                session_plugin_schema->on_ctx_free(rt->sess, plugin_ctx_rt->plugin_ctx,
+                                                   session_plugin_schema->plugin_env);
+            }
+        }
+        FREE(rt->plugin_ctx_array);
+    }
+    session_exdata_runtime_free(rt->plug_mgr, rt->sess, rt->sess_exdata_array);
 	FREE(rt->sess_exdata_array);
 	FREE(rt);
 }

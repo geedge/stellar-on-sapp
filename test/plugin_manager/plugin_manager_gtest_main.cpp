@@ -699,10 +699,6 @@ TEST(plugin_manager_init, session_mq_subscribe) {
  * TEST PLUGIN MANAGER ON SESSION PLUGIN RUNTIME *
  **********************************************/
 
-/*******************************************
- * TEST PLUGIN MANAGER PACKET PLUGIN RUNTIME*
- *******************************************/
-
 struct session_plugin_env
 {
 	struct plugin_manager_schema *plug_mgr;
@@ -723,6 +719,55 @@ struct session_plugin_env
 	int test_mq_free_called;
 	int test_mq_topic_id;
 };
+
+TEST(plugin_manager, no_plugin_runtime) {
+
+	struct stellar st={0};
+
+// init stage
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+// init plugin
+
+// prepare packet and session
+
+	struct session_plugin_env env;
+	memset(&env, 0, sizeof(struct session_plugin_env));
+	env.plug_mgr=plug_mgr;
+	env.N_per_session_pkt_cnt=10;
+	env.N_session=10;
+
+	struct packet pkt={&st, TCP, 6};
+
+	struct session sess[env.N_session];
+	memset(&sess, 0, sizeof(sess));
+
+// pesudo running stage
+	for(int i=0; i < env.N_session; i++)
+		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+
+    for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+
+        for (int i = 0; i < env.N_session; i++)
+        {
+			sess[i].sess_pkt_cnt+=1;
+            plugin_manager_on_session_ingress(&sess[i], &pkt);
+            plugin_manager_on_session_egress(&sess[i], &pkt);
+        }
+
+        plugin_manager_on_packet_egress(plug_mgr, &pkt);
+    }
+
+    for(int i=0; i < env.N_session; i++)
+		plugin_manager_session_runtime_free(sess[i].plug_mgr_rt);
+
+//exit stage
+	plugin_manager_exit(plug_mgr);
+}
+
 
 struct test_basic_ctx
 {
@@ -824,13 +869,14 @@ TEST(plugin_manager, basic_session_plugin) {
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
         plugin_manager_on_packet_ingress(plug_mgr, &pkt);
-        plugin_manager_on_packet_egress(plug_mgr, &pkt);
 
         for (int i = 0; i < env.N_session; i++)
         {
             plugin_manager_on_session_ingress(&sess[i], &pkt);
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
+
+        plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -957,13 +1003,14 @@ TEST(plugin_manager, basic_session_plugin_mq) {
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
         plugin_manager_on_packet_ingress(plug_mgr, &pkt);
-        plugin_manager_on_packet_egress(plug_mgr, &pkt);
 
         for (int i = 0; i < env.N_session; i++)
         {
             plugin_manager_on_session_ingress(&sess[i], &pkt);
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
+
+        plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1034,7 +1081,6 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
         plugin_manager_on_packet_ingress(plug_mgr, &pkt);
-        plugin_manager_on_packet_egress(plug_mgr, &pkt);
 
         for (int i = 0; i < env.N_session; i++)
         {
@@ -1042,6 +1088,8 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
             plugin_manager_on_session_ingress(&sess[i], &pkt);
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
+		
+        plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1056,8 +1104,48 @@ TEST(plugin_manager, session_plugin_ctx_new_dettach) {
 TEST(plugin_manager, session_plugin_ctx_free_send_msg) {
 
 	struct stellar st={0};
+
+// pesudo init stage
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
 	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+// plugin manager register plugin
+
+// pesudo packet and session
+
+	struct session_plugin_env env;
+	memset(&env, 0, sizeof(struct session_plugin_env));
+	env.plug_mgr=plug_mgr;
+	env.N_per_session_pkt_cnt=10;
+	env.N_session=10;
+
+	struct packet pkt={&st, TCP, 6};
+
+	struct session sess[env.N_session];
+	memset(&sess, 0, sizeof(sess));
+
+// pesudo running stage
+	for(int i=0; i < env.N_session; i++)
+		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+
+    for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+
+        for (int i = 0; i < env.N_session; i++)
+        {
+			sess[i].sess_pkt_cnt+=1;
+            plugin_manager_on_session_ingress(&sess[i], &pkt);
+            plugin_manager_on_session_egress(&sess[i], &pkt);
+        }
+
+        plugin_manager_on_packet_egress(plug_mgr, &pkt);
+    }
+
+    for(int i=0; i < env.N_session; i++)
+		plugin_manager_session_runtime_free(sess[i].plug_mgr_rt);
+
+// pesudo exit stage
 	plugin_manager_exit(plug_mgr);
 }
 
