@@ -5,6 +5,7 @@ extern "C"
 
 #include "plugin_manager/plugin_manager_interna.h"
 #include "stellar_on_sapp/stellar_internal.h"
+#include "stellar/session.h"
 
 
 
@@ -24,8 +25,20 @@ struct packet
 struct session
 {
 	struct plugin_manager_runtime *plug_mgr_rt;
+	enum session_type type;
+	enum session_state state;
 	int sess_pkt_cnt;
 };
+enum session_state session_get_current_state(struct session *sess)
+{
+    return sess->state;
+}
+
+enum session_type session_get_type(struct session *sess)
+{
+	return sess->type;
+
+}
 
 struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct stellar *st)
 {

@@ -119,6 +119,7 @@ struct session *session_new_on_sapp(struct stellar *st, struct streaminfo *strea
 void session_free_on_sapp(struct session *sess)
 {
 	sess->state = SESSION_STATE_CLOSING;
+	plugin_manager_on_session_closing(sess);
 	if(sess->plug_mgr_rt)
 	{
 		plugin_manager_session_runtime_free(sess->plug_mgr_rt);
