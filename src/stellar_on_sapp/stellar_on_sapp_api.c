@@ -133,13 +133,13 @@ void session_free_on_sapp(struct session *sess)
 
 unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned char stream_state, struct session *sess, const void *raw_pkt, enum packet_type type)
 {
-	if(sess && raw_pkt)
+	if(sess)
 	{
 		sess->state=(stream_state == OP_STATE_PENDING) ? SESSION_STATE_OPENING : SESSION_STATE_ACTIVE;
 		struct packet *pkt = &sess->cur_pkt;
 		pkt->raw_pkt=raw_pkt;
 		pkt->type=type;
-		plugin_manager_on_session_ingress(sess, pkt);
+		if(raw_pkt)plugin_manager_on_session_ingress(sess, pkt);
 		return APP_STATE_GIVEME;
 	}
 	else
