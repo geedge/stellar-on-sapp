@@ -568,3 +568,10 @@ long long session_get_server_isn(struct session *sess)
     if(MESA_get_stream_opt(pstream, MSO_TCP_ISN_S2C, &(server_isn), &server_isn_sz)!=0)return -1;
     return server_isn;
 }
+
+void stellar_emit_datapath_telemetry(struct packet *pkt,  const char * module, const char *str)
+{
+	if(pkt==NULL)return;
+	if(pkt->raw_pkt==NULL)return;
+	sapp_emit_datapath_telemetry(pkt->raw_pkt, module, str);
+}

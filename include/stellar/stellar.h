@@ -42,3 +42,6 @@ typedef int plugin_on_polling_func(void *plugin_env);
 
 //return polling plugin_id
 int stellar_polling_plugin_register(struct stellar *st,  plugin_on_polling_func on_polling, void *plugin_env);
+
+
+void stellar_emit_datapath_telemetry(struct packet *pkt,  const char * module, const char *str);

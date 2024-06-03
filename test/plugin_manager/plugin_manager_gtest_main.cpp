@@ -972,9 +972,9 @@ static void test_session_msg_free(struct session *sess, void *msg, void *msg_fre
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)msg_free_arg;
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
-	EXPECT_EQ(env->test_mq_pub_called, *(int *)msg);
 	if(msg)
 	{
+		EXPECT_EQ(env->test_mq_pub_called, *(int *)msg);
 		env->test_mq_free_called+=1;
 		FREE(msg);
 	}
