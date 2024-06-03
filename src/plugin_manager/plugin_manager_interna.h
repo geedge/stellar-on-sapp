@@ -16,15 +16,16 @@ struct per_thread_exdata_array
 };
 
 struct stellar_message;
-struct per_thread_mq_array
+struct per_thread_mq
 {
 	struct stellar_message *mq;
+	int pub_msg_cnt;
 };
 
 struct plugin_manger_per_thread_data
 {
 	struct per_thread_exdata_array per_thread_pkt_exdata_array;
-	struct per_thread_mq_array per_thread_pkt_mq_array;
+	struct per_thread_mq per_thread_pkt_mq;
 };
 
 struct plugin_manager_schema
@@ -47,6 +48,7 @@ struct plugin_manager_schema
 	int udp_topic_id;
 	int egress_topic_id;
 	int control_packet_topic_id;
+	int max_message_dispatch;
 	struct plugin_manger_per_thread_data *per_thread_data;
 }__attribute__((aligned(sizeof(void*))));
 
@@ -133,7 +135,7 @@ struct plugin_manager_runtime
 	struct stellar_exdata *sess_exdata_array;
 	struct session_plugin_ctx_runtime *plugin_ctx_array;//N plugins TODO: call alloc and free
 	int current_session_plugin_id;
-	int enable_session_mq;
+	int pub_session_msg_cnt;
 }__attribute__((aligned(sizeof(void*))));
 
 struct registered_packet_plugin_schema
@@ -171,6 +173,8 @@ struct registered_session_plugin_schema
 /*******************************
  * PLUGIN MANAGER INIT & EXIT *
  *******************************/
+
+#define MAX_MSG_PER_DISPATCH 128
 
 #include <dlfcn.h>
 

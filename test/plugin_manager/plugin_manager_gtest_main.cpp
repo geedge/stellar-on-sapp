@@ -55,7 +55,7 @@ void whitebox_test_plugin_manager_intrisic_metadata(struct stellar *st, struct p
 	for(int i=0; i<thread_num; i++)
 	{
 		EXPECT_TRUE(plug_mgr->per_thread_data[i].per_thread_pkt_exdata_array.exdata_array==NULL);
-		EXPECT_TRUE(plug_mgr->per_thread_data[i].per_thread_pkt_mq_array.mq==NULL);
+		EXPECT_TRUE(plug_mgr->per_thread_data[i].per_thread_pkt_mq.mq==NULL);
 	}
 
 	//intrinsic topic
@@ -257,7 +257,7 @@ static void test_basic_on_packet(struct packet *pkt, unsigned char ip_protocol, 
 	return;
 }
 
-TEST(plugin_manager, basic_packet_plugin) {
+TEST(plugin_manager, packet_plugin_illegal_exdata) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -389,7 +389,7 @@ static void test_packet_exdata_free(struct packet *pkt, int idx, void *ex_ptr, v
 }
 
 
-TEST(plugin_manager, basic_packet_exdata) {
+TEST(plugin_manager, packet_plugins_share_exdata) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -486,7 +486,7 @@ static void test_mq_pub_on_packet(struct packet *pkt, unsigned char ip_protocol,
 	return;
 }
 
-TEST(plugin_manager, basic_packet_mq_pub_sub) {
+TEST(plugin_manager, packet_plugins_mq_pub_sub) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -556,6 +556,124 @@ TEST(plugin_manager, basic_packet_mq_pub_sub) {
 	EXPECT_EQ(env.msg_sub_cnt, env.msg_pub_cnt*topic_sub_num);
 }
 
+static void overlimit_packet_msg_free_cb_func(struct packet *pkt, void *msg, void *msg_free_arg)
+{
+	struct packet_plugin_env *env = (struct packet_plugin_env *)msg_free_arg;
+	env->msg_free_cnt+=1;
+	FREE(msg);
+	return;
+}
+
+static void overlimit_sub_on_packet_msg(struct packet *pkt, int topic_id, const void *msg, void *plugin_env)
+{
+	struct packet_plugin_env *env = (struct packet_plugin_env *)plugin_env;
+	EXPECT_TRUE(env!=NULL);
+	EXPECT_EQ(pkt->st, env->plug_mgr->st);
+	env->msg_sub_cnt+=1;
+	return;
+}
+
+static void overlimit_pub_on_packet(struct packet *pkt, unsigned char ip_protocol, void *plugin_env)
+{
+	struct packet_plugin_env *env = (struct packet_plugin_env *)plugin_env;
+	EXPECT_TRUE(env!=NULL);
+	EXPECT_EQ(pkt->ip_proto, ip_protocol);
+	EXPECT_EQ(pkt->st, env->plug_mgr->st);
+	int topic_id_num=(int)(sizeof(env->packet_topic_id) / sizeof(env->packet_topic_id[0]));
+	int cnt=0;
+	int *msg;
+	for(int i=0; i<topic_id_num; i++)
+	{
+		for(int j=0; j < MAX_MSG_PER_DISPATCH; j++)
+		{
+			msg=CALLOC(int, 1);
+			*msg=cnt;
+			int pub_ret=packet_mq_publish_message(pkt, env->packet_topic_id[i], msg);
+			if(cnt < MAX_MSG_PER_DISPATCH)
+			{
+				ASSERT_EQ(pub_ret, 0);
+				env->msg_pub_cnt+=1;
+			}
+			else
+			{
+				ASSERT_EQ(pub_ret, -1);
+			}
+			if(pub_ret!=0)FREE(msg);
+			cnt+=1;
+		}
+	}
+	return;
+}
+
+TEST(plugin_manager, packet_plugins_pub_overlimit) {
+
+	struct stellar st={0};
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+	unsigned char ip_proto=6;
+	struct packet_plugin_env env;
+	memset(&env, 0, sizeof(struct packet_plugin_env));
+	env.plug_mgr=plug_mgr;
+	char topic_name[PACKET_TOPIC_NUM][NAME_MAX];
+
+	int topic_id_num=(int)(sizeof(env.packet_topic_id) / sizeof(env.packet_topic_id[0]));
+
+	for(int i=0; i<topic_id_num; i++)
+	{
+		sprintf(topic_name[i], "PACKET_TOPIC_%d", i);
+		env.packet_topic_id[i]=stellar_packet_mq_create_topic(&st, topic_name[i], overlimit_packet_msg_free_cb_func, &env);
+		EXPECT_GE(env.packet_topic_id[i], 0);
+        {
+            SCOPED_TRACE("White-box test, check stellar internal schema");
+            struct stellar_mq_topic_schema *topic = (struct stellar_mq_topic_schema *)utarray_eltptr(
+                plug_mgr->packet_mq_schema_array, env.packet_topic_id[i]);
+            EXPECT_EQ(topic->free_cb, overlimit_packet_msg_free_cb_func);
+            EXPECT_EQ(topic->free_cb_arg, &env);
+            EXPECT_EQ(topic->topic_id, env.packet_topic_id[i]);
+            EXPECT_STREQ(topic->topic_name, topic_name[i]);
+        }
+    }
+
+	{
+		SCOPED_TRACE("White-box test, check stellar internal schema");
+		EXPECT_EQ(utarray_len(plug_mgr->packet_mq_schema_array), topic_id_num);
+	}
+
+	int pub_plugin_id=stellar_packet_plugin_register(&st, ip_proto, overlimit_pub_on_packet, &env);
+	EXPECT_GE(pub_plugin_id, PACKET_PULGIN_ID_BASE);
+
+	int topic_sub_num=(int)(sizeof(env.packet_mq_sub_plugin_id) / sizeof(env.packet_mq_sub_plugin_id[0]));
+
+    for (int i = 0; i < topic_sub_num; i++)
+    {
+        env.packet_mq_sub_plugin_id[i] = stellar_packet_plugin_register(&st, ip_proto, NULL, &env);// empty on_packet is ok
+        EXPECT_GE(env.packet_mq_sub_plugin_id[i], PACKET_PULGIN_ID_BASE);
+		for(int j = 0; j < topic_id_num; j++)
+		{
+			EXPECT_EQ(stellar_packet_mq_subscribe(&st, env.packet_topic_id[j], overlimit_sub_on_packet_msg, env.packet_mq_sub_plugin_id[i]), 0);
+		}
+    }
+
+	{
+		SCOPED_TRACE("White-box test, check stellar internal schema");
+		EXPECT_EQ(utarray_len(plug_mgr->registered_packet_plugin_array), topic_sub_num+1);
+	}
+
+	struct packet pkt={&st, IPv4, ip_proto};
+
+	int N_packet=10;
+    for (int i = 0; i < N_packet; i++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+        plugin_manager_on_packet_egress(plug_mgr, &pkt);
+    }
+
+    plugin_manager_exit(plug_mgr);
+	EXPECT_EQ(N_packet*MAX_MSG_PER_DISPATCH, env.msg_pub_cnt);
+	EXPECT_EQ(env.msg_free_cnt, env.msg_pub_cnt);
+	EXPECT_EQ(env.msg_sub_cnt, env.msg_pub_cnt*topic_sub_num);
+}
 /**********************************************
  * TEST PLUGIN MANAGER ON SESSION PLUGIN INIT *
  **********************************************/
@@ -1042,7 +1160,161 @@ TEST(plugin_manager, session_plugin_ignore_on_ctx_new_sub_other_msg) {
 
 }
 
+struct test_overlimit_session_mq_ctx
+{
+	int pkt_cnt;
+	int pub_cnt;
+	int sub_cnt;
+};
 
+static void *test_overlimit_pub_session_ctx_new(struct session *sess, void *plugin_env)
+{
+	struct test_overlimit_session_mq_ctx *ctx=CALLOC(struct test_overlimit_session_mq_ctx, 1);
+	return ctx;
+}
+
+static void test_overlimit_pub_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)session_ctx;
+	EXPECT_EQ(ctx->pkt_cnt, env->N_per_session_pkt_cnt);
+	FREE(ctx);
+	return;
+}
+
+static void *test_overlimit_sub_session_ctx_new(struct session *sess, void *plugin_env)
+{
+	struct test_overlimit_session_mq_ctx *ctx=CALLOC(struct test_overlimit_session_mq_ctx, 1);
+	return ctx;
+}
+
+static void test_overlimit_sub_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)session_ctx;
+	EXPECT_EQ(ctx->sub_cnt, (env->N_per_session_pkt_cnt*(MAX_MSG_PER_DISPATCH-1))); //minus intrinsic msg
+	FREE(ctx);
+	return;
+}
+
+static void test_overlimit_pub_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)per_session_ctx;
+	EXPECT_TRUE(env!=NULL);
+	EXPECT_TRUE(ctx!=NULL);
+	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
+	int *pub_msg;
+    if (msg)
+    {
+        env->test_mq_pub_called += 1;
+        ctx->pkt_cnt += 1;
+		for(int i=0; i < MAX_MSG_PER_DISPATCH*2; i++)
+		{
+			pub_msg = CALLOC(int, 1);
+        	*pub_msg = env->test_mq_pub_called;
+			if(i<(MAX_MSG_PER_DISPATCH-1))// minus intrinsic msg
+			{
+        		EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, pub_msg), 0);
+				ctx->pub_cnt+=1;
+			}
+			else
+			{
+        		EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, pub_msg), -1);
+				FREE(pub_msg);
+			}
+		}
+    }
+    return;
+}
+
+static void test_overlimit_on_sub_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)per_session_ctx;
+	EXPECT_TRUE(env!=NULL);
+	EXPECT_TRUE(ctx!=NULL);
+	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
+	EXPECT_EQ(*(int *)msg, env->test_mq_pub_called);
+	env->test_mq_sub_called+=1;
+	ctx->sub_cnt+=1;
+	return;
+}
+
+static void test_overlimit_session_msg_free(struct session *sess, void *msg, void *msg_free_arg)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)msg_free_arg;
+	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
+	if(msg)
+	{
+		EXPECT_EQ(env->test_mq_pub_called, *(int *)msg);
+		env->test_mq_free_called+=1;
+		FREE(msg);
+	}
+	return;
+}
+
+TEST(plugin_manager, session_plugin_pub_msg_overlimt) {
+
+	struct stellar st={0};
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+	unsigned char ip_proto=6;
+	struct session_plugin_env env;
+	memset(&env, 0, sizeof(struct session_plugin_env));
+	env.plug_mgr=plug_mgr;
+	env.N_per_session_pkt_cnt=10;
+	env.N_session=10;
+
+	env.test_mq_pub_plugin_id=stellar_session_plugin_register(&st, test_overlimit_pub_session_ctx_new, test_overlimit_pub_session_ctx_free, &env);
+	EXPECT_GE(env.test_mq_pub_plugin_id, 0);
+
+	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
+	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_overlimit_pub_on_session, env.test_mq_pub_plugin_id), 0);
+
+	env.test_mq_topic_id=stellar_session_mq_create_topic(&st, "SESSION_MQ_TOPIC", test_overlimit_session_msg_free, &env);
+	EXPECT_GE(env.test_mq_topic_id, 0);
+
+	env.test_mq_sub_plugin_id=stellar_session_plugin_register(&st, test_overlimit_sub_session_ctx_new, test_overlimit_sub_session_ctx_free, &env);
+	EXPECT_GE(env.test_mq_sub_plugin_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.test_mq_topic_id, test_overlimit_on_sub_msg, env.test_mq_sub_plugin_id), 0);
+
+	struct packet pkt={&st, TCP, ip_proto};
+
+
+	struct session sess[env.N_session];
+
+	for(int i=0; i < env.N_session; i++)
+		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+
+    for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+
+        for (int i = 0; i < env.N_session; i++)
+        {
+            plugin_manager_on_session_ingress(&sess[i], &pkt);
+            plugin_manager_on_session_egress(&sess[i], &pkt);
+        }
+
+        plugin_manager_on_packet_egress(plug_mgr, &pkt);
+    }
+
+    for(int i=0; i < env.N_session; i++)
+	{
+		plugin_manager_on_session_closing(&sess[i]);
+		plugin_manager_session_runtime_free(sess[i].plug_mgr_rt);
+	}
+
+	plugin_manager_exit(plug_mgr);
+
+	EXPECT_EQ(env.test_mq_pub_called,env.N_per_session_pkt_cnt*env.N_session);
+	EXPECT_EQ(env.test_mq_free_called, env.N_session*env.N_per_session_pkt_cnt*(MAX_MSG_PER_DISPATCH-1));
+	EXPECT_EQ(env.test_mq_sub_called, env.N_session*env.N_per_session_pkt_cnt*(MAX_MSG_PER_DISPATCH-1));
+
+}
 
 static void *test_dettach_session_ctx_new(struct session *sess, void *plugin_env)
 {
@@ -1125,13 +1397,13 @@ TEST(plugin_manager, session_plugin_on_ctx_new_then_dettach) {
 
 
 
-static void *test_invalid_send_msg_session_ctx_new(struct session *sess, void *plugin_env)
+static void *test_invalid_pub_msg_session_ctx_new(struct session *sess, void *plugin_env)
 {
 	struct test_basic_ctx *ctx=CALLOC(struct test_basic_ctx, 1);
 	return ctx;
 }
 
-static void test_invalid_send_msg_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
+static void test_invalid_pub_msg_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	env->basic_ctx_free_called+=1;
@@ -1143,7 +1415,7 @@ static void test_invalid_send_msg_session_ctx_free(struct session *sess, void *s
 	FREE(ctx);
 }
 
-static void test_invalid_send_msg_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+static void test_invalid_pub_msg_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
 {
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
 	ctx->called+=1;
@@ -1160,12 +1432,12 @@ TEST(plugin_manager, session_plugin_pub_on_ctx_free) {
 
 // plugin manager register plugin
 
-	int plugin_id=stellar_session_plugin_register(&st, test_invalid_send_msg_session_ctx_new, test_invalid_send_msg_session_ctx_free, &env);
+	int plugin_id=stellar_session_plugin_register(&st, test_invalid_pub_msg_session_ctx_new, test_invalid_pub_msg_session_ctx_free, &env);
 	EXPECT_GE(plugin_id,0);
 
 	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
 	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
-	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_invalid_send_msg_on_session, plugin_id), 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_invalid_pub_msg_on_session, plugin_id), 0);
 
 	env.test_mq_topic_id=stellar_session_mq_create_topic(&st, "SESSION_MQ_TOPIC", NULL, &env);
 	EXPECT_GE(env.test_mq_topic_id, 0);
