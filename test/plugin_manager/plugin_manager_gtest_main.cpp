@@ -66,12 +66,13 @@ void whitebox_test_plugin_manager_intrisic_metadata(struct stellar *st, struct p
 	EXPECT_GE(stellar_session_mq_get_topic_id(st, TOPIC_CONTROL_PACKET), 0);	
 }
 
-
 /***********************************
  * TEST PLUGIN MANAGER INIT & EXIT *
  ***********************************/
 
-TEST(plugin_manager_init, init_without_toml) {
+//TODO: test plugin_specs_load
+
+TEST(plugin_manager_init, init_with_null_toml) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -296,7 +297,7 @@ static void test_proto_filter_on_packet(struct packet *pkt, unsigned char ip_pro
 	return;
 }
 
-TEST(plugin_manager, packet_plugin_proto_filter) {
+TEST(plugin_manager, packet_plugins_with_proto_filter) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -388,7 +389,7 @@ static void test_packet_exdata_free(struct packet *pkt, int idx, void *ex_ptr, v
 }
 
 
-TEST(plugin_manager, packet_exdata) {
+TEST(plugin_manager, basic_packet_exdata) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -485,7 +486,7 @@ static void test_mq_pub_on_packet(struct packet *pkt, unsigned char ip_protocol,
 	return;
 }
 
-TEST(plugin_manager, packet_mq) {
+TEST(plugin_manager, basic_packet_mq_pub_sub) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -660,7 +661,7 @@ void test_mock_on_session_msg(struct session *sess, int topic_id, const void *ms
 void test_mock_overwrite_on_session_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env){}
 
 
-TEST(plugin_manager_init, session_mq_subscribe) {
+TEST(plugin_manager_init, session_mq_subscribe_overwrite) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -720,7 +721,7 @@ struct session_plugin_env
 	int test_mq_topic_id;
 };
 
-TEST(plugin_manager, no_plugin_runtime) {
+TEST(plugin_manager, no_plugin_register_runtime) {
 
 	struct stellar st={0};
 
@@ -837,7 +838,7 @@ static void test_basic_session_exdata_free(struct session *sess, int idx, void *
 	env->basic_exdata_free_called+=1;
 }
 
-TEST(plugin_manager, basic_session_plugin) {
+TEST(plugin_manager, session_plugin_on_intrinsic_ingress_egress) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -981,7 +982,7 @@ static void test_session_msg_free(struct session *sess, void *msg, void *msg_fre
 	return;
 }
 
-TEST(plugin_manager, basic_session_plugin_mq) {
+TEST(plugin_manager, session_plugin_ignore_on_ctx_new_sub_other_msg) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -1067,7 +1068,7 @@ static void test_dettach_on_session(struct session *sess, int topic_id, const vo
 	ctx->called+=1;
 }
 
-TEST(plugin_manager, session_plugin_ctx_new_dettach) {
+TEST(plugin_manager, session_plugin_on_ctx_new_then_dettach) {
 
 	struct stellar st={0};
 	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
@@ -1148,7 +1149,7 @@ static void test_invalid_send_msg_on_session(struct session *sess, int topic_id,
 	ctx->called+=1;
 }
 
-TEST(plugin_manager, session_plugin_invalid_send_msg) {
+TEST(plugin_manager, session_plugin_pub_on_ctx_free) {
 
 	struct stellar st={0};
 	struct session_plugin_env env;
@@ -1262,7 +1263,7 @@ static void test_session_closing_on_userdefine_msg(struct session *sess, int top
 	env->test_mq_sub_called+=1;
 }
 
-TEST(plugin_manager, session_closing) {
+TEST(plugin_manager, session_plugin_pub_msg_on_closing) {
 
 	struct stellar st={0};
 	struct session_plugin_env env;
@@ -1338,8 +1339,95 @@ TEST(plugin_manager, session_closing) {
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
  **********************************************/
 
+int test_plugin_on_polling_func(void *plugin_env)
+{
+	return 1;
+}
+
+TEST(plugin_manager_init, polling_plugin_register) {
+	struct stellar st={0};
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	st.plug_mgr=plug_mgr;
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+	int plugin_id = stellar_polling_plugin_register(&st, test_plugin_on_polling_func, &st);
+    {
+        SCOPED_TRACE("White-box test, check stellar internal schema");
+		EXPECT_TRUE(plugin_id>=POLLING_PULGIN_ID_BASE);
+        struct registered_polling_plugin_schema *schema = (struct registered_polling_plugin_schema *)utarray_eltptr(
+            plug_mgr->registered_polling_plugin_array, (unsigned int)(plugin_id-POLLING_PULGIN_ID_BASE));
+        EXPECT_EQ(schema->on_polling, (void *)test_plugin_on_polling_func);
+        EXPECT_EQ(schema->plugin_env, &st);
+        EXPECT_EQ(utarray_len(plug_mgr->registered_polling_plugin_array), 1);
+    }
+
+    plugin_manager_exit(plug_mgr);
+}
+
 /**********************************************
  * TEST PLUGIN MANAGER ON POLLING PLUGIN RUNTIME *
+ **********************************************/
+
+struct polling_plugin_env
+{
+	struct plugin_manager_schema *plug_mgr;
+	int N_polling;
+	int return0_polling_called;
+	int return1_polling_called;
+};
+
+int return1_plugin_on_polling(void *plugin_env)
+{
+	struct polling_plugin_env *env = (struct polling_plugin_env *)plugin_env;
+	env->return1_polling_called+=1;
+	return 1;
+}
+
+int return0_plugin_on_polling(void *plugin_env)
+{
+	struct polling_plugin_env *env = (struct polling_plugin_env *)plugin_env;
+	env->return0_polling_called+=1;
+	return 0;
+}
+
+TEST(plugin_manager, basic_polling_plugins) {
+
+// pesudo init stage
+	struct stellar st={0};
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	st.plug_mgr=plug_mgr;
+	struct polling_plugin_env env;
+	memset(&env, 0, sizeof(struct polling_plugin_env));
+	env.plug_mgr=plug_mgr;
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+// plugin manager register plugin
+	int plugin_id = stellar_polling_plugin_register(&st, return0_plugin_on_polling, &env);
+	EXPECT_TRUE(plugin_id>=0);
+	plugin_id = stellar_polling_plugin_register(&st, return1_plugin_on_polling, &env);
+	EXPECT_TRUE(plugin_id>=0);
+
+// pesudo runtime stage
+
+	env.plug_mgr=plug_mgr;
+	env.N_polling=10;
+
+	for(int i=0; i<env.N_polling; i++)
+	{
+		EXPECT_EQ(plugin_manager_on_polling(plug_mgr), 1);
+	}
+
+// pesudo exit stage
+	plugin_manager_exit(plug_mgr);
+
+	EXPECT_EQ(env.return0_polling_called,env.N_polling);
+	EXPECT_EQ(env.return1_polling_called,env.N_polling);
+
+}
+
+
+/**********************************************
+ * GTEST MAIN *
  **********************************************/
 
 int main(int argc, char ** argv)
