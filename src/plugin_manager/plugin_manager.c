@@ -773,6 +773,8 @@ int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_session_ms
 	struct stellar_mq_subscriber_info *p=NULL;
   	while( (p=(struct stellar_mq_subscriber_info *)utarray_next(session_plugin_schema->registed_session_mq_subscriber_info,p))) 
 	{
+		if(p->topic_id==topic_id)
+		{
 			struct stellar_mq_subscriber *tmp_subscriber=topic->subscribers;
 			int cnt=0;
 			while(tmp_subscriber)
@@ -785,6 +787,7 @@ int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_session_ms
 				cnt++;
 				tmp_subscriber=tmp_subscriber->next;
 			}
+		}
 	};
 
 	struct stellar_mq_subscriber *new_subscriber = CALLOC(struct stellar_mq_subscriber,1);
