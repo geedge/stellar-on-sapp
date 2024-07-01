@@ -146,7 +146,7 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 	case OP_STATE_CLOSE:
 		// for TCPALL && UDP closed by idle timeout, definitely no packet
 		// for TCP stream, only trigger update when packet payload > 0
-		if(a_packet && pstream->ptcpdetail->datalen > 0)
+		if(a_packet && raw_pkt != NULL)
 		{
 			entry_ret=session_state_update_on_sapp(pstream, state, sess, raw_pkt, pkt_type);
 		}
