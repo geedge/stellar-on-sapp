@@ -9,7 +9,6 @@ struct plugin_manager_schema *plugin_manager_init(struct stellar *st, const char
 void plugin_manager_exit(struct plugin_manager_schema *plug_mgr);
 
 void plugin_manager_on_packet_ingress(struct plugin_manager_schema *plug_mgr, struct packet *pkt);
-void plugin_manager_on_packet_egress(struct plugin_manager_schema *plug_mgr, struct packet *pkt);
 
 //return polling work state, 0: idle, 1: working
 int plugin_manager_on_polling(struct plugin_manager_schema *plug_mgr);

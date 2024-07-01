@@ -4,44 +4,22 @@
 
 #include "stellar/session_exdata.h"
 #include "stellar/session_mq.h"
-#include "stellar/packet_exdata.h"
-#include "stellar/packet_mq.h"
 
 #include "bitmap/bitmap.h"
 #include "uthash/utarray.h"
 
-struct per_thread_exdata_array
-{
-	struct stellar_exdata *exdata_array;
-};
-
 struct stellar_message;
-struct per_thread_mq
-{
-	struct stellar_message *mq;
-	int pub_msg_cnt;
-};
-
-struct plugin_manger_per_thread_data
-{
-	struct per_thread_exdata_array per_thread_pkt_exdata_array;
-	struct per_thread_mq per_thread_pkt_mq;
-};
 
 struct plugin_manager_schema
 {
 	struct stellar *st;
 	UT_array *plugin_load_specs_array;
-	UT_array *packet_exdata_schema_array;
-	UT_array *packet_mq_schema_array;
 	UT_array *session_exdata_schema_array;
 	UT_array *session_mq_schema_array;
 	UT_array *registered_session_plugin_array;
 	UT_array *registered_packet_plugin_array;
 	UT_array *registered_polling_plugin_array;
-	int packet_mq_topic_num;
 	int session_mq_topic_num;
-	int packet_topic_subscriber_num;
 	int session_topic_subscriber_num;
 	int tcp_topic_id;
 	int tcp_stream_topic_id;
@@ -49,10 +27,7 @@ struct plugin_manager_schema
 	int egress_topic_id;
 	int control_packet_topic_id;
 	int max_message_dispatch;
-	struct plugin_manger_per_thread_data *per_thread_data;
 }__attribute__((aligned(sizeof(void*))));
-
-
 
 
 struct stellar_exdata
@@ -69,7 +44,6 @@ struct stellar_exdata_schema
 	{
 		void *free_func;
 		session_exdata_free *sess_free_func;
-		packet_exdata_free *pkt_free_func;
 	};
 	
 	void *free_arg;
@@ -91,7 +65,6 @@ typedef struct stellar_mq_subscriber
 	union 
 	{
     	on_session_msg_cb_func *sess_msg_cb;
-    	on_packet_msg_cb_func *pkt_msg_cb;
 	};
     struct stellar_mq_subscriber *next, *prev;
 }stellar_mq_subscriber __attribute__((aligned(sizeof(void*))));
@@ -108,7 +81,6 @@ struct stellar_mq_topic_schema
 	{
 		void *free_cb;
 		session_msg_free_cb_func *sess_msg_free_cb;
-		packet_msg_free_cb_func *pkt_msg_free_cb;
 	};
 	struct stellar_mq_subscriber *subscribers; 
 }__attribute__((aligned(sizeof(void*))));

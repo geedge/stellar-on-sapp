@@ -60,7 +60,6 @@ inline struct plugin_manager_runtime * session_plugin_manager_runtime_get(struct
 /*********************************************
  * STELLAR INIT & EXIT ON SAPP *
  *********************************************/
-
 struct stellar *stellar_init_on_sapp(const char *toml_conf_path)
 {
 	struct stellar *st = CALLOC(struct stellar, 1);
@@ -157,7 +156,6 @@ void session_defer_on_sapp(struct session *sess)
 		if(pkt->raw_pkt)
 		{
 			plugin_manager_on_session_egress(sess, pkt);
-			plugin_manager_on_packet_egress(sess->st->plug_mgr, pkt);
 		}
 	}
 	sess->cur_pkt.raw_pkt=NULL;//clear raw_pkt
@@ -193,10 +191,6 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	}
 	//FIXME: defer TCP/UDP packet on session update
 	plugin_manager_on_packet_ingress(st->plug_mgr, &pkt);
-	if(pkt.ip_proto!=IPPROTO_TCP && pkt.ip_proto!=IPPROTO_UDP)
-	{
-		plugin_manager_on_packet_egress(st->plug_mgr, &pkt);
-	}
 }
 
 inline int polling_on_sapp(struct stellar *st)
