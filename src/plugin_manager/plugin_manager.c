@@ -551,6 +551,7 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
                 int cur_sub_idx = 0;
                 DL_FOREACH_SAFE(topic->subscribers, sub_elt, sub_tmp)
                 {
+					plug_mgr_rt->current_session_plugin_id=sub_elt->plugin_idx;
                     if (bitmap_get(plug_mgr_rt->session_mq_status, mq_elt->topic_id, cur_sub_idx) != 0)
                     {
 						plugin_ctx_rt=(plug_mgr_rt->plugin_ctx_array+sub_elt->plugin_idx);
