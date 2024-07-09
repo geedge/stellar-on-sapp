@@ -3,10 +3,13 @@
 
 #include "stellar_internal.h"
 
-#include "stellar/stellar.h"
 #include "stellar/utils.h"
 
+#include "stellar/stellar.h"
+#include "stellar/session_mq.h"
+
 #include "plugin_manager/plugin_manager.h"
+
 
 #include <MESA/stream.h>
 
@@ -15,6 +18,7 @@
 struct stellar
 {
 	struct plugin_manager_schema *plug_mgr;
+	int tcp_stream_topic_id;
 };
 
 struct packet
@@ -37,10 +41,6 @@ struct session
 	struct plugin_manager_runtime *plug_mgr_rt;
 }__attribute__((aligned(sizeof(void*))));
 
-inline struct stellar * packet_stellar_get(struct packet *pkt)
-{
-	return pkt->st;
-}
 
 inline struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct stellar *st)
 {
@@ -70,6 +70,7 @@ struct stellar *stellar_init_on_sapp(const char *toml_conf_path)
 		return NULL;
 	}
 	st->plug_mgr=pm;
+	st->tcp_stream_topic_id=stellar_session_mq_get_topic_id(st, TOPIC_TCP_STREAM);
 	return st;
 }
 
@@ -140,7 +141,12 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned c
 		pkt->raw_pkt=raw_pkt;
 		pkt->type=type;
 		if(raw_pkt)plugin_manager_on_session_ingress(sess, pkt);
-		return APP_STATE_GIVEME;
+
+		//check TCP topic active subscirber num, if 0, return APP_STATE_DROPME, to reduce tcp reassemble overhead		
+		if(type == TCP_STREAM && session_mq_topic_is_active(sess, sess->st->tcp_stream_topic_id) == 0)
+			return APP_STATE_DROPME;
+		else
+			return APP_STATE_GIVEME;
 	}
 	else
 		return APP_STATE_DROPME;

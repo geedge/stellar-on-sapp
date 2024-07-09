@@ -104,6 +104,7 @@ struct plugin_manager_runtime
 	struct stellar_message *pending_mq;// message list
 	struct stellar_message *delivered_mq;// message list
 	struct bitmap *session_mq_status; //N * M bits, N topic, M subscriber
+	struct bitmap *session_topic_status; //N bits, N topic
 	struct stellar_exdata *sess_exdata_array;
 	struct session_plugin_ctx_runtime *plugin_ctx_array;//N plugins TODO: call alloc and free
 	int current_session_plugin_id;

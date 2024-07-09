@@ -1058,6 +1058,8 @@ TEST(plugin_manager, session_plugin_pub_msg_on_closing) {
 	EXPECT_EQ(env.test_mq_sub_called,env.N_session);
 }
 
+//TODO: test session_mq_topic_is_active
+
 /**********************************************
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
  **********************************************/

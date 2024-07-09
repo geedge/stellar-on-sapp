@@ -22,3 +22,5 @@ int session_mq_publish_message(struct session *sess, int topic_id, void *msg);
 
 int session_mq_ignore_message(struct session *sess, int topic_id, int plugin_id);
 int session_mq_unignore_message(struct session *sess, int topic_id, int plugin_id);
+
+int session_mq_topic_is_active(struct session *sess, int topic_id);

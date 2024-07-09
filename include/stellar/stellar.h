@@ -14,7 +14,8 @@ typedef void plugin_on_unload_func(void *plugin_env);
 typedef void *session_ctx_new_func(struct session *sess, void *plugin_env);
 typedef void session_ctx_free_func(struct session *sess, void *session_ctx, void *plugin_env);
 
-#define TOPIC_TCP "TCP"
+//intrinsic topic, publish packet as message
+#define TOPIC_TCP "TCP"  
 #define TOPIC_TCP_STREAM "TCP_STREAM"
 #define TOPIC_UDP "UDP"
 #define TOPIC_EGRESS "EGRESS"

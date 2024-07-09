@@ -226,7 +226,6 @@ void *stellar_exdata_get(UT_array *exdata_schema, struct stellar_exdata *exdata_
  * SESSION EXDATA *
  *******************************/
 
-//TODO: limit exdata new index in plugin init stage
 int stellar_session_exdata_new_index(struct stellar *st, const char *name, session_exdata_free *free_func,void *free_arg) 
 {
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
@@ -582,12 +581,23 @@ static void plugin_manager_session_message_dispatch(struct session *sess)
                     }
                     cur_sub_idx++;
                 }
+				if(cur_sub_idx==0)bitmap_set(plug_mgr_rt->session_topic_status, mq_elt->topic_id, 1, 0);
             }
             DL_DELETE(plug_mgr_rt->pending_mq, mq_elt);
 			DL_APPEND(plug_mgr_rt->delivered_mq, mq_elt);// move to delivered message list
         }
     }
 	return;
+}
+
+int session_mq_topic_is_active(struct session *sess, int topic_id)
+{
+	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
+	assert(plug_mgr_rt);
+	if(plug_mgr_rt->session_topic_status==NULL)return -1;//runtime free stage , mq_status alaway null, ignore publish message	
+	if(topic_id >= plug_mgr_rt->plug_mgr->session_mq_topic_num)return -1;// topic_id out of range
+	if(bitmap_get(plug_mgr_rt->session_topic_status, topic_id, 1) == 0)return 0;
+	return 1;
 }
 
 /*******************************
@@ -633,6 +643,7 @@ struct plugin_manager_runtime *plugin_manager_session_runtime_new(struct plugin_
 	rt->pending_mq = NULL;
 	rt->delivered_mq = NULL;
 	rt->session_mq_status=bitmap_new(plug_mgr->session_mq_topic_num, plug_mgr->session_topic_subscriber_num, 1);
+	rt->session_topic_status=bitmap_new(plug_mgr->session_mq_topic_num, 1, 1);
 	rt->sess_exdata_array = (struct stellar_exdata *)session_exdata_runtime_new(plug_mgr);
 	if(plug_mgr->registered_session_plugin_array)
 		rt->plugin_ctx_array = CALLOC(struct session_plugin_ctx_runtime, utarray_len(plug_mgr->registered_session_plugin_array));
@@ -657,6 +668,11 @@ void plugin_manager_session_runtime_free(struct plugin_manager_runtime *rt)
 	{
 		bitmap_free(rt->session_mq_status);
 		rt->session_mq_status=NULL;
+	}
+	if(rt->session_topic_status != NULL)
+	{
+		bitmap_free(rt->session_topic_status);
+		rt->session_topic_status=NULL;
 	}
     if (rt->plug_mgr->registered_session_plugin_array)
     {
@@ -810,7 +826,6 @@ void plugin_manager_on_session_ingress(struct session *sess, struct packet *pkt)
 		break;
 	}
 	plug_mgr_rt->pub_session_msg_cnt=0;
-	//TODO: check TCP topic active subscirber num, if 0, return APP_STATE_DROPME, to reduce tcp reassemble overhead
 	session_mq_publish_message(sess, topic_id ,(void *)pkt);
 	plugin_manager_session_message_dispatch(sess);
     return;
