@@ -50,13 +50,15 @@ struct stellar_exdata_schema
 	int idx;
 }__attribute__((aligned(sizeof(void*))));
 
-
 struct stellar_message
 {
-	int topic_id;
-    void *msg_data;
+    struct
+    {
+        int topic_id;
+    } header;
+    void *body;
     struct stellar_message *next, *prev;
-}__attribute__((aligned(sizeof(void*))));
+} __attribute__((aligned(sizeof(void *))));
 
 typedef struct stellar_mq_subscriber 
 {
