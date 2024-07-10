@@ -46,8 +46,21 @@ void bitmap_free(struct bitmap *bmp) {
 	}
 }
 
-
-
+int bitmap_is_all_zero(struct bitmap *bmp, int x, int y, int length) {
+    if (x < 0 || y < 0 || x >= bmp->width || y >= bmp->height) {
+        return -1; // Return error code if coordinates are out of bounds
+    }
+    int idx = y * bmp->width + x;
+    if (idx + length > bmp->width * bmp->height) {
+        return -1; // Return error if range exceeds bitmap bounds
+    }
+    for (int i = 0; i < length; i++) {
+        if (bmp->data[(idx + i) / 8] & (1 << ((idx + i) % 8))) {
+            return 0; // Return 0 if any bit is not zero
+        }
+    }
+    return 1; // Return 1 if all bits are zero
+}
 
 int test_bitmap() {
     struct bitmap *bmp = bitmap_new(10, 5, 1); // Create a 10x5 bitmap

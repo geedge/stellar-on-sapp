@@ -295,6 +295,10 @@ struct session_plugin_env
 	int test_mq_sub_called;
 	int test_mq_free_called;
 	int test_mq_topic_id;
+	int plugin_id_1;
+	int plugin_id_2;
+	int plugin_id_1_called;
+	int plugin_id_2_called;
 };
 
 TEST(plugin_manager, no_plugin_register_runtime) {
@@ -1058,7 +1062,234 @@ TEST(plugin_manager, session_plugin_pub_msg_on_closing) {
 	EXPECT_EQ(env.test_mq_sub_called,env.N_session);
 }
 
-//TODO: test session_mq_topic_is_active
+struct test_session_called_ctx
+{
+	int called;
+};
+
+static void *test_session_called_ctx_new(struct session *sess, void *plugin_env)
+{
+	struct test_session_called_ctx *ctx=CALLOC(struct test_session_called_ctx, 1);
+	return ctx;
+}
+
+static void test_session_called_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
+{
+	FREE(session_ctx);
+}
+
+//test session topic is active
+static void test_session_mq_topic_is_active_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
+	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
+	env->plugin_id_1_called+=1;
+	ctx->called+=1;
+	EXPECT_EQ(env->plugin_id_1, sess->plug_mgr_rt->current_session_plugin_id);
+	EXPECT_EQ(env->intrinsc_tcp_topic_id, topic_id);
+
+	session_mq_ignore_message(sess, topic_id, env->plugin_id_1);
+	EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 1);
+	return;
+}
+
+static void test_session_mq_topic_is_active_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
+	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
+	env->plugin_id_2_called+=1;
+	ctx->called+=1;
+	EXPECT_EQ(env->plugin_id_2, sess->plug_mgr_rt->current_session_plugin_id);	
+	EXPECT_EQ(env->intrinsc_tcp_topic_id, topic_id);
+
+	EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 1);
+
+	if(ctx->called > env->N_per_session_pkt_cnt/2)
+	{
+		session_mq_ignore_message(sess, topic_id, env->plugin_id_2);
+		EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 0);	
+	}
+	return;
+}
+
+TEST(plugin_manager, test_session_mq_topic_is_active) {
+
+	struct stellar st={0};
+	struct session_plugin_env env;
+	memset(&env, 0, sizeof(struct session_plugin_env));
+
+// pesudo init stage
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+// plugin manager register plugin
+
+	int plugin_id_1=stellar_session_plugin_register(&st, test_session_called_ctx_new, test_session_called_ctx_free, &env);
+	EXPECT_GE(plugin_id_1,0);
+
+	int plugin_id_2=stellar_session_plugin_register(&st, test_session_called_ctx_new, test_session_called_ctx_free, &env);
+	EXPECT_GE(plugin_id_2,0);
+
+	env.plugin_id_1=plugin_id_1;
+	env.plugin_id_2=plugin_id_2;
+
+	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
+	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_session_mq_topic_is_active_plugin_1_on_msg, plugin_id_1), 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_session_mq_topic_is_active_plugin_2_on_msg, plugin_id_2), 0);
+
+// pesudo packet and session
+
+	env.plug_mgr=plug_mgr;
+	env.N_per_session_pkt_cnt=10;
+	env.N_session=10;
+
+	struct packet pkt={&st, TCP, 6};
+
+	struct session sess[env.N_session];
+	memset(&sess, 0, sizeof(sess));
+
+// pesudo running stage
+	for(int i=0; i < env.N_session; i++)
+	{
+		sess[i].state=SESSION_STATE_OPENING;
+		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+	}
+
+    for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+
+        for (int i = 0; i < env.N_session; i++)
+        {
+			sess[i].sess_pkt_cnt+=1;
+			sess[i].state=SESSION_STATE_ACTIVE;
+            plugin_manager_on_session_ingress(&sess[i], &pkt);
+            plugin_manager_on_session_egress(&sess[i], &pkt);
+        }
+
+    }
+
+    for(int i=0; i < env.N_session; i++)
+	{
+		sess[i].state=SESSION_STATE_CLOSING;
+		plugin_manager_on_session_closing(&sess[i]);
+		plugin_manager_session_runtime_free(sess[i].plug_mgr_rt);
+	}
+
+// pesudo exit stage
+	plugin_manager_exit(plug_mgr);
+
+	EXPECT_EQ(env.plugin_id_1_called,env.N_session*1);// per session called once, then ignore
+	EXPECT_EQ(env.plugin_id_2_called,env.N_session*(env.N_per_session_pkt_cnt/2+1));// per session called one half, then ignore
+}
+
+//test dettach session
+static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
+	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
+	env->plugin_id_1_called+=1;
+	ctx->called+=1;
+	EXPECT_EQ(env->plugin_id_1, sess->plug_mgr_rt->current_session_plugin_id);
+	EXPECT_EQ(env->intrinsc_tcp_topic_id, topic_id);
+
+	stellar_session_plugin_dettach_current_session(sess);
+	EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 1);
+	return;
+}
+
+static void test_session_dettach_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
+	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
+	env->plugin_id_2_called+=1;
+	ctx->called+=1;
+	EXPECT_EQ(env->plugin_id_2, sess->plug_mgr_rt->current_session_plugin_id);	
+	EXPECT_EQ(env->intrinsc_tcp_topic_id, topic_id);
+
+	EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 1);
+
+	if(ctx->called > env->N_per_session_pkt_cnt/2)
+	{
+		stellar_session_plugin_dettach_current_session(sess);
+		EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 0);	
+	}
+
+	return;
+}
+
+TEST(plugin_manager, test_session_dettach) {
+
+	struct stellar st={0};
+	struct session_plugin_env env;
+	memset(&env, 0, sizeof(struct session_plugin_env));
+
+// pesudo init stage
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+// plugin manager register plugin
+
+	int plugin_id_1=stellar_session_plugin_register(&st, test_session_called_ctx_new, test_session_called_ctx_free, &env);
+	EXPECT_GE(plugin_id_1,0);
+
+	int plugin_id_2=stellar_session_plugin_register(&st, test_session_called_ctx_new, test_session_called_ctx_free, &env);
+	EXPECT_GE(plugin_id_2,0);
+
+	env.plugin_id_1=plugin_id_1;
+	env.plugin_id_2=plugin_id_2;
+
+	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
+	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_session_dettach_plugin_1_on_msg, plugin_id_1), 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_session_dettach_plugin_2_on_msg, plugin_id_2), 0);
+
+// pesudo packet and session
+
+	env.plug_mgr=plug_mgr;
+	env.N_per_session_pkt_cnt=10;
+	env.N_session=10;
+
+	struct packet pkt={&st, TCP, 6};
+
+	struct session sess[env.N_session];
+	memset(&sess, 0, sizeof(sess));
+
+// pesudo running stage
+	for(int i=0; i < env.N_session; i++)
+	{
+		sess[i].state=SESSION_STATE_OPENING;
+		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+	}
+
+    for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+
+        for (int i = 0; i < env.N_session; i++)
+        {
+			sess[i].sess_pkt_cnt+=1;
+			sess[i].state=SESSION_STATE_ACTIVE;
+            plugin_manager_on_session_ingress(&sess[i], &pkt);
+            plugin_manager_on_session_egress(&sess[i], &pkt);
+        }
+
+    }
+
+    for(int i=0; i < env.N_session; i++)
+	{
+		sess[i].state=SESSION_STATE_CLOSING;
+		plugin_manager_on_session_closing(&sess[i]);
+		plugin_manager_session_runtime_free(sess[i].plug_mgr_rt);
+	}
+
+// pesudo exit stage
+	plugin_manager_exit(plug_mgr);
+
+	EXPECT_EQ(env.plugin_id_1_called,env.N_session*1);// per session called once, then ignore
+	EXPECT_EQ(env.plugin_id_2_called,env.N_session*(env.N_per_session_pkt_cnt/2+1));// per session called one half, then ignore
+}
 
 /**********************************************
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
