@@ -889,7 +889,8 @@ void stellar_session_plugin_dettach_current_session(struct session *sess)
 	if(session_plugin_schema==NULL)return;
 	struct stellar_mq_topic_schema *topic=NULL;
 	unsigned int plugin_subscriber_num = utarray_len(session_plugin_schema->registed_session_mq_subscriber_info);
-	//FIXME: maybe no need to clear session_mq_status, check plugin_ctx before message dispatch
+	//Won't Do: maybe no need to clear session_mq_status, check plugin_ctx before message dispatch
+	//allow plugin register with null ctx_new and ctx_free
 	if(plug_mgr_rt->session_mq_status)
 	{
 		for(unsigned int i=0; i < plugin_subscriber_num; i++)

@@ -197,6 +197,8 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	}
 	//FIXME: defer TCP/UDP packet on session update
 	plugin_manager_on_packet_ingress(st->plug_mgr, &pkt);
+
+	// TODO: create transient icmp session
 }
 
 inline int polling_on_sapp(struct stellar *st)
