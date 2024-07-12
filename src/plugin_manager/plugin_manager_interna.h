@@ -55,6 +55,7 @@ struct stellar_message
     struct
     {
         int topic_id;
+		enum session_mq_priority priority;
     } header;
     void *body;
     struct stellar_message *next, *prev;
@@ -103,8 +104,8 @@ struct plugin_manager_runtime
 {
 	struct plugin_manager_schema *plug_mgr;
 	struct session *sess;
-	struct stellar_message *pending_mq;// message list
-	struct stellar_message *delivered_mq;// message list
+	struct stellar_message *priority_mq[SESSION_MQ_PRIORITY_MAX];// message list
+	struct stellar_message *dealth_letter_queue;// dlq list
 	struct bitmap *session_mq_status; //N * M bits, N topic, M subscriber
 	struct bitmap *session_topic_status; //N bits, N topic
 	struct stellar_exdata *sess_exdata_array;

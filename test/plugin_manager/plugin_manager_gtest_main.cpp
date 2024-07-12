@@ -1291,6 +1291,9 @@ TEST(plugin_manager, test_session_dettach) {
 	EXPECT_EQ(env.plugin_id_2_called,env.N_session*(env.N_per_session_pkt_cnt/2+1));// per session called one half, then ignore
 }
 
+
+//TODO: test case for priority mq
+
 /**********************************************
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
  **********************************************/

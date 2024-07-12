@@ -24,3 +24,13 @@ int session_mq_ignore_message(struct session *sess, int topic_id, int plugin_id)
 int session_mq_unignore_message(struct session *sess, int topic_id, int plugin_id);
 
 int session_mq_topic_is_active(struct session *sess, int topic_id);
+
+enum session_mq_priority 
+{
+	SESSION_MQ_PRIORITY_LOW,
+	SESSION_MQ_PRIORITY_NORMAL,
+	SESSION_MQ_PRIORITY_HIGH,
+	SESSION_MQ_PRIORITY_MAX,
+};
+
+int session_mq_publish_message_with_priority(struct session *sess, int topic_id, void *msg, enum session_mq_priority priority);
