@@ -893,7 +893,7 @@ void plugin_manager_on_session_ingress(struct session *sess, struct packet *pkt)
 		break;
 	}
 	plug_mgr_rt->pub_session_msg_cnt=0;
-	session_mq_publish_message(sess, topic_id ,(void *)pkt);
+	session_mq_publish_message_with_priority(sess, topic_id ,(void *)pkt, SESSION_MQ_PRIORITY_HIGH);
 	plugin_manager_session_message_dispatch(sess);
     return;
 }
@@ -902,7 +902,7 @@ void plugin_manager_on_session_egress(struct session *sess, struct packet *pkt)
 {
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt==NULL)return;
-	session_mq_publish_message(sess, plug_mgr_rt->plug_mgr->egress_topic_id ,pkt);
+	session_mq_publish_message_with_priority(sess, plug_mgr_rt->plug_mgr->egress_topic_id ,pkt, SESSION_MQ_PRIORITY_HIGH);
 	plugin_manager_session_message_dispatch(sess);
 	session_mq_free(plug_mgr_rt->sess,&plug_mgr_rt->dealth_letter_queue, plug_mgr_rt->plug_mgr->session_mq_schema_array);
 	assert(plug_mgr_rt->priority_mq[SESSION_MQ_PRIORITY_HIGH]==NULL);
@@ -919,11 +919,11 @@ void plugin_manager_on_session_closing(struct session *sess)
 	switch (session_get_type(sess))
 	{
 		case SESSION_TYPE_TCP:
-			session_mq_publish_message(sess, plug_mgr_rt->plug_mgr->tcp_topic_id ,NULL);
-			session_mq_publish_message(sess, plug_mgr_rt->plug_mgr->tcp_stream_topic_id , NULL);
+			session_mq_publish_message_with_priority(sess, plug_mgr_rt->plug_mgr->tcp_topic_id ,NULL, SESSION_MQ_PRIORITY_HIGH);
+			session_mq_publish_message_with_priority(sess, plug_mgr_rt->plug_mgr->tcp_stream_topic_id , NULL, SESSION_MQ_PRIORITY_HIGH);
 			break;
 		case SESSION_TYPE_UDP:
-			session_mq_publish_message(sess, plug_mgr_rt->plug_mgr->udp_topic_id ,NULL);
+			session_mq_publish_message_with_priority(sess, plug_mgr_rt->plug_mgr->udp_topic_id ,NULL, SESSION_MQ_PRIORITY_HIGH);
 			break;
 		default:
 			break;
