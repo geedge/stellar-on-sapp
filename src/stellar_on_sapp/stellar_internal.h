@@ -23,3 +23,5 @@ enum packet_type
 };
 
 enum packet_type packet_get_type(const struct packet *pkt);
+
+struct stellar * packet_stellar_get(struct packet *pkt);

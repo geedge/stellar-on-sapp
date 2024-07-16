@@ -122,7 +122,7 @@ test_in_centos8:
   script:
     - *everything_before_script
     - ls -l /opt/MESA/lib && echo "/opt/MESA/lib" >> /etc/ld.so.conf
-    - cd build; make test
+    - cd build; ctest -V
   dependencies:
     - develop_build_for_centos8
     - release_build_for_centos8

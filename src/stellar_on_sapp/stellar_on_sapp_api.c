@@ -41,6 +41,11 @@ struct session
 	struct plugin_manager_runtime *plug_mgr_rt;
 }__attribute__((aligned(sizeof(void*))));
 
+inline struct stellar * packet_stellar_get(struct packet *pkt)
+{
+	return pkt->st;
+}
+
 
 inline struct plugin_manager_schema * stellar_plugin_manager_schema_get(struct stellar *st)
 {
@@ -140,6 +145,8 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned c
 		struct packet *pkt = &sess->cur_pkt;
 		pkt->raw_pkt=raw_pkt;
 		pkt->type=type;
+		pkt->sess=sess;
+		pkt->st=sess->st;
 		if(raw_pkt)plugin_manager_on_session_ingress(sess, pkt);
 
 		//check TCP topic active subscirber num, if 0, return APP_STATE_DROPME, to reduce tcp reassemble overhead		
@@ -162,6 +169,7 @@ void session_defer_on_sapp(struct session *sess)
 		if(pkt->raw_pkt)
 		{
 			plugin_manager_on_session_egress(sess, pkt);
+			plugin_manager_on_packet_egress(sess->st->plug_mgr, pkt);
 		}
 	}
 	sess->cur_pkt.raw_pkt=NULL;//clear raw_pkt
@@ -197,6 +205,11 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	}
 	//FIXME: defer TCP/UDP packet on session update
 	plugin_manager_on_packet_ingress(st->plug_mgr, &pkt);
+	if(pkt.ip_proto!=IPPROTO_TCP && pkt.ip_proto!=IPPROTO_UDP)
+	{
+		plugin_manager_on_packet_egress(st->plug_mgr, &pkt);
+	}
+
 }
 
 inline int polling_on_sapp(struct stellar *st)

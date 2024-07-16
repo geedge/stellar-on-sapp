@@ -61,6 +61,10 @@ int stellar_get_current_thread_id(struct stellar *st)
 	return 0;
 }
 
+struct stellar * packet_stellar_get(struct packet *pkt)
+{
+	return pkt->st;
+}
 
 struct plugin_manager_runtime * session_plugin_manager_runtime_get(struct session *sess)
 {
