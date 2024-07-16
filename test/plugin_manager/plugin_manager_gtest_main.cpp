@@ -1193,7 +1193,6 @@ static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic
 	ctx->called+=1;
 	EXPECT_EQ(env->plugin_id_1, sess->plug_mgr_rt->current_session_plugin_id);
 	EXPECT_EQ(env->intrinsc_tcp_topic_id, topic_id);
-
 	stellar_session_plugin_dettach_current_session(sess);
 	EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 1);
 	return;
@@ -1289,10 +1288,133 @@ TEST(plugin_manager, test_session_dettach) {
 
 	EXPECT_EQ(env.plugin_id_1_called,env.N_session*1);// per session called once, then ignore
 	EXPECT_EQ(env.plugin_id_2_called,env.N_session*(env.N_per_session_pkt_cnt/2+1));// per session called one half, then ignore
+
 }
 
 
-//TODO: test case for priority mq
+//test dettach session
+static void test_session_mq_priority_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
+	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
+	env->plugin_id_1_called+=1;
+	ctx->called+=1;
+	EXPECT_EQ(env->plugin_id_1, sess->plug_mgr_rt->current_session_plugin_id);
+	EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 1);
+	if(topic_id == env->intrinsc_tcp_topic_id)
+	{
+			EXPECT_EQ(ctx->called%3, 1);// intrinsc msg has high priority
+			EXPECT_EQ(session_mq_publish_message_with_priority(sess, env->test_mq_topic_id, (void *)(long)env->plugin_id_1, SESSION_MQ_PRIORITY_LOW), 0);
+	}
+	if(topic_id == env->test_mq_topic_id)
+	{
+		if(ctx->called%3 == 2)EXPECT_EQ((int)(long)msg, env->plugin_id_2);
+		if(ctx->called%3 == 0)EXPECT_EQ((int )(long)msg, env->plugin_id_1);
+	}
+	return;
+}
+
+static void test_session_mq_priority_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
+	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
+	env->plugin_id_2_called+=1;
+	ctx->called+=1;
+	EXPECT_EQ(env->plugin_id_2, sess->plug_mgr_rt->current_session_plugin_id);	
+	EXPECT_EQ(session_mq_topic_is_active(sess, topic_id), 1);
+
+	if(topic_id == env->intrinsc_tcp_topic_id)
+	{
+		EXPECT_EQ(ctx->called%3, 1);
+		// publish msg has normal priority
+		EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, (void *)(long)env->plugin_id_2), 0);
+	}
+	if(topic_id == env->test_mq_topic_id)
+	{
+		if(ctx->called%3 == 2)EXPECT_EQ((int)(long)msg, env->plugin_id_2);
+		if(ctx->called%3 == 0)EXPECT_EQ((int)(long)msg, env->plugin_id_1);
+	}	
+	return;
+}
+
+TEST(plugin_manager, test_session_mq_priority) {
+
+	struct stellar st={0};
+	struct session_plugin_env env;
+	memset(&env, 0, sizeof(struct session_plugin_env));
+
+// pesudo init stage
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+// plugin manager register plugin
+
+	int plugin_id_1=stellar_session_plugin_register(&st, test_session_called_ctx_new, test_session_called_ctx_free, &env);
+	EXPECT_GE(plugin_id_1,0);
+
+	int plugin_id_2=stellar_session_plugin_register(&st, test_session_called_ctx_new, test_session_called_ctx_free, &env);
+	EXPECT_GE(plugin_id_2,0);
+
+	env.plugin_id_1=plugin_id_1;
+	env.plugin_id_2=plugin_id_2;
+
+	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
+	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_session_mq_priority_plugin_1_on_msg, plugin_id_1), 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_session_mq_priority_plugin_2_on_msg, plugin_id_2), 0);
+
+	env.test_mq_topic_id=stellar_session_mq_create_topic(&st, "SESSION_PRIORITY_TOPIC", NULL, &env);
+	EXPECT_GE(env.test_mq_topic_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.test_mq_topic_id, test_session_mq_priority_plugin_1_on_msg, plugin_id_1), 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.test_mq_topic_id, test_session_mq_priority_plugin_2_on_msg, plugin_id_2), 0);
+
+// pesudo packet and session
+
+	env.plug_mgr=plug_mgr;
+	env.N_per_session_pkt_cnt=10;
+	env.N_session=10;
+
+	struct packet pkt={&st, TCP, 6};
+
+	struct session sess[env.N_session];
+	memset(&sess, 0, sizeof(sess));
+
+// pesudo running stage
+	for(int i=0; i < env.N_session; i++)
+	{
+		sess[i].state=SESSION_STATE_OPENING;
+		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+	}
+
+    for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+
+        for (int i = 0; i < env.N_session; i++)
+        {
+			sess[i].sess_pkt_cnt+=1;
+			sess[i].state=SESSION_STATE_ACTIVE;
+            plugin_manager_on_session_ingress(&sess[i], &pkt);
+            plugin_manager_on_session_egress(&sess[i], &pkt);
+        }
+
+    }
+
+    for(int i=0; i < env.N_session; i++)
+	{
+		sess[i].state=SESSION_STATE_CLOSING;
+		plugin_manager_on_session_closing(&sess[i]);
+		plugin_manager_session_runtime_free(sess[i].plug_mgr_rt);
+	}
+
+// pesudo exit stage
+	plugin_manager_exit(plug_mgr);
+
+	// each session publish TCP TOPIC per_session_pkt_cnt+1, and SESSION_PRIORITY_TOPIC 2*(msg per_session_pkt_cnt+1)
+	EXPECT_EQ(env.plugin_id_1_called,env.N_session*((env.N_per_session_pkt_cnt+1)*3));
+	EXPECT_EQ(env.plugin_id_2_called,env.N_session*((env.N_per_session_pkt_cnt+1)*3));
+
+}
 
 /**********************************************
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
