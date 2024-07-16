@@ -886,6 +886,8 @@ TEST(plugin_manager, no_plugin_register_runtime) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
+
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1010,6 +1012,7 @@ TEST(plugin_manager, session_plugin_on_intrinsic_ingress_egress) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1151,6 +1154,8 @@ TEST(plugin_manager, session_plugin_ignore_on_ctx_new_sub_other_msg) {
             plugin_manager_on_session_ingress(&sess[i], &pkt);
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
+
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
 
     }
 
@@ -1305,6 +1310,7 @@ TEST(plugin_manager, session_plugin_pub_msg_overlimt) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1386,6 +1392,7 @@ TEST(plugin_manager, session_plugin_on_ctx_new_then_dettach) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1473,6 +1480,7 @@ TEST(plugin_manager, session_plugin_pub_on_ctx_free) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1591,6 +1599,7 @@ TEST(plugin_manager, session_plugin_pub_msg_on_closing) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1706,7 +1715,7 @@ TEST(plugin_manager, test_session_mq_topic_is_active) {
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
         plugin_manager_on_packet_ingress(plug_mgr, &pkt);
-
+		
         for (int i = 0; i < env.N_session; i++)
         {
 			sess[i].sess_pkt_cnt+=1;
@@ -1715,6 +1724,7 @@ TEST(plugin_manager, test_session_mq_topic_is_active) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1821,6 +1831,7 @@ TEST(plugin_manager, test_session_dettach) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)
@@ -1945,6 +1956,7 @@ TEST(plugin_manager, test_session_mq_priority) {
             plugin_manager_on_session_egress(&sess[i], &pkt);
         }
 
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
     }
 
     for(int i=0; i < env.N_session; i++)

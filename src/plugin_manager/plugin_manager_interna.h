@@ -124,12 +124,12 @@ struct stellar_mq_topic_schema
 	struct stellar_mq_subscriber *subscribers; 
 }__attribute__((aligned(sizeof(void*))));
 
-enum plugin_ctx_state
+enum plugin_exdata_state
 { INIT, ACTIVE, EXIT };
 
 struct session_plugin_ctx_runtime
 {
-	enum plugin_ctx_state state;
+	enum plugin_exdata_state state;
 	int session_plugin_id;
 	void *plugin_ctx;
 }__attribute__((aligned(sizeof(void*))));
