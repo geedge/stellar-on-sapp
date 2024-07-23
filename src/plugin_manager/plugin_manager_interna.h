@@ -53,10 +53,13 @@ struct plugin_manager_schema
 	struct plugin_manger_per_thread_data *per_thread_data;
 }__attribute__((aligned(sizeof(void*))));
 
+enum plugin_exdata_state
+{ INIT, ACTIVE, EXIT };
 
 struct stellar_exdata
 {
 	void *exdata;
+	enum plugin_exdata_state state;
 };
 
 
@@ -124,8 +127,7 @@ struct stellar_mq_topic_schema
 	struct stellar_mq_subscriber *subscribers; 
 }__attribute__((aligned(sizeof(void*))));
 
-enum plugin_exdata_state
-{ INIT, ACTIVE, EXIT };
+
 
 struct session_plugin_ctx_runtime
 {

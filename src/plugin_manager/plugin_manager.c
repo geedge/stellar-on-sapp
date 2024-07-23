@@ -231,6 +231,7 @@ int stellar_exdata_set(UT_array *exdata_schema, struct stellar_exdata *exdata_ar
 	if(exdata_schema == NULL|| exdata_array == NULL)return -1;
 	unsigned int len=utarray_len(exdata_schema);
 	if(len < (unsigned int)idx)return -1;
+	if((exdata_array+idx)->state == EXIT)return -1;
 	(exdata_array+idx)->exdata=ex_ptr;
 	return 0;
 }
@@ -240,6 +241,7 @@ void *stellar_exdata_get(UT_array *exdata_schema, struct stellar_exdata *exdata_
 	if(exdata_schema == NULL|| exdata_array == NULL)return NULL;
 	unsigned int len = utarray_len(exdata_schema);
 	if(len < (unsigned int)idx)return NULL;
+	if((exdata_array+idx)->state == EXIT)return NULL;
 	return (exdata_array+idx)->exdata;
 }
 
@@ -267,6 +269,7 @@ static void per_thread_packet_exdata_arrary_clean(struct plugin_manager_schema *
 	for (unsigned int i = 0; i < len; i++)
 	{
 		void *exdata = (per_thread_pkt_exdata_arrary + i)->exdata;
+		(per_thread_pkt_exdata_arrary + i)->state=EXIT;
 		struct stellar_exdata_schema *schema = (struct stellar_exdata_schema *)utarray_eltptr(plug_mgr->packet_exdata_schema_array, i);
 		if (exdata)
 		{
@@ -276,6 +279,7 @@ static void per_thread_packet_exdata_arrary_clean(struct plugin_manager_schema *
 			}
 			(per_thread_pkt_exdata_arrary + i)->exdata=NULL;
 		}
+		(per_thread_pkt_exdata_arrary + i)->state=INIT;
 	}
 }
 
@@ -847,6 +851,7 @@ static void session_exdata_runtime_free(struct plugin_manager_schema *plug_mgr, 
 	for (unsigned int i = 0; i < len; i++)
 	{
 		void *exdata = (exdata_rt + i)->exdata;
+		(exdata_rt + i)->state=EXIT;
 		struct stellar_exdata_schema *schema = (struct stellar_exdata_schema *)utarray_eltptr(plug_mgr->session_exdata_schema_array, i);
 		if (exdata)
 		{

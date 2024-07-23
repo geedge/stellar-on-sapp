@@ -389,6 +389,9 @@ static void test_packet_exdata_free(struct packet *pkt, int idx, void *ex_ptr, v
 	EXPECT_EQ(*(long long *)ex_ptr, idx);
 	FREE(ex_ptr);
 	env->exdata_free_called[idx]+=1;
+
+	EXPECT_EQ((long)packet_exdata_get(pkt, idx), NULL);// illegal get in exdata_free callback
+	EXPECT_EQ(packet_exdata_set(pkt, idx, pkt), -1);// illegal set in exdata_free callback
 	return;
 }
 
@@ -687,7 +690,7 @@ static void test_exdata_free_pub_msg_exdata_free(struct packet *pkt, int idx, vo
 	EXPECT_EQ(env->packet_exdata_idx[idx], idx);
 	EXPECT_EQ(ex_ptr, pkt);
 	env->exdata_free_called[idx]+=1;
-	EXPECT_EQ(packet_mq_publish_message(pkt, env->packet_topic_id[0], pkt), 0 );// publish message in packet exdata_free is ok
+	EXPECT_EQ(packet_mq_publish_message(pkt, env->packet_topic_id[0], pkt), -1);// publish message in packet exdata_free is illegal
 	env->msg_pub_cnt+=1;
 	return;
 }
@@ -745,9 +748,9 @@ TEST(plugin_manager, packet_plugin_exdata_free_pub_msg) {
 	plugin_manager_exit(plug_mgr);
 
 	EXPECT_EQ(env.basic_on_packet_called, 1);
-	EXPECT_EQ(env.msg_pub_cnt, env.msg_sub_cnt);
-	EXPECT_EQ(env.msg_pub_cnt, env.msg_free_cnt);
-	EXPECT_EQ(env.msg_free_cnt, 1);
+	EXPECT_EQ(env.msg_pub_cnt, 1);
+	EXPECT_EQ(env.msg_sub_cnt, 0);
+	EXPECT_EQ(env.msg_free_cnt, 0);
 	EXPECT_EQ(env.exdata_free_called[0], 1);
 }
 
@@ -1034,6 +1037,8 @@ static void test_basic_session_exdata_free(struct session *sess, int idx, void *
 	struct session_plugin_env *env = (struct session_plugin_env *)arg;
 	EXPECT_EQ(env->basic_exdata_idx, idx);
 	EXPECT_EQ(ex_ptr, env);
+	EXPECT_EQ((long)session_exdata_get(sess, idx), NULL);// illegal get in exdata_free callback
+	EXPECT_EQ(session_exdata_set(sess, idx, arg), -1);// illegal set in exdata_free callback
 	env->basic_exdata_free_called+=1;
 }
 
