@@ -110,10 +110,21 @@ int session_set_preappend_segment_id_list(struct session *sess, uint16_t *sid, s
 
 const struct packet *session_get0_current_packet(struct session *sess);
 
+
+//flow direction
 #define PACKET_DIRECTION_C2S 0
 #define PACKET_DIRECTION_S2C 1
 #define PACKET_DIRECTION_UNKNOWN 2
 int packet_get_direction(const struct packet *pkt);
+
+//route direction
+#define PACKET_DIRECTION_INCOMING 0
+#define PACKET_DIRECTION_OUTGOING 1
+int packet_get_route_direction(const struct packet *pkt);
+
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len);
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
 unsigned char packet_get_ip_protocol(struct packet *pkt);
+
+void packet_drop(const struct packet *pkt);
+const char *packet_get0_readable_addr(struct packet *pkt);

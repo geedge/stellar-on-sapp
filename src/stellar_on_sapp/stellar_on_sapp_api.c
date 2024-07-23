@@ -26,6 +26,7 @@ struct packet
 	enum packet_type type;
 	unsigned char ip_proto;
 	const void *raw_pkt;
+	struct streaminfo *pstream;
 	struct session *sess;
 	struct stellar *st;
 }__attribute__((aligned(sizeof(void*)))) ;
@@ -147,6 +148,7 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned c
 		pkt->type=type;
 		pkt->sess=sess;
 		pkt->st=sess->st;
+		pkt->pstream=stream;
 		if(raw_pkt)plugin_manager_on_session_ingress(sess, pkt);
 
 		//check TCP topic active subscirber num, if 0, return APP_STATE_DROPME, to reduce tcp reassemble overhead		
@@ -186,6 +188,7 @@ void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void 
 	pkt.raw_pkt=get_current_rawpkt_from_streaminfo(pstream);
 	pkt.st=st;
 	pkt.sess=NULL;
+	pkt.pstream=pstream;
 	switch (type)
 	{
 	case IPv4:
@@ -290,6 +293,37 @@ inline unsigned char packet_get_ip_protocol(struct packet *pkt)
 {
 	if(pkt == NULL)return 0;
 	return pkt->ip_proto;
+}
+
+int packet_get_route_direction(const struct packet *pkt)
+{
+	if(pkt == NULL || pkt->raw_pkt==NULL)return PACKET_DIRECTION_UNKNOWN;
+	int dir=PACKET_DIRECTION_UNKNOWN;
+	get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_ROUTE_DIR, &dir);
+	MESA_dir_link_to_human(dir);
+	if (dir == (int)'I')
+    {
+        return PACKET_DIRECTION_INCOMING;
+    }
+    if (dir == (int)'E')
+    {
+        return PACKET_DIRECTION_OUTGOING;
+    }
+	return PACKET_DIRECTION_UNKNOWN;
+}
+
+void packet_drop(const struct packet *pkt)
+{
+	if(pkt == NULL || pkt->pstream==NULL)return;
+	int value=1;
+	MESA_set_stream_opt(pkt->pstream, MSO_DROP_CURRENT_PKT, &value, sizeof(value));
+}
+
+const char *packet_get0_readable_addr(struct packet *pkt)
+{
+	if(pkt == NULL || pkt->pstream==NULL)return NULL;
+	struct streaminfo *pstream=pkt->pstream;
+	return printaddr(&pstream->addr, pstream->threadnum);
 }
 
 /*********************************************
