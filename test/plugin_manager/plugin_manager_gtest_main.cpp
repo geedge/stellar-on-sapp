@@ -1327,11 +1327,27 @@ TEST(plugin_manager, session_plugin_pub_msg_overlimt) {
 
 }
 
+
+static void test_dettach_msg_free(struct session *sess, void *msg, void *msg_free_arg)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)msg_free_arg;
+	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
+	env->test_mq_free_called+=1;
+	return;
+}
+
 static void *test_dettach_session_ctx_new(struct session *sess, void *plugin_env)
 {
 	struct test_basic_ctx *ctx=CALLOC(struct test_basic_ctx, 1);
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+
+	EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, plugin_env), 0);// publish success, but won't be delivered to currnet plugin
+
 	stellar_session_plugin_dettach_current_session(sess);
 	ctx->called+=1;
+
+	EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, plugin_env), 0);// publish success, but won't be delivered to currnet plugin
+
 	return ctx;
 }
 
@@ -1342,12 +1358,19 @@ static void test_dettach_session_ctx_free(struct session *sess, void *session_ct
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)session_ctx;
 	EXPECT_EQ(sess->sess_pkt_cnt, 1);// first packet ingress, call ctx_free immediately
 	EXPECT_EQ(ctx->called, 1);
+
+	EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, plugin_env), 0);// publish success, but won't be delivered to currnet plugin
+
 	FREE(ctx);
 }
 
 static void test_dettach_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
 {
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+
+	EXPECT_EQ(topic_id, env->intrinsc_tcp_topic_id);
+
 	ctx->called+=1;
 }
 
@@ -1371,6 +1394,11 @@ TEST(plugin_manager, session_plugin_on_ctx_new_then_dettach) {
 	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
 	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
 	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_dettach_on_session, plugin_id), 0);
+
+	env.test_mq_topic_id=stellar_session_mq_create_topic(&st, "SESSION_MQ_TOPIC", test_dettach_msg_free, &env);
+	EXPECT_GE(env.test_mq_topic_id, 0);
+
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.test_mq_topic_id, test_dettach_on_session, plugin_id), 0);
 
 	struct packet pkt={&st, TCP, ip_proto};
 
@@ -1404,6 +1432,7 @@ TEST(plugin_manager, session_plugin_on_ctx_new_then_dettach) {
 	plugin_manager_exit(plug_mgr);
 
 	EXPECT_EQ(env.basic_ctx_free_called,env.N_session);
+	EXPECT_EQ(env.test_mq_free_called,env.N_session*3);
 }
 
 
@@ -1715,7 +1744,7 @@ TEST(plugin_manager, test_session_mq_topic_is_active) {
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
         plugin_manager_on_packet_ingress(plug_mgr, &pkt);
-		
+
         for (int i = 0; i < env.N_session; i++)
         {
 			sess[i].sess_pkt_cnt+=1;
@@ -1974,6 +2003,86 @@ TEST(plugin_manager, test_session_mq_priority) {
 	EXPECT_EQ(env.plugin_id_2_called,env.N_session*((env.N_per_session_pkt_cnt+1)*3));
 
 }
+
+void test_session_exdata_free_pub_msg_exdata_free(struct session *sess, int idx, void *ex_ptr, void *arg)
+{
+	EXPECT_EQ(ex_ptr, arg);
+	struct session_plugin_env *env = (struct session_plugin_env *)ex_ptr;	
+	EXPECT_EQ(session_mq_publish_message(sess, env->intrinsc_tcp_topic_id, env), -1);	
+	env->basic_exdata_free_called+=1;
+}
+
+static void test_session_exdata_free_pub_msg_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+{
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;		
+	EXPECT_EQ(session_exdata_set(sess, env->basic_exdata_idx, (void *)plugin_env), 0);
+	if(msg)env->plugin_id_1_called+=1;
+}
+
+TEST(plugin_manager, session_exdata_free_pub_msg) {
+
+	struct stellar st={0};
+	struct session_plugin_env env;
+
+// pesudo init stage
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+// plugin manager register plugin
+
+	env.plugin_id_1=stellar_session_plugin_register(&st, NULL, NULL, &env);
+	EXPECT_GE(env.plugin_id_1,0);
+
+	env.intrinsc_tcp_topic_id=stellar_session_mq_get_topic_id(&st, TOPIC_TCP);
+	EXPECT_GE(env.intrinsc_tcp_topic_id, 0);
+	EXPECT_EQ(stellar_session_mq_subscribe(&st, env.intrinsc_tcp_topic_id, test_session_exdata_free_pub_msg_on_session, env.plugin_id_1), 0);
+
+	env.basic_exdata_idx=stellar_session_exdata_new_index(&st, "BASIC_EXDATA", test_session_exdata_free_pub_msg_exdata_free, &env) ;
+	EXPECT_GE(env.basic_exdata_idx, 0);
+
+// pesudo packet and session
+
+	memset(&env, 0, sizeof(struct session_plugin_env));
+	env.plug_mgr=plug_mgr;
+	env.N_per_session_pkt_cnt=10;
+	env.N_session=10;
+
+	struct packet pkt={&st, TCP, 6};
+
+	struct session sess[env.N_session];
+	memset(&sess, 0, sizeof(sess));
+
+// pesudo running stage
+	for(int i=0; i < env.N_session; i++)
+		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+
+    for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
+    {
+        plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+
+        for (int i = 0; i < env.N_session; i++)
+        {
+			sess[i].sess_pkt_cnt+=1;
+            plugin_manager_on_session_ingress(&sess[i], &pkt);
+            plugin_manager_on_session_egress(&sess[i], &pkt);
+        }
+
+		plugin_manager_on_packet_egress(plug_mgr, &pkt);
+    }
+
+    for(int i=0; i < env.N_session; i++)
+	{
+		plugin_manager_on_session_closing(&sess[i]);
+		plugin_manager_session_runtime_free(sess[i].plug_mgr_rt);
+	}
+
+// pesudo exit stage
+	plugin_manager_exit(plug_mgr);
+
+	EXPECT_EQ(env.basic_exdata_free_called,env.N_session);
+	EXPECT_EQ(env.plugin_id_1_called,env.N_session*env.N_per_session_pkt_cnt);
+}
+
 
 /**********************************************
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
