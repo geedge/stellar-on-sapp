@@ -672,6 +672,7 @@ int packet_mq_publish_message(struct packet *pkt, int topic_id, void *data)
 	struct stellar *st = packet_stellar_get(pkt);
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	int tid = stellar_get_current_thread_id(plug_mgr->st);
+	if(plug_mgr->per_thread_data[tid].pub_packet_msg_cnt == -1)return -1;
 	if(plug_mgr->per_thread_data[tid].pub_packet_msg_cnt >= plug_mgr->max_message_dispatch)return -1;
 	if(stellar_mq_publish_message(ON_PACKET_TOPIC ,topic_id, data, plug_mgr->stellar_mq_schema_array, plug_mgr->per_thread_data[tid].priority_mq,SESSION_MQ_PRIORITY_HIGH)==0)
 	{
@@ -721,6 +722,7 @@ int session_mq_publish_message_with_priority(struct session *sess, int topic_id,
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	assert(plug_mgr_rt);
 	if(plug_mgr_rt->session_mq_status==NULL)return -1;//runtime free stage , mq_status alaway null, ignore publish message
+	if(plug_mgr_rt->pub_session_msg_cnt == -1)return -1;
 	if(plug_mgr_rt->pub_session_msg_cnt >= plug_mgr_rt->plug_mgr->max_message_dispatch)return -1;
 	int tid = stellar_get_current_thread_id(plug_mgr_rt->plug_mgr->st);
 	if(stellar_mq_publish_message(ON_SESSION_TOPIC ,topic_id, data, plug_mgr_rt->plug_mgr->stellar_mq_schema_array,plug_mgr_rt->plug_mgr->per_thread_data[tid].priority_mq,priority)==0)
@@ -949,10 +951,13 @@ void plugin_manager_on_packet_ingress(struct plugin_manager_schema *plug_mgr, st
 void plugin_manager_on_packet_egress(struct plugin_manager_schema *plug_mgr, struct packet *pkt)
 {
 	if(plug_mgr->registered_packet_plugin_array == NULL || pkt == NULL)return;
-	per_thread_packet_exdata_arrary_clean(plug_mgr, pkt);
+	int tid=stellar_get_current_thread_id(plug_mgr->st);
+	stellar_mq_dispatch(plug_mgr->per_thread_data[tid].priority_mq, &plug_mgr->per_thread_data[tid].dealth_letter_queue, NULL, pkt);
+	plug_mgr->per_thread_data[tid].pub_packet_msg_cnt=-1;//disable packet message publish
 	stellar_mq_free(NULL, pkt, 
 					&plug_mgr->per_thread_data[stellar_get_current_thread_id(plug_mgr->st)].dealth_letter_queue, 
 					plug_mgr->stellar_mq_schema_array);
+	per_thread_packet_exdata_arrary_clean(plug_mgr, pkt);
 }
 
 /*********************************************
@@ -1053,6 +1058,7 @@ void plugin_manager_on_session_egress(struct session *sess, struct packet *pkt)
 	session_mq_publish_message_with_priority(sess, plug_mgr_rt->plug_mgr->egress_topic_id ,pkt, SESSION_MQ_PRIORITY_HIGH);
 	int tid=stellar_get_current_thread_id(plug_mgr_rt->plug_mgr->st);
 	stellar_mq_dispatch(plug_mgr_rt->plug_mgr->per_thread_data[tid].priority_mq, &plug_mgr_rt->plug_mgr->per_thread_data[tid].dealth_letter_queue, sess, pkt);
+	plug_mgr_rt->pub_session_msg_cnt=-1;//disable session message publish
 	stellar_mq_free(plug_mgr_rt->sess,pkt, &plug_mgr_rt->plug_mgr->per_thread_data[tid].dealth_letter_queue, plug_mgr_rt->plug_mgr->stellar_mq_schema_array);
 	return;
 }
@@ -1061,6 +1067,7 @@ void plugin_manager_on_session_closing(struct session *sess)
 {
 	struct plugin_manager_runtime *plug_mgr_rt = session_plugin_manager_runtime_get(sess);
 	if(plug_mgr_rt==NULL)return;
+	plug_mgr_rt->pub_session_msg_cnt=0;// reset pub_msg_cnt
 	switch (session_get_type(sess))
 	{
 		case SESSION_TYPE_TCP:
@@ -1075,6 +1082,7 @@ void plugin_manager_on_session_closing(struct session *sess)
 	}
 	int tid=stellar_get_current_thread_id(plug_mgr_rt->plug_mgr->st);
 	stellar_mq_dispatch(plug_mgr_rt->plug_mgr->per_thread_data[tid].priority_mq, &plug_mgr_rt->plug_mgr->per_thread_data[tid].dealth_letter_queue, sess, NULL);
+	plug_mgr_rt->pub_session_msg_cnt=-1;//disable session message publish
 	stellar_mq_free(plug_mgr_rt->sess,NULL,&plug_mgr_rt->plug_mgr->per_thread_data[tid].dealth_letter_queue, plug_mgr_rt->plug_mgr->stellar_mq_schema_array);
     return;
 }

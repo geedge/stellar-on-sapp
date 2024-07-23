@@ -680,6 +680,77 @@ TEST(plugin_manager, packet_plugins_pub_overlimit) {
 }
 
 
+
+static void test_exdata_free_pub_msg_exdata_free(struct packet *pkt, int idx, void *ex_ptr, void *arg)
+{
+	struct packet_plugin_env *env = (struct packet_plugin_env *)arg;
+	EXPECT_EQ(env->packet_exdata_idx[idx], idx);
+	EXPECT_EQ(ex_ptr, pkt);
+	env->exdata_free_called[idx]+=1;
+	EXPECT_EQ(packet_mq_publish_message(pkt, env->packet_topic_id[0], pkt), 0 );// publish message in packet exdata_free is ok
+	env->msg_pub_cnt+=1;
+	return;
+}
+
+static void test_exdata_free_pub_msg_free(struct packet *pkt, void *msg, void *msg_free_arg)
+{
+	struct packet_plugin_env *env = (struct packet_plugin_env *)msg_free_arg;
+	EXPECT_EQ(pkt, msg);
+	env->msg_free_cnt+=1;
+	EXPECT_EQ(packet_mq_publish_message(pkt, env->packet_topic_id[0], pkt), -1 );// publish message in packet msg_free is illegal
+	return;
+}
+
+static void test_exdata_free_pub_msg_on_packet(struct packet *pkt, unsigned char ip_protocol, void *plugin_env)
+{
+	struct packet_plugin_env *env = (struct packet_plugin_env *)plugin_env;
+	EXPECT_TRUE(env!=NULL);
+	EXPECT_EQ(pkt->ip_proto, ip_protocol);
+	EXPECT_EQ(pkt->st, env->plug_mgr->st);
+	EXPECT_EQ(packet_exdata_set(pkt, env->packet_exdata_idx[0], pkt), 0);
+	env->basic_on_packet_called+=1;
+	return;
+}
+
+static void test_exdata_free_pub_msg_on_packet_msg(struct packet *pkt, int topic_id, const void *msg, void *plugin_env)
+{
+	struct packet_plugin_env *env = (struct packet_plugin_env *)plugin_env;
+	EXPECT_EQ(topic_id, env->packet_topic_id[0]);
+	env->msg_sub_cnt+=1;
+}
+
+TEST(plugin_manager, packet_plugin_exdata_free_pub_msg) {
+
+	struct stellar st={0};
+	struct plugin_manager_schema *plug_mgr = plugin_manager_init(&st, NULL);
+	whitebox_test_plugin_manager_intrisic_metadata(&st, plug_mgr);
+
+	unsigned char ip_proto=6;
+	struct packet_plugin_env env;
+	memset(&env, 0, sizeof(struct packet_plugin_env));
+	env.plug_mgr=plug_mgr;
+	int plugin_id=stellar_packet_plugin_register(&st, ip_proto, test_exdata_free_pub_msg_on_packet, &env);
+	EXPECT_GE(plugin_id, PACKET_PULGIN_ID_BASE);
+
+	env.packet_exdata_idx[0]=stellar_packet_exdata_new_index(&st, "PACKET_EXDATA", test_exdata_free_pub_msg_exdata_free, &env);
+	env.packet_topic_id[0]=stellar_packet_mq_create_topic(&st, "PACKET_TOPIC", test_exdata_free_pub_msg_free, &env);
+
+	EXPECT_EQ(stellar_packet_mq_subscribe(&st, env.packet_topic_id[0], test_exdata_free_pub_msg_on_packet_msg, plugin_id),0);
+	
+
+    struct packet pkt={&st, IPv4, ip_proto};
+	plugin_manager_on_packet_ingress(plug_mgr, &pkt);
+	plugin_manager_on_packet_egress(plug_mgr, &pkt);
+	
+	plugin_manager_exit(plug_mgr);
+
+	EXPECT_EQ(env.basic_on_packet_called, 1);
+	EXPECT_EQ(env.msg_pub_cnt, env.msg_sub_cnt);
+	EXPECT_EQ(env.msg_pub_cnt, env.msg_free_cnt);
+	EXPECT_EQ(env.msg_free_cnt, 1);
+	EXPECT_EQ(env.exdata_free_called[0], 1);
+}
+
 /**********************************************
  * TEST PLUGIN MANAGER ON SESSION PLUGIN INIT *
  **********************************************/
@@ -1256,6 +1327,7 @@ static void test_overlimit_session_msg_free(struct session *sess, void *msg, voi
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)msg_free_arg;
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
+	EXPECT_EQ(session_mq_publish_message(sess, env->test_mq_topic_id, msg), -1);// illegal publish when msg_free
 	if(msg)
 	{
 		EXPECT_EQ(env->test_mq_pub_called, *(int *)msg);
