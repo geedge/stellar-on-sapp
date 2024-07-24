@@ -1972,9 +1972,15 @@ static void test_session_mq_priority_plugin_1_on_msg(struct session *sess, int t
 	}
 	if(topic_id == env->test_mq_topic_id)
 	{
-		if(ctx->called%3 == 2)EXPECT_EQ((int)(long)msg, env->plugin_id_2);
-		if(ctx->called%3 == 0)EXPECT_EQ((int )(long)msg, env->plugin_id_1);
-	}
+        if (ctx->called % 3 == 2)
+		{
+            EXPECT_EQ((int)(long)msg, env->plugin_id_2);
+		}
+        if (ctx->called % 3 == 0)
+		{
+            EXPECT_EQ((int)(long)msg, env->plugin_id_1);
+		}
+    }
 	return;
 }
 
@@ -1995,9 +2001,15 @@ static void test_session_mq_priority_plugin_2_on_msg(struct session *sess, int t
 	}
 	if(topic_id == env->test_mq_topic_id)
 	{
-		if(ctx->called%3 == 2)EXPECT_EQ((int)(long)msg, env->plugin_id_2);
-		if(ctx->called%3 == 0)EXPECT_EQ((int)(long)msg, env->plugin_id_1);
-	}	
+        if (ctx->called % 3 == 2)
+		{
+            EXPECT_EQ((int)(long)msg, env->plugin_id_2);
+		}
+        if (ctx->called % 3 == 0)
+		{
+            EXPECT_EQ((int)(long)msg, env->plugin_id_1);
+		}
+    }	
 	return;
 }
 

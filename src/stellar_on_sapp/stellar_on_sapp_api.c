@@ -550,14 +550,6 @@ const char *session_get0_l2_l3_hdr(struct session *sess, int session_direction, 
 }
 
 
-static const void *session_get_cached_rawpkt(struct session *sess, int session_direction)
-{
-	struct streaminfo *pstream=sess->pstream;
-	assert(pstream);
-	int route_direction=(session_direction==SESSION_DIRECTION_IN)?(DIR_ROUTE_UP):(DIR_ROUTE_DOWN);
-	return get_rawpkt_from_streaminfo(pstream, route_direction);
-}
-
 uint16_t *session_get0_segment_id_list(struct session *sess, int session_direction, size_t *sid_num)
 {
 	*sid_num=0;
