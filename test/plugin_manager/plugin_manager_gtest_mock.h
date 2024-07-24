@@ -51,15 +51,19 @@ int stellar_plugin_manager_schema_set(struct stellar *st, struct plugin_manager_
 	return 0;
 }
 
-int stellar_get_worker_thread_num(struct stellar *st __attribute__((unused)))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
+int stellar_get_worker_thread_num(struct stellar *st)
 {
 	return 16;
 }
 
-int stellar_get_current_thread_id(struct stellar *st __attribute__((unused)))
+int stellar_get_current_thread_id(struct stellar *st)
 {
 	return 0;
 }
+#pragma GCC diagnostic pop
 
 struct stellar * packet_stellar_get(struct packet *pkt)
 {

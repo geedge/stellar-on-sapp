@@ -224,15 +224,18 @@ inline int polling_on_sapp(struct stellar *st)
  * STELLAR INFO INTERFACE WRAPPER ON SAPP
  *********************************************/
 
-int stellar_get_worker_thread_num(struct stellar *st __attribute__((unused)))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+int stellar_get_worker_thread_num(struct stellar *st)
 {
 	return get_thread_count();
 }
 
-int stellar_get_current_thread_id(struct stellar *st __attribute__((unused)))
+int stellar_get_current_thread_id(struct stellar *st)
 {
 	return get_current_worker_thread_id();
 }
+#pragma GCC diagnostic pop
 
 /*********************************************
  * PACKET INFO INTERFACE WRAPPER ON SAPP*

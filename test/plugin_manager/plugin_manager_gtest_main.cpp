@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
+#pragma GCC diagnostic ignored "-Wunused-parameter"
 
+#include <gtest/gtest.h>
 #include "stellar/utils.h"
 #include "plugin_manager_gtest_mock.h"
 
@@ -87,9 +88,9 @@ TEST(plugin_manager_init, init_with_null_toml) {
  * TEST PLUGIN MANAGER PACKET PLUGIN INIT *
  ******************************************/
 
-static void test_mock_packet_exdata_free(struct packet *pkt __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
+static void test_mock_packet_exdata_free(struct packet *pkt , int idx , void *ex_ptr , void *arg ){}
 
-static void test_mock_overwrite_packet_exdata_free(struct packet *pkt __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
+static void test_mock_overwrite_packet_exdata_free(struct packet *pkt , int idx , void *ex_ptr , void *arg ){}
 
 TEST(plugin_manager_init, packet_exdata_new_index_overwrite) {
 	struct stellar st={0};
@@ -119,8 +120,8 @@ TEST(plugin_manager_init, packet_exdata_new_index_overwrite) {
     plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_packet_msg_free(struct packet *pkt __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
-void test_mock_overwrite_packet_msg_free(struct packet *pkt __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
+void test_mock_packet_msg_free(struct packet *pkt , void *msg , void *msg_free_arg ){}
+void test_mock_overwrite_packet_msg_free(struct packet *pkt , void *msg , void *msg_free_arg ){}
 
 TEST(plugin_manager_init, packet_mq_topic_create_and_update) {
 	struct stellar st={0};
@@ -183,9 +184,9 @@ TEST(plugin_manager_init, packet_mq_topic_create_and_update) {
     plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_on_packet_msg(struct packet *pkt __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *plugin_env __attribute__((unused))){}
+void test_mock_on_packet_msg(struct packet *pkt , int topic_id , const void *msg , void *plugin_env ){}
 
-void test_mock_overwrite_on_packet_msg(struct packet *pkt __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *plugin_env __attribute__((unused))){}
+void test_mock_overwrite_on_packet_msg(struct packet *pkt , int topic_id , const void *msg , void *plugin_env ){}
 
 TEST(plugin_manager_init, packet_mq_subscribe) {
 
@@ -765,8 +766,8 @@ TEST(plugin_manager, packet_plugin_exdata_free_pub_msg) {
  * TEST PLUGIN MANAGER ON SESSION PLUGIN INIT *
  **********************************************/
 
-static void test_mock_session_exdata_free(struct session *sess __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
-static void test_mock_overwrite_session_exdata_free(struct session *sess __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
+static void test_mock_session_exdata_free(struct session *sess , int idx , void *ex_ptr , void *arg ){}
+static void test_mock_overwrite_session_exdata_free(struct session *sess , int idx , void *ex_ptr , void *arg ){}
 
 TEST(plugin_manager_init, session_exdata_new_index_overwrite) {
 	struct stellar st={0};
@@ -795,8 +796,8 @@ TEST(plugin_manager_init, session_exdata_new_index_overwrite) {
     plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_session_msg_free(struct session *sess __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
-void test_mock_overwrite_session_msg_free(struct session *sess __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
+void test_mock_session_msg_free(struct session *sess , void *msg , void *msg_free_arg ){}
+void test_mock_overwrite_session_msg_free(struct session *sess , void *msg , void *msg_free_arg ){}
 
 TEST(plugin_manager_init, session_mq_topic_create_and_update) {
 	struct stellar st={0};
@@ -861,8 +862,8 @@ TEST(plugin_manager_init, session_mq_topic_create_and_update) {
 	plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_on_session_msg(struct session *sess __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *per_session_ctx __attribute__((unused)), void *plugin_env __attribute__((unused))){}
-void test_mock_overwrite_on_session_msg(struct session *sess __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *per_session_ctx __attribute__((unused)), void *plugin_env __attribute__((unused))){}
+void test_mock_on_session_msg(struct session *sess , int topic_id , const void *msg , void *per_session_ctx , void *plugin_env ){}
+void test_mock_overwrite_on_session_msg(struct session *sess , int topic_id , const void *msg , void *per_session_ctx , void *plugin_env ){}
 
 
 TEST(plugin_manager_init, session_mq_subscribe_overwrite) {
@@ -954,7 +955,10 @@ TEST(plugin_manager, no_plugin_register_runtime) {
 
 // pesudo running stage
 	for(int i=0; i < env.N_session; i++)
+	{
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+		sess[i].type=SESSION_TYPE_TCP;
+	}
 
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
@@ -1087,7 +1091,10 @@ TEST(plugin_manager, session_plugin_on_intrinsic_ingress_egress) {
 	struct session sess[env.N_session];
 
 	for(int i=0; i < env.N_session; i++)
+	{
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+		sess[i].type=SESSION_TYPE_TCP;
+	}
 
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
@@ -1236,7 +1243,10 @@ TEST(plugin_manager, session_plugin_ignore_on_ctx_new_sub_other_msg) {
 	struct session sess[env.N_session];
 
 	for(int i=0; i < env.N_session; i++)
+	{
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+		sess[i].type=SESSION_TYPE_TCP;
+	}
 
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
@@ -1400,7 +1410,10 @@ TEST(plugin_manager, session_plugin_pub_msg_overlimt) {
 	struct session sess[env.N_session];
 
 	for(int i=0; i < env.N_session; i++)
+	{
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+		sess[i].type=SESSION_TYPE_TCP;
+	}
 
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
@@ -1467,7 +1480,7 @@ static void test_dettach_session_ctx_free(struct session *sess, void *session_ct
 	FREE(ctx);
 }
 
-static void test_dettach_on_session(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
+static void test_dettach_on_session(struct session *sess, int topic_id, const void *msg , void *per_session_ctx, void *plugin_env)
 {
 	EXPECT_TRUE(sess!=NULL);
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
@@ -1511,7 +1524,10 @@ TEST(plugin_manager, session_plugin_on_ctx_new_then_dettach) {
 	memset(&sess, 0, sizeof(sess));
 
 	for(int i=0; i < env.N_session; i++)
+	{
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+		sess[i].type=SESSION_TYPE_TCP;
+	}
 
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
@@ -1561,7 +1577,7 @@ static void test_invalid_pub_msg_session_ctx_free(struct session *sess, void *se
 	FREE(ctx);
 }
 
-static void test_invalid_pub_msg_on_session(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
+static void test_invalid_pub_msg_on_session(struct session *sess, int topic_id, const void *msg , void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	EXPECT_TRUE(sess!=NULL);
@@ -1605,7 +1621,10 @@ TEST(plugin_manager, session_plugin_pub_on_ctx_free) {
 
 // pesudo running stage
 	for(int i=0; i < env.N_session; i++)
+	{
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+		sess[i].type=SESSION_TYPE_TCP;
+	}
 
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
@@ -1765,19 +1784,19 @@ struct test_session_called_ctx
 	int called;
 };
 
-static void *test_session_called_ctx_new(struct session *sess __attribute__((unused)), void *plugin_env __attribute__((unused)))
+static void *test_session_called_ctx_new(struct session *sess , void *plugin_env )
 {
 	struct test_session_called_ctx *ctx=CALLOC(struct test_session_called_ctx, 1);
 	return ctx;
 }
 
-static void test_session_called_ctx_free(struct session *sess __attribute__((unused)) , void *session_ctx, void *plugin_env __attribute__((unused)))
+static void test_session_called_ctx_free(struct session *sess  , void *session_ctx, void *plugin_env )
 {
 	FREE(session_ctx);
 }
 
 //test session topic is active
-static void test_session_mq_topic_is_active_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
+static void test_session_mq_topic_is_active_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg , void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -1791,7 +1810,7 @@ static void test_session_mq_topic_is_active_plugin_1_on_msg(struct session *sess
 	return;
 }
 
-static void test_session_mq_topic_is_active_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
+static void test_session_mq_topic_is_active_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg , void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -1884,7 +1903,7 @@ TEST(plugin_manager, test_session_mq_topic_is_active) {
 }
 
 //test dettach session
-static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
+static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg , void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -1897,7 +1916,7 @@ static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic
 	return;
 }
 
-static void test_session_dettach_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
+static void test_session_dettach_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg , void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -2182,7 +2201,10 @@ TEST(plugin_manager, session_exdata_free_pub_msg) {
 
 // pesudo running stage
 	for(int i=0; i < env.N_session; i++)
+	{
 		sess[i].plug_mgr_rt=plugin_manager_session_runtime_new(plug_mgr, &sess[i]);
+		sess[i].type=SESSION_TYPE_TCP;
+	}
 
     for (int j = 0; j < env.N_per_session_pkt_cnt; j++)
     {
@@ -2216,7 +2238,7 @@ TEST(plugin_manager, session_exdata_free_pub_msg) {
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
  **********************************************/
 
-int test_plugin_on_polling_func(void *plugin_env __attribute__((unused)))
+int test_plugin_on_polling_func(void *plugin_env )
 {
 	return 1;
 }

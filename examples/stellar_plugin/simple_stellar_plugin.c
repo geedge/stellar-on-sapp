@@ -1,3 +1,5 @@
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+
 #include "stellar/stellar.h"
 #include "stellar/session.h"
 #include "stellar/utils.h"
@@ -8,8 +10,8 @@
 
 #include <stdio.h>
 #include <string.h>
-
 #include <assert.h>
+
 
 struct simple_stellar_plugin_env
 {
@@ -158,7 +160,7 @@ void simple_plugin_on_packet(struct packet *pkt,  unsigned char ip_protocol, voi
 	return;
 }
 
-void simple_plugin_packet_get_exdata(struct packet *pkt,  unsigned char ip_protocol __attribute__((unused)), void *plugin_env)
+void simple_plugin_packet_get_exdata(struct packet *pkt,  unsigned char ip_protocol , void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
 	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)packet_exdata_get(pkt, env->packet_exdata_idx);
@@ -177,7 +179,7 @@ int simple_plugin_on_polling(void *plugin_env)
 	return 0;
 }
 
-static void simple_plugin_packet_exdata_free(struct packet *pkt __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr, void *arg)
+static void simple_plugin_packet_exdata_free(struct packet *pkt , int idx , void *ex_ptr, void *arg)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)arg;	
 	assert(env);
@@ -188,7 +190,7 @@ static void simple_plugin_packet_exdata_free(struct packet *pkt __attribute__((u
 	}
 }
 
-static void simple_plugin_packet_msg_free(struct packet *pkt __attribute__((unused)), void *msg, void *msg_free_arg)
+static void simple_plugin_packet_msg_free(struct packet *pkt , void *msg, void *msg_free_arg)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)msg_free_arg;	
 	assert(env);
@@ -200,7 +202,7 @@ static void simple_plugin_packet_msg_free(struct packet *pkt __attribute__((unus
 		
 }
 
-static void simple_plugin_on_packet_msg_cb(struct packet *pkt __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg, void *plugin_env)
+static void simple_plugin_on_packet_msg_cb(struct packet *pkt , int topic_id , const void *msg, void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;	
 	assert(env);
@@ -299,7 +301,7 @@ void simple_session_packet_plugin_exit(void *plugin_env)
  * simple plugin sub session stat  *
  *******************************/
 
-static void simple_plugin_sub_session_stat_on_msg(struct session *sess, int topic_id, const void *data, void *plugin_ctx __attribute__((unused)), void *plugin_env)
+static void simple_plugin_sub_session_stat_on_msg(struct session *sess, int topic_id, const void *data, void *plugin_ctx , void *plugin_env)
 {
 
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
