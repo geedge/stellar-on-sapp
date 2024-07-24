@@ -35,7 +35,7 @@ static int stream_is_inner_most(struct streaminfo *a_stream)
 }
 
 
-static void stellar_on_sapp_bridge_free(const struct streaminfo *stream, int bridge_id, void *data)
+static void stellar_on_sapp_bridge_free(const struct streaminfo *stream __attribute__((unused)), int bridge_id __attribute__((unused)), void *data)
 {
 	session_free_on_sapp((struct session *)data);
 	return;
@@ -64,7 +64,7 @@ int STELLAR_DEFER_LOADER_INIT()
 	return 0;
 }
 
-char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_defer_entry(struct streaminfo *pstream,void **pme __attribute__((unused)), int thread_seq __attribute__((unused)),void *a_packet __attribute__((unused)))
 {
 	if(pstream->pktstate==OP_STATE_PENDING && stream_is_inner_most(pstream)==0)
 	{
@@ -84,7 +84,7 @@ void  STELLAR_DEFER_LOADER_EXIT(void)
 }
 
 
-static int is_ctrl_packet(struct streaminfo *pstream, const void *raw_pkt)
+static int is_ctrl_packet(struct streaminfo *pstream __attribute__((unused)), const void *raw_pkt)
 {
 	int is_ctrl_pkt=0;
 	if(raw_pkt)
@@ -94,7 +94,7 @@ static int is_ctrl_packet(struct streaminfo *pstream, const void *raw_pkt)
 	return is_ctrl_pkt;
 }
 
-static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme, int thread_seq,void *a_packet, enum entry_type type)
+static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UCHAR state, void **pme __attribute__((unused)), int thread_seq __attribute__((unused)),void *a_packet, enum entry_type type)
 {
 	unsigned char entry_ret=APP_STATE_GIVEME;
 	if(state == OP_STATE_PENDING && (stream_is_inner_most(pstream)==0)) 
@@ -173,19 +173,19 @@ unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, i
 	return loader_transfer_stream_entry(pstream, pstream->opstate, pme,  thread_seq,  a_packet, ENTRY_TYPE_TCP);
 }
 
-char stellar_on_sapp_ip4_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
+char stellar_on_sapp_ip4_entry( struct streaminfo *pstream,unsigned char routedir __attribute__((unused)),int thread_seq __attribute__((unused)), void *a_packet)
 {
 	if(stream_is_inner_most(pstream)==1)packet_update_on_sapp(g_stellar, pstream, a_packet, IPv4);
 	return APP_STATE_GIVEME;
 }
 
-char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedir,int thread_seq, void *a_packet)
+char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedir __attribute__((unused)),int thread_seq __attribute__((unused)), void *a_packet)
 {
 	if(stream_is_inner_most(pstream)==1)packet_update_on_sapp(g_stellar, pstream, a_packet, IPv6);
 	return APP_STATE_GIVEME;
 }
 
-char stellar_on_sapp_polling_entry(struct streaminfo *stream,  void **pme, int thread_seq,void *a_packet)
+char stellar_on_sapp_polling_entry(struct streaminfo *stream __attribute__((unused)),  void **pme __attribute__((unused)), int thread_seq __attribute__((unused)),void *a_packet __attribute__((unused)))
 {
 	int ret = polling_on_sapp(g_stellar);
 	switch (ret)

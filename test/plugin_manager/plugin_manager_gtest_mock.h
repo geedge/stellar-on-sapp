@@ -51,12 +51,12 @@ int stellar_plugin_manager_schema_set(struct stellar *st, struct plugin_manager_
 	return 0;
 }
 
-int stellar_get_worker_thread_num(struct stellar *st)
+int stellar_get_worker_thread_num(struct stellar *st __attribute__((unused)))
 {
 	return 16;
 }
 
-int stellar_get_current_thread_id(struct stellar *st)
+int stellar_get_current_thread_id(struct stellar *st __attribute__((unused)))
 {
 	return 0;
 }

@@ -87,9 +87,9 @@ TEST(plugin_manager_init, init_with_null_toml) {
  * TEST PLUGIN MANAGER PACKET PLUGIN INIT *
  ******************************************/
 
-static void test_mock_packet_exdata_free(struct packet *pkt, int idx, void *ex_ptr, void *arg){}
+static void test_mock_packet_exdata_free(struct packet *pkt __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
 
-static void test_mock_overwrite_packet_exdata_free(struct packet *pkt, int idx, void *ex_ptr, void *arg){}
+static void test_mock_overwrite_packet_exdata_free(struct packet *pkt __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
 
 TEST(plugin_manager_init, packet_exdata_new_index_overwrite) {
 	struct stellar st={0};
@@ -119,8 +119,8 @@ TEST(plugin_manager_init, packet_exdata_new_index_overwrite) {
     plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_packet_msg_free(struct packet *pkt, void *msg, void *msg_free_arg){}
-void test_mock_overwrite_packet_msg_free(struct packet *pkt, void *msg, void *msg_free_arg){}
+void test_mock_packet_msg_free(struct packet *pkt __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
+void test_mock_overwrite_packet_msg_free(struct packet *pkt __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
 
 TEST(plugin_manager_init, packet_mq_topic_create_and_update) {
 	struct stellar st={0};
@@ -183,9 +183,9 @@ TEST(plugin_manager_init, packet_mq_topic_create_and_update) {
     plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_on_packet_msg(struct packet *pkt, int topic_id, const void *msg, void *plugin_env){}
+void test_mock_on_packet_msg(struct packet *pkt __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *plugin_env __attribute__((unused))){}
 
-void test_mock_overwrite_on_packet_msg(struct packet *pkt, int topic_id, const void *msg, void *plugin_env){}
+void test_mock_overwrite_on_packet_msg(struct packet *pkt __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *plugin_env __attribute__((unused))){}
 
 TEST(plugin_manager_init, packet_mq_subscribe) {
 
@@ -464,7 +464,9 @@ TEST(plugin_manager, packet_plugins_share_exdata) {
 static void test_packet_msg_free_cb_func(struct packet *pkt, void *msg, void *msg_free_arg)
 {
 	struct packet_plugin_env *env = (struct packet_plugin_env *)msg_free_arg;
-	EXPECT_EQ(pkt, msg);
+	EXPECT_TRUE(pkt!=NULL);
+	int topic_id_num=(int)(sizeof(env->packet_topic_id) / sizeof(env->packet_topic_id[0]));
+	EXPECT_TRUE((long)msg < topic_id_num && (long)msg >= 0);
 	env->msg_free_cnt+=1;
 	return;
 }
@@ -474,6 +476,7 @@ static void test_mq_on_packet_msg(struct packet *pkt, int topic_id, const void *
 	struct packet_plugin_env *env = (struct packet_plugin_env *)plugin_env;
 	EXPECT_TRUE(env!=NULL);
 	EXPECT_EQ(pkt->st, env->plug_mgr->st);
+	EXPECT_EQ(topic_id, env->packet_topic_id[(int)(long)msg]);
 	env->msg_sub_cnt+=1;
 	return;
 }
@@ -487,7 +490,7 @@ static void test_mq_pub_on_packet(struct packet *pkt, unsigned char ip_protocol,
 	int topic_id_num=(int)(sizeof(env->packet_topic_id) / sizeof(env->packet_topic_id[0]));
 	for(int i=0; i<topic_id_num; i++)
 	{
-		EXPECT_EQ(packet_mq_publish_message(pkt, env->packet_topic_id[i], pkt), 0);
+		EXPECT_EQ(packet_mq_publish_message(pkt, env->packet_topic_id[i], (void *)(long)(i)), 0);
 		env->msg_pub_cnt+=1;
 	}
 	return;
@@ -565,6 +568,7 @@ TEST(plugin_manager, packet_plugins_mq_pub_sub) {
 
 static void overlimit_packet_msg_free_cb_func(struct packet *pkt, void *msg, void *msg_free_arg)
 {
+	EXPECT_TRUE(pkt!=NULL);
 	struct packet_plugin_env *env = (struct packet_plugin_env *)msg_free_arg;
 	env->msg_free_cnt+=1;
 	FREE(msg);
@@ -575,6 +579,7 @@ static void overlimit_sub_on_packet_msg(struct packet *pkt, int topic_id, const 
 {
 	struct packet_plugin_env *env = (struct packet_plugin_env *)plugin_env;
 	EXPECT_TRUE(env!=NULL);
+	EXPECT_EQ(topic_id, env->packet_topic_id[*(int*)msg]);
 	EXPECT_EQ(pkt->st, env->plug_mgr->st);
 	env->msg_sub_cnt+=1;
 	return;
@@ -594,7 +599,7 @@ static void overlimit_pub_on_packet(struct packet *pkt, unsigned char ip_protoco
 		for(int j=0; j < MAX_MSG_PER_DISPATCH; j++)
 		{
 			msg=CALLOC(int, 1);
-			*msg=cnt;
+			*msg=i;
 			int pub_ret=packet_mq_publish_message(pkt, env->packet_topic_id[i], msg);
 			if(cnt < MAX_MSG_PER_DISPATCH)
 			{
@@ -718,6 +723,8 @@ static void test_exdata_free_pub_msg_on_packet(struct packet *pkt, unsigned char
 static void test_exdata_free_pub_msg_on_packet_msg(struct packet *pkt, int topic_id, const void *msg, void *plugin_env)
 {
 	struct packet_plugin_env *env = (struct packet_plugin_env *)plugin_env;
+	EXPECT_EQ(pkt, msg);
+	EXPECT_EQ(topic_id, env->packet_topic_id[0]);
 	EXPECT_EQ(topic_id, env->packet_topic_id[0]);
 	env->msg_sub_cnt+=1;
 }
@@ -758,8 +765,8 @@ TEST(plugin_manager, packet_plugin_exdata_free_pub_msg) {
  * TEST PLUGIN MANAGER ON SESSION PLUGIN INIT *
  **********************************************/
 
-static void test_mock_session_exdata_free(struct session *sess, int idx, void *ex_ptr, void *arg){}
-static void test_mock_overwrite_session_exdata_free(struct session *sess, int idx, void *ex_ptr, void *arg){}
+static void test_mock_session_exdata_free(struct session *sess __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
+static void test_mock_overwrite_session_exdata_free(struct session *sess __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr __attribute__((unused)), void *arg __attribute__((unused))){}
 
 TEST(plugin_manager_init, session_exdata_new_index_overwrite) {
 	struct stellar st={0};
@@ -788,8 +795,8 @@ TEST(plugin_manager_init, session_exdata_new_index_overwrite) {
     plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_session_msg_free(struct session *sess, void *msg, void *msg_free_arg){}
-void test_mock_overwrite_session_msg_free(struct session *sess, void *msg, void *msg_free_arg){}
+void test_mock_session_msg_free(struct session *sess __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
+void test_mock_overwrite_session_msg_free(struct session *sess __attribute__((unused)), void *msg __attribute__((unused)), void *msg_free_arg __attribute__((unused))){}
 
 TEST(plugin_manager_init, session_mq_topic_create_and_update) {
 	struct stellar st={0};
@@ -854,8 +861,8 @@ TEST(plugin_manager_init, session_mq_topic_create_and_update) {
 	plugin_manager_exit(plug_mgr);
 }
 
-void test_mock_on_session_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env){}
-void test_mock_overwrite_on_session_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env){}
+void test_mock_on_session_msg(struct session *sess __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *per_session_ctx __attribute__((unused)), void *plugin_env __attribute__((unused))){}
+void test_mock_overwrite_on_session_msg(struct session *sess __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg __attribute__((unused)), void *per_session_ctx __attribute__((unused)), void *plugin_env __attribute__((unused))){}
 
 
 TEST(plugin_manager_init, session_mq_subscribe_overwrite) {
@@ -982,6 +989,7 @@ struct test_basic_ctx
 
 static void *test_basic_session_ctx_new(struct session *sess, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	env->basic_ctx_new_called+=1;
 	struct test_basic_ctx *ctx=CALLOC(struct test_basic_ctx, 1);
@@ -990,6 +998,7 @@ static void *test_basic_session_ctx_new(struct session *sess, void *plugin_env)
 
 static void test_basic_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	env->basic_ctx_free_called+=1;
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)session_ctx;
@@ -1004,6 +1013,7 @@ static void test_basic_on_session_ingress(struct session *sess, int topic_id, co
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
 	EXPECT_TRUE(env!=NULL);
 	EXPECT_TRUE(ctx!=NULL);
+	EXPECT_EQ(topic_id, env->intrinsc_tcp_topic_id);
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
 	EXPECT_EQ(session_exdata_set(sess, 2, sess), -1);// illegal set
 	EXPECT_EQ(session_exdata_get(sess, 2), nullptr);// illegal get
@@ -1020,6 +1030,7 @@ static void test_basic_on_session_egress(struct session *sess, int topic_id, con
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
+	EXPECT_EQ(topic_id, env->intrinsc_egress_topic_id);
 	EXPECT_TRUE(env!=NULL);
 	EXPECT_TRUE(ctx!=NULL);
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
@@ -1112,12 +1123,15 @@ struct test_session_mq_ctx
 
 static void *test_mq_pub_session_ctx_new(struct session *sess, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
+	EXPECT_TRUE(plugin_env!=NULL);
 	struct test_basic_ctx *ctx=CALLOC(struct test_basic_ctx, 1);
 	return ctx;
 }
 
 static void test_mq_pub_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)session_ctx;
 	EXPECT_EQ(ctx->called, env->N_per_session_pkt_cnt);
@@ -1137,6 +1151,7 @@ static void test_mq_sub_session_ctx_free(struct session *sess, void *session_ctx
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)session_ctx;
+	EXPECT_TRUE(sess!=NULL);
 	EXPECT_EQ(ctx->called, env->N_per_session_pkt_cnt);
 	FREE(ctx);
 	return;
@@ -1146,6 +1161,7 @@ static void test_mq_pub_on_session(struct session *sess, int topic_id, const voi
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
+	EXPECT_EQ(topic_id, env->intrinsc_tcp_topic_id);
 	EXPECT_TRUE(env!=NULL);
 	EXPECT_TRUE(ctx!=NULL);
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
@@ -1167,6 +1183,7 @@ static void test_mq_on_sub_msg(struct session *sess, int topic_id, const void *m
 	EXPECT_TRUE(env!=NULL);
 	EXPECT_TRUE(ctx!=NULL);
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
+	EXPECT_EQ(topic_id, env->test_mq_topic_id);
 	EXPECT_EQ(*(int *)msg, env->test_mq_pub_called);
 	env->test_mq_sub_called+=1;
 	ctx->called+=1;
@@ -1256,6 +1273,8 @@ struct test_overlimit_session_mq_ctx
 
 static void *test_overlimit_pub_session_ctx_new(struct session *sess, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
+	EXPECT_TRUE(plugin_env!=NULL);
 	struct test_overlimit_session_mq_ctx *ctx=CALLOC(struct test_overlimit_session_mq_ctx, 1);
 	return ctx;
 }
@@ -1265,18 +1284,22 @@ static void test_overlimit_pub_session_ctx_free(struct session *sess, void *sess
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)session_ctx;
 	EXPECT_EQ(ctx->pkt_cnt, env->N_per_session_pkt_cnt);
+	EXPECT_TRUE(sess!=NULL);
 	FREE(ctx);
 	return;
 }
 
 static void *test_overlimit_sub_session_ctx_new(struct session *sess, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
+	EXPECT_TRUE(plugin_env!=NULL);
 	struct test_overlimit_session_mq_ctx *ctx=CALLOC(struct test_overlimit_session_mq_ctx, 1);
 	return ctx;
 }
 
 static void test_overlimit_sub_session_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)session_ctx;
 	EXPECT_EQ(ctx->sub_cnt, (env->N_per_session_pkt_cnt*(MAX_MSG_PER_DISPATCH-1))); //minus intrinsic msg
@@ -1288,6 +1311,7 @@ static void test_overlimit_pub_on_session(struct session *sess, int topic_id, co
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)per_session_ctx;
+	EXPECT_EQ(topic_id, env->intrinsc_tcp_topic_id);
 	EXPECT_TRUE(env!=NULL);
 	EXPECT_TRUE(ctx!=NULL);
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
@@ -1319,6 +1343,7 @@ static void test_overlimit_on_sub_msg(struct session *sess, int topic_id, const 
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	struct test_overlimit_session_mq_ctx *ctx=(struct test_overlimit_session_mq_ctx *)per_session_ctx;
+	EXPECT_EQ(topic_id, env->test_mq_topic_id);
 	EXPECT_TRUE(env!=NULL);
 	EXPECT_TRUE(ctx!=NULL);
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
@@ -1409,6 +1434,7 @@ static void test_dettach_msg_free(struct session *sess, void *msg, void *msg_fre
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)msg_free_arg;
 	EXPECT_EQ(sess->plug_mgr_rt->plug_mgr, env->plug_mgr);
+	EXPECT_EQ(msg, msg_free_arg);
 	env->test_mq_free_called+=1;
 	return;
 }
@@ -1441,8 +1467,9 @@ static void test_dettach_session_ctx_free(struct session *sess, void *session_ct
 	FREE(ctx);
 }
 
-static void test_dettach_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+static void test_dettach_on_session(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 
@@ -1516,6 +1543,8 @@ TEST(plugin_manager, session_plugin_on_ctx_new_then_dettach) {
 
 static void *test_invalid_pub_msg_session_ctx_new(struct session *sess, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
+	EXPECT_TRUE(plugin_env!=NULL);
 	struct test_basic_ctx *ctx=CALLOC(struct test_basic_ctx, 1);
 	return ctx;
 }
@@ -1532,8 +1561,11 @@ static void test_invalid_pub_msg_session_ctx_free(struct session *sess, void *se
 	FREE(ctx);
 }
 
-static void test_invalid_pub_msg_on_session(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+static void test_invalid_pub_msg_on_session(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
 {
+	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+	EXPECT_TRUE(sess!=NULL);
+	EXPECT_EQ(topic_id, env->intrinsc_tcp_topic_id);
 	struct test_basic_ctx *ctx=(struct test_basic_ctx *)per_session_ctx;
 	ctx->called+=1;
 }
@@ -1612,6 +1644,7 @@ struct test_session_closing_ctx
 
 static void *test_session_closing_ctx_new(struct session *sess, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
 	struct test_session_closing_ctx *ctx=CALLOC(struct test_session_closing_ctx, 1);
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	env->basic_ctx_new_called+=1;
@@ -1620,6 +1653,7 @@ static void *test_session_closing_ctx_new(struct session *sess, void *plugin_env
 
 static void test_session_closing_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
 {
+	EXPECT_TRUE(sess!=NULL);
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	env->basic_ctx_free_called+=1;
 	struct test_session_closing_ctx *ctx=(struct test_session_closing_ctx *)session_ctx;
@@ -1632,6 +1666,7 @@ static void test_session_closing_on_intrisic_msg(struct session *sess, int topic
 {
 	struct test_session_closing_ctx *ctx=(struct test_session_closing_ctx *)per_session_ctx;
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
+	EXPECT_EQ(topic_id, env->intrinsc_tcp_topic_id);
 	if(msg)ctx->pkt_called+=1;
 	if(session_get_current_state(sess)==SESSION_STATE_CLOSING)
 	{
@@ -1648,6 +1683,7 @@ static void test_session_closing_on_userdefine_msg(struct session *sess, int top
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;
 	ctx->userdefine_on_msg_called+=1;
 	EXPECT_EQ(msg, plugin_env);
+	EXPECT_EQ(topic_id, env->test_mq_topic_id);
 	EXPECT_EQ(session_get_current_state(sess),SESSION_STATE_CLOSING);
 	env->test_mq_sub_called+=1;
 }
@@ -1729,19 +1765,19 @@ struct test_session_called_ctx
 	int called;
 };
 
-static void *test_session_called_ctx_new(struct session *sess, void *plugin_env)
+static void *test_session_called_ctx_new(struct session *sess __attribute__((unused)), void *plugin_env __attribute__((unused)))
 {
 	struct test_session_called_ctx *ctx=CALLOC(struct test_session_called_ctx, 1);
 	return ctx;
 }
 
-static void test_session_called_ctx_free(struct session *sess, void *session_ctx, void *plugin_env)
+static void test_session_called_ctx_free(struct session *sess __attribute__((unused)) , void *session_ctx, void *plugin_env __attribute__((unused)))
 {
 	FREE(session_ctx);
 }
 
 //test session topic is active
-static void test_session_mq_topic_is_active_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+static void test_session_mq_topic_is_active_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -1755,7 +1791,7 @@ static void test_session_mq_topic_is_active_plugin_1_on_msg(struct session *sess
 	return;
 }
 
-static void test_session_mq_topic_is_active_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+static void test_session_mq_topic_is_active_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -1848,7 +1884,7 @@ TEST(plugin_manager, test_session_mq_topic_is_active) {
 }
 
 //test dettach session
-static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -1861,7 +1897,7 @@ static void test_session_dettach_plugin_1_on_msg(struct session *sess, int topic
 	return;
 }
 
-static void test_session_dettach_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg, void *per_session_ctx, void *plugin_env)
+static void test_session_dettach_plugin_2_on_msg(struct session *sess, int topic_id, const void *msg __attribute__((unused)), void *per_session_ctx, void *plugin_env)
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;	
 	struct test_session_called_ctx *ctx=(struct test_session_called_ctx *)per_session_ctx;
@@ -2097,6 +2133,7 @@ void test_session_exdata_free_pub_msg_exdata_free(struct session *sess, int idx,
 {
 	EXPECT_EQ(ex_ptr, arg);
 	struct session_plugin_env *env = (struct session_plugin_env *)ex_ptr;	
+	EXPECT_EQ(idx, env->basic_exdata_idx);
 	EXPECT_EQ(session_mq_publish_message(sess, env->intrinsc_tcp_topic_id, env), -1);	
 	env->basic_exdata_free_called+=1;
 }
@@ -2105,6 +2142,8 @@ static void test_session_exdata_free_pub_msg_on_session(struct session *sess, in
 {
 	struct session_plugin_env *env = (struct session_plugin_env *)plugin_env;		
 	EXPECT_EQ(session_exdata_set(sess, env->basic_exdata_idx, (void *)plugin_env), 0);
+	EXPECT_EQ(env->intrinsc_tcp_topic_id, topic_id);
+	EXPECT_EQ(per_session_ctx, nullptr);
 	if(msg)env->plugin_id_1_called+=1;
 }
 
@@ -2177,7 +2216,7 @@ TEST(plugin_manager, session_exdata_free_pub_msg) {
  * TEST PLUGIN MANAGER ON POLLING PLUGIN INIT *
  **********************************************/
 
-int test_plugin_on_polling_func(void *plugin_env)
+int test_plugin_on_polling_func(void *plugin_env __attribute__((unused)))
 {
 	return 1;
 }

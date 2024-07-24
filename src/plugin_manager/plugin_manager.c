@@ -383,7 +383,7 @@ int stellar_mq_update_topic(int topic_id, void *msg_free_cb, void *msg_free_arg,
 	return 0;
 }
 
-int stellar_mq_create_topic(struct stellar *st, const char *topic_name, void *msg_free_cb, void *msg_free_arg, UT_array **mq_schema_array)
+static int stellar_mq_create_topic(const char *topic_name, void *msg_free_cb, void *msg_free_arg, UT_array **mq_schema_array)
 {
 	if(*mq_schema_array == NULL)
 	{
@@ -623,7 +623,7 @@ int stellar_packet_mq_create_topic(struct stellar *st, const char *topic_name, p
 {
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	assert(plug_mgr);
-	int topic_id=stellar_mq_create_topic(st, topic_name, (void *)msg_free_cb, msg_free_arg, &plug_mgr->stellar_mq_schema_array);
+	int topic_id=stellar_mq_create_topic(topic_name, (void *)msg_free_cb, msg_free_arg, &plug_mgr->stellar_mq_schema_array);
 	if(topic_id>=0)plug_mgr->packet_mq_topic_num+=1;
 	return topic_id;
 }
@@ -707,7 +707,7 @@ int stellar_session_mq_create_topic(struct stellar *st, const char *topic_name, 
 {
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 	assert(plug_mgr);
-	int topic_id=stellar_mq_create_topic(st, topic_name, (void *)msg_free_cb, msg_free_arg, &plug_mgr->stellar_mq_schema_array);
+	int topic_id=stellar_mq_create_topic(topic_name, (void *)msg_free_cb, msg_free_arg, &plug_mgr->stellar_mq_schema_array);
 	if(topic_id>=0)plug_mgr->session_mq_topic_num+=1;
 	return topic_id;	
 }

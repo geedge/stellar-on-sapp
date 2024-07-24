@@ -158,11 +158,14 @@ void simple_plugin_on_packet(struct packet *pkt,  unsigned char ip_protocol, voi
 	return;
 }
 
-void simple_plugin_packet_get_exdata(struct packet *pkt,  unsigned char ip_protocol, void *plugin_env)
+void simple_plugin_packet_get_exdata(struct packet *pkt,  unsigned char ip_protocol __attribute__((unused)), void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;
 	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)packet_exdata_get(pkt, env->packet_exdata_idx);
-	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);
+	if(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) != 0)
+	{
+		abort();
+	}
 	return;
 }
 
@@ -174,28 +177,38 @@ int simple_plugin_on_polling(void *plugin_env)
 	return 0;
 }
 
-static void simple_plugin_packet_exdata_free(struct packet *pkt, int idx, void *ex_ptr, void *arg)
+static void simple_plugin_packet_exdata_free(struct packet *pkt __attribute__((unused)), int idx __attribute__((unused)), void *ex_ptr, void *arg)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)arg;	
 	assert(env);
 	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)ex_ptr;		
-	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);
+	if(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) != 0)
+	{
+		abort();
+	}
 }
 
-static void simple_plugin_packet_msg_free(struct packet *pkt, void *msg, void *msg_free_arg)
+static void simple_plugin_packet_msg_free(struct packet *pkt __attribute__((unused)), void *msg, void *msg_free_arg)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)msg_free_arg;	
 	assert(env);
 	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)msg;		
-	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);	
+	if(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) != 0)
+	{
+		abort();
+	}
+		
 }
 
-static void simple_plugin_on_packet_msg_cb(struct packet *pkt, int topic_id, const void *msg, void *plugin_env)
+static void simple_plugin_on_packet_msg_cb(struct packet *pkt __attribute__((unused)), int topic_id __attribute__((unused)), const void *msg, void *plugin_env)
 {
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;	
 	assert(env);
 	struct simple_stellar_plugin_env *exdata = (struct simple_stellar_plugin_env *)msg;		
-	assert(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) == 0);
+	if(memcmp(env, exdata, sizeof(struct simple_stellar_plugin_env)) != 0)
+	{
+		abort();
+	}
 }
 
 void *simple_session_packet_plugin_init(struct stellar *st)
@@ -286,7 +299,7 @@ void simple_session_packet_plugin_exit(void *plugin_env)
  * simple plugin sub session stat  *
  *******************************/
 
-static void simple_plugin_sub_session_stat_on_msg(struct session *sess, int topic_id, const void *data, void *plugin_ctx, void *plugin_env)
+static void simple_plugin_sub_session_stat_on_msg(struct session *sess, int topic_id, const void *data, void *plugin_ctx __attribute__((unused)), void *plugin_env)
 {
 
 	struct simple_stellar_plugin_env *env = (struct simple_stellar_plugin_env *)plugin_env;

@@ -224,12 +224,12 @@ inline int polling_on_sapp(struct stellar *st)
  * STELLAR INFO INTERFACE WRAPPER ON SAPP
  *********************************************/
 
-int stellar_get_worker_thread_num(struct stellar *st)
+int stellar_get_worker_thread_num(struct stellar *st __attribute__((unused)))
 {
 	return get_thread_count();
 }
 
-int stellar_get_current_thread_id(struct stellar *st)
+int stellar_get_current_thread_id(struct stellar *st __attribute__((unused)))
 {
 	return get_current_worker_thread_id();
 }

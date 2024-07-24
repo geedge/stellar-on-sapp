@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_C_STANDARD 11)
 
 #set warning as error
-add_compile_options(-Wall -Wextra -Werror -Wno-error=unused-variable -Wno-error=unused-parameter)
+add_compile_options(-Wall -Wextra -Werror)
 
 
 if(NOT CMAKE_BUILD_TYPE)
