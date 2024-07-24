@@ -335,6 +335,12 @@ int packet_get_current_thread_id(struct packet *pkt)
 	return thread_id;
 }
 
+inline struct session *packet_get_session(const struct packet *pkt)
+{
+	if(pkt == NULL)return NULL;
+	return pkt->sess;
+}
+
 /*********************************************
  * SESSION INFO INTERFACE WRAPPER ON SAPP*
  *********************************************/
