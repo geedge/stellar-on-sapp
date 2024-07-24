@@ -326,6 +326,15 @@ const char *packet_get0_readable_addr(struct packet *pkt)
 	return printaddr(&pstream->addr, pstream->threadnum);
 }
 
+int packet_get_current_thread_id(struct packet *pkt)
+{
+	int thread_id = -1;
+	struct streaminfo *pstream=pkt->pstream;
+	assert(pstream);
+	thread_id = pstream->threadnum;
+	return thread_id;
+}
+
 /*********************************************
  * SESSION INFO INTERFACE WRAPPER ON SAPP*
  *********************************************/

@@ -128,3 +128,4 @@ unsigned char packet_get_ip_protocol(struct packet *pkt);
 
 void packet_drop(const struct packet *pkt);
 const char *packet_get0_readable_addr(struct packet *pkt);
+int packet_get_current_thread_id(struct packet *pkt);
