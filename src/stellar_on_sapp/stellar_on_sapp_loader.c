@@ -2,6 +2,7 @@
 
 #include "stellar/stellar.h"
 #include "stellar/session_exdata.h"
+#include "stellar/packet_exdata.h"
 #include "stellar_on_sapp.h"
 #include <MESA/stream.h>
 
@@ -18,7 +19,8 @@ enum entry_type
 
 struct stellar *g_stellar=NULL;
 int g_session_bridge_id=-1;
-int g_streaminfo_exdata_id=-1;
+int g_session_streaminfo_exdata_id=-1;
+int g_packet_streaminfo_exdata_id=-1;
 
 
 static int stream_is_inner_most(struct streaminfo *a_stream)
@@ -47,8 +49,10 @@ int STELLAR_START_LOADER_INIT()
 	g_session_bridge_id=stream_bridge_build(STELLAR_BRIDEGE_NAME, "w");
 	if(g_session_bridge_id < 0)return -1;
 	stream_bridge_register_data_free_cb(g_session_bridge_id, stellar_on_sapp_bridge_free);
-	g_streaminfo_exdata_id=stellar_session_exdata_new_index(g_stellar, STELLAR_EXDATA_NAME, NULL, NULL); 
-	if(g_streaminfo_exdata_id < 0)return -1;
+	g_session_streaminfo_exdata_id=stellar_session_exdata_new_index(g_stellar, STELLAR_EXDATA_NAME, NULL, NULL); 
+	if(g_session_streaminfo_exdata_id < 0)return -1;
+	g_packet_streaminfo_exdata_id=stellar_packet_exdata_new_index(g_stellar, STELLAR_EXDATA_NAME, NULL, NULL); 
+	if(g_session_streaminfo_exdata_id < 0)return -1;
 	return 0;
 }
 
@@ -126,7 +130,7 @@ static unsigned char loader_transfer_stream_entry(struct streaminfo *pstream, UC
 		if(!sess)
 		{
             sess = session_new_on_sapp(g_stellar, pstream);
-            session_exdata_set(sess, g_streaminfo_exdata_id, pstream);
+            session_exdata_set(sess, g_session_streaminfo_exdata_id, pstream);
             stream_bridge_async_data_put(pstream, g_session_bridge_id, sess);
 		}
         entry_ret = session_state_update_on_sapp(pstream, state, sess, raw_pkt, pkt_type);
@@ -174,13 +178,23 @@ unsigned char stellar_on_sapp_tcp_entry(struct streaminfo *pstream,void **pme, i
 
 char stellar_on_sapp_ip4_entry( struct streaminfo *pstream,unsigned char routedir ,int thread_seq , void *a_packet)
 {
-	if(stream_is_inner_most(pstream)==1)packet_update_on_sapp(g_stellar, pstream, a_packet, IPv4);
+	if(stream_is_inner_most(pstream)==1)
+	{
+		struct packet *pkt=stellar_get0_current_thread_packet(g_stellar);
+		packet_exdata_set(pkt, g_packet_streaminfo_exdata_id, pstream);
+		packet_update_on_sapp(g_stellar, pstream, pkt,a_packet, IPv4);
+	}
 	return APP_STATE_GIVEME;
 }
 
 char stellar_on_sapp_ip6_entry( struct streaminfo *pstream,unsigned char routedir ,int thread_seq , void *a_packet)
 {
-	if(stream_is_inner_most(pstream)==1)packet_update_on_sapp(g_stellar, pstream, a_packet, IPv6);
+	if(stream_is_inner_most(pstream)==1)
+	{
+		struct packet *pkt=stellar_get0_current_thread_packet(g_stellar);
+		packet_exdata_set(pkt, g_packet_streaminfo_exdata_id, pstream);
+		packet_update_on_sapp(g_stellar, pstream, pkt, a_packet, IPv6);
+	}
 	return APP_STATE_GIVEME;
 }
 

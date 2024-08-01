@@ -15,7 +15,8 @@ unsigned char session_state_update_on_sapp(struct streaminfo *stream, unsigned c
 
 void session_defer_on_sapp(struct session *sess);
 
-void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, void *a_packet, enum packet_type type);
+struct packet *stellar_get0_current_thread_packet(struct stellar *st);
+void packet_update_on_sapp(struct stellar *st, struct streaminfo *pstream, struct packet *pkt, void *iphdr, enum packet_type type);
 
 //return polling work state, 0: idle, 1: working
 int polling_on_sapp(struct stellar *st);
