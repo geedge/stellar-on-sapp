@@ -100,6 +100,8 @@ add_subdirectory(examples/stellar_plugin)
 enable_testing()
 add_subdirectory(test)
 
+install(FILES include/stellar/packet_exdata.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
+install(FILES include/stellar/packet_mq.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
 install(FILES include/stellar/session_exdata.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
 install(FILES include/stellar/session_mq.h DESTINATION  ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
 install(FILES include/stellar/session.h DESTINATION ${CMAKE_INSTALL_PREFIX}/framework/include/stellar COMPONENT Headers)
