@@ -324,6 +324,14 @@ int packet_get_route_direction(const struct packet *pkt)
 	return PACKET_DIRECTION_UNKNOWN;
 }
 
+int packet_get_linkid(const struct packet *pkt)
+{
+	if(pkt == NULL || pkt->raw_pkt==NULL)return -1;
+	int link_id = -1;
+	get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_LINK_ID, &link_id);
+	return link_id;
+}
+
 void packet_drop(const struct packet *pkt)
 {
 	if(pkt == NULL || pkt->pstream==NULL)return;

@@ -121,6 +121,7 @@ int packet_get_direction(const struct packet *pkt);
 #define PACKET_DIRECTION_INCOMING 0
 #define PACKET_DIRECTION_OUTGOING 1
 int packet_get_route_direction(const struct packet *pkt);
+int packet_get_linkid(const struct packet *pkt);
 
 const char *packet_get0_data(const struct packet *pkt, size_t *data_len);
 int packet_arrive_time(const struct packet *pkt, struct timeval *ts);
