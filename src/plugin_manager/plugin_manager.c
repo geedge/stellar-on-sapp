@@ -586,8 +586,14 @@ static void stellar_mq_dispatch(struct stellar_message *priority_mq[], struct st
 		}
         DL_FOREACH_SAFE(priority_mq[cur_priority], mq_elt, mq_tmp)
         {
-			if(mq_elt->header.type==ON_SESSION_TOPIC)stellar_mq_dispatch_one_session_message(sess, mq_elt);
-			if(mq_elt->header.type==ON_PACKET_TOPIC)stellar_mq_dispatch_one_packet_message(pkt, mq_elt);
+			if(mq_elt->header.type==ON_SESSION_TOPIC && sess)
+			{
+				stellar_mq_dispatch_one_session_message(sess, mq_elt);
+			}
+			if(mq_elt->header.type==ON_PACKET_TOPIC && pkt)
+			{
+				stellar_mq_dispatch_one_packet_message(pkt, mq_elt);
+			}
 			DL_DELETE(priority_mq[mq_elt->header.priority], mq_elt);
     		DL_APPEND(*dealth_letter_queue, mq_elt); // move to dlq list
 
