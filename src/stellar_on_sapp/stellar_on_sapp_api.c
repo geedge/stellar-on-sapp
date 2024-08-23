@@ -312,12 +312,12 @@ int packet_get_route_direction(const struct packet *pkt)
 	if(pkt == NULL || pkt->raw_pkt==NULL)return PACKET_DIRECTION_UNKNOWN;
 	int dir=PACKET_DIRECTION_UNKNOWN;
 	get_opt_from_rawpkt(pkt->raw_pkt, RAW_PKT_GET_ROUTE_DIR, &dir);
-	MESA_dir_link_to_human(dir);
-	if (dir == (int)'I')
+	dir=MESA_dir_link_to_human(dir);
+	if (dir == (int)'I' || dir == (int)'i')
     {
         return PACKET_DIRECTION_INCOMING;
     }
-    if (dir == (int)'E')
+    if (dir == (int)'E' || dir == (int)'e')
     {
         return PACKET_DIRECTION_OUTGOING;
     }
