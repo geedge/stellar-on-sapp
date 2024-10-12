@@ -809,7 +809,7 @@ inline int session_mq_unignore_message(struct session *sess, int topic_id, int p
 
 int stellar_session_mq_subscribe(struct stellar *st, int topic_id, on_session_msg_cb_func *plugin_on_msg_cb, int plugin_id)
 {
-	if(plugin_id >= PACKET_PULGIN_ID_BASE || plugin_on_msg_cb == NULL)return -1;// ignore packet plugin
+	if(plugin_id >= PACKET_PULGIN_ID_BASE)return -1;// ignore packet plugin
 	struct plugin_manager_schema *plug_mgr = stellar_plugin_manager_schema_get(st);
 
 	if(plug_mgr == NULL || plug_mgr->registered_session_plugin_array == NULL)return -1;
