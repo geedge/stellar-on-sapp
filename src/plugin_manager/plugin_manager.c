@@ -264,6 +264,7 @@ static void per_thread_packet_exdata_arrary_clean(struct plugin_manager_schema *
 {
 	if(plug_mgr==NULL || plug_mgr->packet_exdata_schema_array == NULL)return;
 	unsigned int len=utarray_len(plug_mgr->packet_exdata_schema_array);
+	if(len==0)return;
 	struct stellar_exdata *per_thread_pkt_exdata_arrary = per_thread_packet_exdata_arrary_get(plug_mgr);
 	if(per_thread_pkt_exdata_arrary == NULL)return;
 	for (unsigned int i = 0; i < len; i++)
@@ -439,7 +440,7 @@ static int stellar_mq_publish_message(enum stellar_topic_type type, int topic_id
 	msg->header.type=type;
 	msg->header.priority = priority;
 	msg->body = data;
-	DL_APPEND(priority_mq[priority], msg);
+	DL_APPEND(priority_mq[SESSION_MQ_PRIORITY_LOW], msg);
 	return 0;
 }
 
@@ -576,32 +577,25 @@ static void stellar_mq_dispatch_one_packet_message(struct packet *pkt, struct st
 static void stellar_mq_dispatch(struct stellar_message *priority_mq[], struct stellar_message ** dealth_letter_queue, struct session *sess, struct packet *pkt)
 {
 	struct stellar_message *mq_elt=NULL, *mq_tmp=NULL;
-	int cur_priority = SESSION_MQ_PRIORITY_HIGH;
-	while(cur_priority >= SESSION_MQ_PRIORITY_LOW)
-	{
-		if(priority_mq[cur_priority]==NULL)
-		{
-			cur_priority--;
-			continue;
-		}
-        DL_FOREACH_SAFE(priority_mq[cur_priority], mq_elt, mq_tmp)
-        {
-			if(mq_elt->header.type==ON_SESSION_TOPIC && sess)
-			{
-				stellar_mq_dispatch_one_session_message(sess, mq_elt);
-			}
-			if(mq_elt->header.type==ON_PACKET_TOPIC && pkt)
-			{
-				stellar_mq_dispatch_one_packet_message(pkt, mq_elt);
-			}
-			DL_DELETE(priority_mq[mq_elt->header.priority], mq_elt);
-    		DL_APPEND(*dealth_letter_queue, mq_elt); // move to dlq list
 
-			cur_priority=SESSION_MQ_PRIORITY_HIGH;
-			break;
-        }		
-	}
-	return;
+    while (priority_mq[0])
+    {
+        DL_FOREACH_SAFE(priority_mq[0], mq_elt, mq_tmp)
+        {
+            if (mq_elt->header.type == ON_SESSION_TOPIC && sess)
+            {
+                stellar_mq_dispatch_one_session_message(sess, mq_elt);
+            }
+            if (mq_elt->header.type == ON_PACKET_TOPIC && pkt)
+            {
+                stellar_mq_dispatch_one_packet_message(pkt, mq_elt);
+            }
+            DL_DELETE(priority_mq[0], mq_elt);
+            DL_APPEND(*dealth_letter_queue, mq_elt); // move to dlq list
+            break;
+        }
+    }
+    return;
 }
 
 static void stellar_mq_free(struct session *sess, struct packet *pkt, struct stellar_message **head, UT_array *mq_schema_array)

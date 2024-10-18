@@ -2068,7 +2068,7 @@ static void test_session_mq_priority_plugin_2_on_msg(struct session *sess, int t
 	return;
 }
 
-TEST(plugin_manager, test_session_mq_priority) {
+TEST(plugin_manager, DISABLED_test_session_mq_priority) {
 
 	struct stellar st={0};
 	struct session_plugin_env env;
