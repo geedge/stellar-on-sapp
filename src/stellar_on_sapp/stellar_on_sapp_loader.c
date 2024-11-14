@@ -6,6 +6,8 @@
 #include "stellar_on_sapp.h"
 #include <MESA/stream.h>
 
+#include <stddef.h>
+
 #define STELLAR_PLUGIN_PATH "./stellar_plugin/spec.toml"
 #define STELLAR_BRIDEGE_NAME "STELLAR_SESSION"
 #define STELLAR_EXDATA_NAME "SAPP_STREAMINFO"

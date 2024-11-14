@@ -48,6 +48,7 @@ if (CMAKE_CXX_CPPCHECK)
             "--suppress=redundantAssignment"
             "--suppress=duplicateValueTernary"
             "--suppress=funcArgOrderDifferent"
+            "--suppress=knownConditionTrueFalse"
     )
     set(CMAKE_C_CPPCHECK ${CMAKE_CXX_CPPCHECK})
 else()

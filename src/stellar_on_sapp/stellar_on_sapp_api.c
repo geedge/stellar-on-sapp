@@ -10,10 +10,13 @@
 
 #include "plugin_manager/plugin_manager.h"
 
-
 #include <MESA/stream.h>
-
+#include <string.h>
 #include <assert.h>
+
+
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 
 struct stellar
 {

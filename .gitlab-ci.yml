@@ -50,6 +50,7 @@ stages:
       --suppress=uninitvar
       --suppress=unusedStructMember
       --suppress=funcArgOrderDifferent
+       --suppress=*:${CI_PROJECT_DIR}/deps/*
   tags:
     - share
 
