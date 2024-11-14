@@ -1,12 +1,12 @@
 variables:
   GIT_STRATEGY: "clone"
   BUILD_PADDING_PREFIX: /tmp/padding_for_CPACK_RPM_BUILD_SOURCE_DIRS_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX_PREFIX/
-  BUILD_IMAGE_CENTOS8: "git.mesalab.cn:7443/mesa_platform/build-env:rocky8-for-sapp"
-  INSTALL_DEPENDENCY_LIBRARY: sapp sapp-devel framework_env libMESA_prof_load-devel
-                              libMESA_htable-devel libMESA_jump_layer
-                              libMESA_handle_logger-devel libMESA_field_stat2-devel
-                              libfieldstat3-devel libfieldstat4-devel libbreakpad_mini-devel
-                              libcjson-devel zlib-devel brotli-devel
+  BUILD_IMAGE_X86_64_ROCKY8: "git.mesalab.cn:7443/mesa_platform/build-env:rocky8-for-sapp"
+  BUILD_IMAGE_AARCH64_ROCKY9: "git.mesalab.cn:7443/mesa_platform/build-env:rocky9-aarch64"
+  INSTALL_DEPENDENCY_LIBRARY: sapp sapp-devel framework_env libbreakpad_mini-devel 
+                              libMESA_handle_logger-devel  libMESA_prof_load-devel libMESA_htable-devel 
+                              libMESA_field_stat2-devel libfieldstat3-devel libfieldstat4-devel 
+                              libcjson-devel zlib-devel 
   SYMBOL_TARGET: stellar-on-sapp
   INSTALL_PREFIX: "/opt/tsg/"
 
@@ -50,14 +50,20 @@ stages:
       --suppress=uninitvar
       --suppress=unusedStructMember
       --suppress=funcArgOrderDifferent
-       --suppress=*:${CI_PROJECT_DIR}/deps/*
-  tags:
-    - share
+      --suppress=knownConditionTrueFalse
 
-run_cppcheck_for_centos8:
+
+run_cppcheck_for_x86_64_rocky8:
   extends: .cppcheck_script
-  image: $BUILD_IMAGE_CENTOS8
+  image: $BUILD_IMAGE_X86_64_ROCKY8
+  tags:
+    - tsg-os-builder-el8
 
+run_cppcheck_for_aarch64_rocky9:
+  extends: .cppcheck_script
+  image: $BUILD_IMAGE_AARCH64_ROCKY9
+  tags:
+    - tsg-os-builder-aarch64
 ###############################################################################
 # build 
 ###############################################################################
@@ -69,16 +75,17 @@ run_cppcheck_for_centos8:
   variables:    
     BUILD_TEST: "ON"
     BUILD_TYPE: Debug
-  tags:
-    - share
 
-.build_by_travis_for_centos8:
+
+.build_by_travis_for_x86_64_rocky8:
   stage: build
-  image: $BUILD_IMAGE_CENTOS8
+  image: $BUILD_IMAGE_X86_64_ROCKY8
   extends: .build_before_script
+  tags:
+    - tsg-os-builder-el8
 
-develop_build_for_centos8:
-  extends: .build_by_travis_for_centos8
+develop_build_for_x86_64_rocky8:
+  extends: .build_by_travis_for_x86_64_rocky8
   variables:
     BUILD_TYPE: RelWithDebInfo
   artifacts:
@@ -88,8 +95,8 @@ develop_build_for_centos8:
   except:
     - tags
 
-release_build_debug_for_centos8:
-  extends: .build_by_travis_for_centos8
+release_build_debug_for_x86_64_rocky8:
+  extends: .build_by_travis_for_x86_64_rocky8
   variables:
     BUILD_TYPE: Debug
     PACKAGE: 1
@@ -101,8 +108,51 @@ release_build_debug_for_centos8:
   only:
     - tags
 
-release_build_for_centos8:
-  extends: .build_by_travis_for_centos8
+release_build_for_x86_64_rocky8:
+  extends: .build_by_travis_for_x86_64_rocky8
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+    PACKAGE: 1
+  artifacts:
+    name: "$SYMBOL_TARGET-$CI_COMMIT_REF_NAME-release"
+    paths:
+      - build/*
+  only:
+    - tags   
+
+.build_by_travis_for_aarch64_rocky9:
+  stage: build
+  image: $BUILD_IMAGE_AARCH64_ROCKY9
+  extends: .build_before_script
+  tags:
+    - tsg-os-builder-aarch64  
+
+develop_build_for_aarch64_rocky9:
+  extends: .build_by_travis_for_aarch64_rocky9
+  variables:
+    BUILD_TYPE: RelWithDebInfo
+  artifacts:
+    name: "$SYMBOL_TARGET-$CI_COMMIT_REF_NAME-debug"
+    paths:
+      - build/*
+  except:
+    - tags
+
+release_build_debug_for_aarch64_rocky9:
+  extends: .build_by_travis_for_aarch64_rocky9
+  variables:
+    BUILD_TYPE: Debug
+    PACKAGE: 1
+    ASAN_OPTION: "ADDRESS"
+  artifacts:
+    name: "$SYMBOL_TARGET-$CI_COMMIT_REF_NAME-release"
+    paths:
+      - build/*
+  only:
+    - tags
+
+release_build_for_aarch64_rocky9:
+  extends: .build_by_travis_for_aarch64_rocky9
   variables:
     BUILD_TYPE: RelWithDebInfo
     PACKAGE: 1
@@ -116,41 +166,66 @@ release_build_for_centos8:
 ###############################################################################
 # test 
 ###############################################################################
-test_in_centos8:
+.define_before_test:
   stage: test
-  image: $BUILD_IMAGE_CENTOS8
   allow_failure: false
   script:
     - *everything_before_script
     - ls -l /opt/MESA/lib && echo "/opt/MESA/lib" >> /etc/ld.so.conf
     - cd build; ctest -V
-  dependencies:
-    - develop_build_for_centos8
-    - release_build_for_centos8
-  tags:
-    - share    
 
+test_in_x86_64_rocky8:
+  extends: .define_before_test
+  image: $BUILD_IMAGE_X86_64_ROCKY8
+  dependencies:
+    - develop_build_for_x86_64_rocky8
+    - release_build_for_x86_64_rocky8
+  tags:
+    - tsg-os-builder-el8    
+
+test_in_aarch64_rocky9:
+  extends: .define_before_test
+  image: $BUILD_IMAGE_AARCH64_ROCKY9
+  dependencies:
+    - develop_build_for_aarch64_rocky9
+    - release_build_for_aarch64_rocky9
+  tags:
+    - tsg-os-builder-aarch64
 ###############################################################################
 # upload 
 ###############################################################################
-.define_before_upload_centos8:
+.define_before_upload:
   stage: upload
-  image: $BUILD_IMAGE_CENTOS8
   before_script:
     - pwd; ls -l ; cd build ; ls -l
     - cp /root/rpm_upload_tools.py ./  
-  variables:
-    PULP3_REPO_NAME: stellar-stable-x86_64.el8
-    PULP3_DIST_NAME: stellar-stable-x86_64.el8
   only:
     - tags
-  tags:
-    - share 
 
-rpm_upload_for_centos8:
-  extends: .define_before_upload_centos8
+rpm_upload_for_x86_64_rocky8:
+  extends: .define_before_upload
+  image: $BUILD_IMAGE_X86_64_ROCKY8  
+  variables:
+    PULP3_REPO_NAME: stellar-stable-x86_64.el8
+    PULP3_DIST_NAME: stellar-stable-x86_64.el8  
   dependencies:
-    - release_build_debug_for_centos8
-    - release_build_for_centos8
+    - release_build_debug_for_x86_64_rocky8
+    - release_build_for_x86_64_rocky8
   script:
     - python3 rpm_upload_tools.py $PULP3_REPO_NAME $PULP3_DIST_NAME *.rpm    
+  tags:
+    - tsg-os-builder-el8 
+
+rpm_upload_for_aarch64_rocky9:
+  extends: .define_before_upload
+  image: $BUILD_IMAGE_AARCH64_ROCKY9  
+  variables:
+    PULP3_REPO_NAME: stellar-stable-aarch64.el9
+    PULP3_DIST_NAME: stellar-stable-aarch64.el9
+  dependencies:
+    - release_build_debug_for_aarch64_rocky9
+    - release_build_for_aarch64_rocky9
+  script:
+    - python3 rpm_upload_tools.py $PULP3_REPO_NAME $PULP3_DIST_NAME *.rpm    
+  tags:
+    - tsg-os-builder-aarch64
